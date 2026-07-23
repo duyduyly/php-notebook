@@ -23,8 +23,9 @@ This document explains what Joomla extensions are, the eight extension types ava
 8. [Recommended Report Structure](#recommended-report-structure)
 9. [Extension Audit Checklist](#extension-audit-checklist)
 10. [Quick Reference](#quick-reference)
-11. [Conclusion](#conclusion)
-12. [References](#references)
+11. [How Many Extension Categories Are There?](#how-many-extension-categories)
+12. [Conclusion](#conclusion)
+13. [References](#references)
 
 ---
 
@@ -403,8 +404,151 @@ Screen = Which management operation is being performed?
 
 [Back to Table of Contents](#table-of-contents)
 
+<a id="how-many-extension-categories"></a>
+## 11. How Many Extension Categories Are There?
+
+The answer depends on the classification dimension being discussed. There is not one single list that should be used for every purpose.
+
+### Classification by technical type: eight types
+
+Joomla 3 registers these eight extension types:
+
+```text
+Component | Module | Plugin | Template
+Language | Library | Package | File
+```
+
+This dimension answers:
+
+> What technical role does the extension perform?
+
+### Classification by origin: four audit values
+
+For a complete project audit, use four origin values:
+
+| Origin | Meaning | Required audit action |
+|---|---|---|
+| `Core` | Included in the official Joomla distribution | Compare with a clean Joomla package and check for Core modifications |
+| `Third-party` | Supplied by an external vendor or community developer | Verify vendor support, license, update path, and Joomla 6 compatibility |
+| `Custom` | Built specifically for the website or organization | Review source code, dependencies, ownership, and rewrite effort |
+| `Unknown` | Available evidence is not sufficient | Investigate; do not guess or silently classify it as Custom |
+
+This dimension answers:
+
+> Who created, supplies, and maintains the extension?
+
+If the discussion excludes Joomla Core extensions, most identified extensions fall into two main origins:
+
+```text
+Non-Core extension
+├── Third-party / Vendor
+└── Custom
+```
+
+However, an audit must retain `Unknown` until evidence confirms one of those origins. Therefore, saying “the project has only two extension types” is inaccurate. A safer statement is:
+
+> Identified non-Core extensions are usually either Third-party/Vendor or Custom; unverified extensions remain Unknown.
+
+### A custom module is not a separate top-level origin
+
+`Module` is a technical type. `Custom` is an origin. Their combination is called a **Custom module**.
+
+```text
+Extension
+├── Type
+│   ├── Component
+│   ├── Module
+│   ├── Plugin
+│   ├── Template
+│   ├── Language
+│   ├── Library
+│   ├── Package
+│   └── File
+└── Origin
+    ├── Core
+    ├── Third-party
+    ├── Custom
+    └── Unknown
+```
+
+Examples:
+
+| Technical name | Type | Origin | Correct name |
+|---|---|---|---|
+| `com_content` | Component | Core | Core component |
+| `com_akeeba` | Component | Third-party | Third-party component |
+| `com_vehicle` | Component | Custom | Custom component |
+| `mod_menu` | Module | Core | Core module |
+| `mod_vendor_slider` | Module | Third-party | Third-party module |
+| `mod_vehicle_search` | Module | Custom | Custom module |
+| `plg_system_abc` | Plugin | Unknown | Unknown plugin requiring verification |
+
+### Status is a third dimension, not an extension type
+
+The following terms describe condition or audit status. They are not additional origins or technical types:
+
+| Status | Meaning |
+|---|---|
+| `Core modified` | A Core extension whose source differs from the clean Joomla package |
+| `Abandoned` | The vendor or maintainer no longer supports the extension |
+| `Orphan` | Files or database records remain although the extension is no longer properly used |
+| `Missing source` | The database contains an extension record, but its source files are missing |
+| `Unregistered` | Source files exist, but the extension is not correctly registered in Joomla |
+| `Disabled` | The extension is installed but not enabled |
+
+For example, `com_content` can be recorded as:
+
+```text
+Type: Component
+Origin: Core
+Status: Core modified
+```
+
+Do not change its origin to Custom merely because developers modified its source.
+
+### Practical classification rule
+
+```text
+Is it included in a clean package of the exact Joomla version?
+├── Yes
+│   ├── Source matches the clean package → Core
+│   └── Source differs → Core + Status: Core modified
+└── No
+    ├── Vendor, package, license, or official update server exists → Third-party
+    ├── Project team or contractor built it specifically for the site → Custom
+    └── Evidence is insufficient → Unknown
+```
+
+Use at least these columns in the extension inventory:
+
+| Extension | Type | Origin | Status | Evidence | Upgrade action |
+|---|---|---|---|---|---|
+| `mod_vehicle_search` | Module | Custom | Active | Internal Git history and manifest author | Rewrite and test |
+| `com_akeeba` | Component | Third-party | Active | Vendor manifest and update server | Find supported Joomla 6 release |
+| `com_content` | Component | Core | Core modified | Diff against clean Joomla package | Remove or port modification |
+| `plg_system_abc` | Plugin | Unknown | Need verification | Author and source history missing | Investigate before migration |
+
+### Naming formula for reports
+
+Use this formula consistently:
+
+```text
+[Origin] + [Type]
+```
+
+Examples:
+
+- Core component.
+- Third-party module.
+- Custom plugin.
+- Unknown library.
+
+Keep `Status` in a separate column. This structure prevents Custom extension and Custom module from being counted as two unrelated top-level categories.
+
+[Back to Table of Contents](#table-of-contents)
+
 <a id="conclusion"></a>
-## 11. Conclusion
+## 12. Conclusion
 
 Joomla 3 has **eight extension types**: Component, Module, Plugin, Template, Language, Library, Package, and File.
 
@@ -426,7 +570,7 @@ The Joomla administrator interface provides the initial inventory and useful met
 [Back to Table of Contents](#table-of-contents)
 
 <a id="references"></a>
-## 12. References
+## 13. References
 
 - [Joomla Extension Types](https://docs.joomla.org/Extension_types_%28general_definitions%29)
 - [Joomla 3 Extension Manager](https://docs.joomla.org/Help310%3AExtensions_Extension_Manager_Manage)
