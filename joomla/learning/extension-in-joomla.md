@@ -1,136 +1,192 @@
-# Extension trong Joomla
+# Joomla Extensions
 
-## 1. Extension là gì?
+This document explains what Joomla extensions are, the eight extension types available in Joomla 3, how extension types differ from extension origins, and how to identify Joomla Core, third-party, and custom extensions during an audit or upgrade.
 
-**Extension** là phần mở rộng dùng để bổ sung hoặc thay đổi chức năng của website Joomla.
+<a id="table-of-contents"></a>
+## Table of Contents
 
-Ví dụ:
+1. [What Is a Joomla Extension?](#what-is-a-joomla-extension)
+2. [Key Concepts](#key-concepts)
+3. [The Eight Joomla Extension Types](#the-eight-joomla-extension-types)
+   - [Component](#component)
+   - [Module](#module)
+   - [Plugin](#plugin)
+   - [Template](#template)
+   - [Language](#language)
+   - [Library](#library)
+   - [Package](#package)
+   - [File](#file)
+4. [Extension Origins](#extension-origins)
+5. [How to Check Extensions in Joomla 3](#how-to-check-extensions-in-joomla-3)
+6. [How to Identify Core, Third-Party, and Custom Extensions](#how-to-identify-extension-origin)
+7. [Install, Manage, and Update Screens](#management-screens)
+8. [Recommended Report Structure](#recommended-report-structure)
+9. [Extension Audit Checklist](#extension-audit-checklist)
+10. [Quick Reference](#quick-reference)
+11. [Conclusion](#conclusion)
+12. [References](#references)
 
-- Quản lý bài viết, người dùng và liên hệ.
-- Hiển thị menu, banner hoặc form đăng nhập.
-- Tích hợp thanh toán, API hoặc công cụ sao lưu.
-- Thay đổi giao diện website.
-- Cung cấp thêm ngôn ngữ.
+---
 
-Ngay cả nhiều chức năng có sẵn của Joomla cũng được tổ chức dưới dạng extension.
+<a id="what-is-a-joomla-extension"></a>
+## 1. What Is a Joomla Extension?
 
-> Không nên nhầm **extension type** với **extension origin** hoặc các màn hình **Install, Manage, Update**.
+A **Joomla extension** is an installable or built-in software unit that adds, changes, or supports functionality in a Joomla website.
 
-## 2. Ba khái niệm cần phân biệt
+Extensions can:
 
-| Khái niệm | Câu hỏi cần trả lời | Ví dụ |
+- Manage articles, users, contacts, or other business data.
+- Display menus, banners, login forms, or content blocks.
+- React to system events such as login, content saving, or page rendering.
+- Integrate payment services, APIs, analytics, or backup tools.
+- Define the frontend or administrator interface.
+- Add languages or shared code libraries.
+
+Many built-in Joomla features are also implemented as extensions. Therefore, an extension is not automatically third-party simply because Joomla calls it an extension.
+
+> Do not confuse an **extension type** with an **extension origin** or with management screens such as **Install**, **Manage**, and **Update**.
+
+[Back to Table of Contents](#table-of-contents)
+
+<a id="key-concepts"></a>
+## 2. Key Concepts
+
+| Concept | Question it answers | Examples |
 |---|---|---|
-| Type | Extension hoạt động theo cơ chế nào? | Component, Module, Plugin |
-| Origin | Extension do ai cung cấp? | Joomla Core, Third-party, Custom |
-| Management screen | Đang thực hiện thao tác gì? | Install, Manage, Update |
+| Type | How does the extension work? | Component, Module, Plugin |
+| Origin | Who provides and maintains it? | Joomla Core, Third-party, Custom |
+| Client | Where does it run? | Site, Administrator |
+| Folder/Group | Which event group does a plugin belong to? | system, content, user |
+| Status | Is the extension active? | Enabled, Disabled |
+| Management screen | What operation is being performed? | Install, Manage, Update |
 
-Ngoài ra:
+These properties are independent. For example, a system-group plugin can be Joomla Core, third-party, or custom.
 
-- **Client** cho biết extension chạy ở frontend hay backend.
-- **Folder/Group** cho biết plugin thuộc nhóm sự kiện nào.
-- **Status** cho biết extension đang được bật hay tắt.
+[Back to Table of Contents](#table-of-contents)
 
-## 3. Joomla 3 có bao nhiêu loại extension?
+<a id="the-eight-joomla-extension-types"></a>
+## 3. The Eight Joomla Extension Types
 
-Joomla 3 có **8 loại extension**:
+Joomla 3 supports **eight extension types**:
 
-| # | Type | Tên kỹ thuật thường gặp | Chức năng chính |
+| # | Type | Common technical name | Primary responsibility |
 |---:|---|---|---|
-| 1 | Component | `com_*` | Chức năng nghiệp vụ lớn |
-| 2 | Module | `mod_*` | Khối nội dung nhỏ trên trang |
-| 3 | Plugin | `plg_*` | Xử lý sự kiện trong hệ thống |
-| 4 | Template | Tên template | Giao diện frontend hoặc backend |
-| 5 | Language | `en-GB`, `vi-VN` | Gói ngôn ngữ |
-| 6 | Library | `lib_*` | Code dùng chung |
-| 7 | Package | `pkg_*` | Bộ cài chứa nhiều extension |
-| 8 | File | `files_*` | Cài hoặc cập nhật một nhóm file |
+| 1 | Component | `com_*` | Major application or business feature |
+| 2 | Module | `mod_*` | Small content block placed in a template position |
+| 3 | Plugin | `plg_*` | Event-based processing |
+| 4 | Template | Template name | Site or administrator presentation |
+| 5 | Language | `en-GB`, `vi-VN` | Translated interface strings |
+| 6 | Library | `lib_*` | Shared code used by other extensions |
+| 7 | Package | `pkg_*` | Installer bundle containing multiple extensions |
+| 8 | File | `files_*` | Installation or update of a group of files |
 
+<a id="component"></a>
 ### 3.1. Component
 
-Component là chức năng lớn, thường có phần quản trị trong backend và phần hiển thị ở frontend. Có thể xem component như một ứng dụng nhỏ bên trong Joomla.
+A **component** is a major application inside Joomla. It commonly has an administrator interface, a site interface, or both.
 
-Ví dụ:
+Examples:
 
-- `com_content`: quản lý bài viết.
-- `com_users`: quản lý người dùng.
-- `com_contact`: quản lý liên hệ.
-- `com_akeeba`: chức năng sao lưu của Akeeba.
-- `com_vehicle`: component custom quản lý xe.
+- `com_content`: article management.
+- `com_users`: user management.
+- `com_contact`: contact management.
+- `com_akeeba`: Akeeba Backup functionality.
+- `com_vehicle`: a possible custom vehicle-management component.
 
+A component is comparable to a small application running inside Joomla.
+
+<a id="module"></a>
 ### 3.2. Module
 
-Module là một khối nội dung nhỏ được đặt tại một vị trí của template.
+A **module** is a smaller content or interface block displayed in a template position.
 
-Ví dụ:
+Examples include:
 
-- Menu.
-- Form đăng nhập.
-- Banner.
-- Danh sách bài viết mới.
-- Khối tìm kiếm xe.
+- Navigation menus.
+- Login forms.
+- Banners.
+- Latest article lists.
+- Vehicle search blocks.
+- Footer contact details.
 
-Một module extension có thể tạo ra nhiều module instance. Ví dụ website có thể tạo 20 khối Custom HTML từ `mod_custom`, nhưng trong Extension Manager, `mod_custom` vẫn chỉ là một extension.
+One module extension can create multiple module instances. For example, a website may contain twenty Custom HTML blocks created from `mod_custom`, while Extension Manager still lists `mod_custom` as one extension.
 
+<a id="plugin"></a>
 ### 3.3. Plugin
 
-Plugin thực thi khi một sự kiện của Joomla xảy ra, chẳng hạn:
+A **plugin** runs when a Joomla event occurs, such as:
 
-- Người dùng đăng nhập.
-- Bài viết được lưu.
-- Nội dung được hiển thị.
-- Request được khởi tạo.
-- Extension được cài đặt.
+- A user logs in.
+- An article is saved.
+- Content is rendered.
+- A request is initialized.
+- An extension is installed.
 
-Các plugin group phổ biến:
+Common plugin groups include:
 
-| Plugin group | Chức năng |
+| Plugin group | Responsibility |
 |---|---|
-| `system` | Xử lý sự kiện toàn hệ thống |
-| `content` | Xử lý bài viết và nội dung |
-| `user` | Xử lý người dùng |
-| `authentication` | Xác thực đăng nhập |
-| `editors` | Trình soạn thảo |
-| `captcha` | CAPTCHA |
+| `system` | System-wide events |
+| `content` | Article and content processing |
+| `user` | User-related events |
+| `authentication` | Login authentication |
+| `editors` | Content editors |
+| `editors-xtd` | Extra editor buttons |
+| `captcha` | CAPTCHA integrations |
 | `finder` | Smart Search |
+| `extension` | Extension installation events |
 
-> `Folder = system` không có nghĩa plugin là Joomla Core. Nó chỉ cho biết plugin thuộc nhóm sự kiện hệ thống.
+> `Folder = system` does not mean that a plugin belongs to Joomla Core. It only identifies the plugin event group.
 
+<a id="template"></a>
 ### 3.4. Template
 
-Template quyết định giao diện và bố cục của Joomla:
+A **template** controls presentation and page layout.
 
-- **Site Template**: giao diện frontend.
-- **Administrator Template**: giao diện backend.
+Joomla uses two main template clients:
 
-Template có thể chứa override tại:
+- **Site Template**: the public frontend.
+- **Administrator Template**: the backend administration interface.
+
+Templates can contain layout overrides under:
 
 ```text
 /templates/template_name/html/
 ```
 
-Template override là code tùy chỉnh giao diện của component hoặc module, nhưng **không phải một extension riêng**.
+A template override customizes output from a component or module, but the override itself is **not a separate extension**. Overrides must still be reviewed during an upgrade because they may depend on old Joomla markup or APIs.
 
+<a id="language"></a>
 ### 3.5. Language
 
-Language extension cung cấp file dịch cho Joomla hoặc các extension khác.
+A **language extension** provides translated interface strings for Joomla or another extension.
 
-Ví dụ:
+Examples:
 
 - `en-GB`: English.
 - `vi-VN`: Vietnamese.
-- `zh-CN`: Chinese Simplified.
+- `zh-CN`: Simplified Chinese.
 
-Khi audit website, language extension cũng cần được ghi nhận.
+Language extensions should be included in an audit, even when they are installed with Joomla or another extension package.
 
+<a id="library"></a>
 ### 3.6. Library
 
-Library chứa code dùng chung cho một hoặc nhiều extension khác, ví dụ framework, API client hoặc helper classes.
+A **library** contains reusable code shared by one or more extensions.
 
-Library thường không có trang hiển thị trực tiếp. Tuy nhiên, khi library không tương thích với phiên bản PHP hoặc Joomla mới, các extension phụ thuộc vào nó có thể cùng bị lỗi.
+Examples include:
 
+- Framework code.
+- API clients.
+- Helper classes.
+- Shared file or data-processing utilities.
+
+Libraries normally do not create a visible page. However, an incompatible library can break every component, module, or plugin that depends on it.
+
+<a id="package"></a>
 ### 3.7. Package
 
-Package là bộ cài có thể chứa nhiều extension:
+A **package** is an installer bundle that contains multiple extensions.
 
 ```text
 pkg_example
@@ -140,31 +196,37 @@ pkg_example
 └── lib_example
 ```
 
-Khi làm báo cáo nâng cấp, cần ghi nhận cả package và từng extension con vì mỗi extension con đều có rủi ro tương thích riêng.
+During an upgrade audit, record both the package and its child extensions. Each child may have a separate version, dependency, configuration, and compatibility risk.
 
+<a id="file"></a>
 ### 3.8. File
 
-File extension dùng để cài hoặc cập nhật một nhóm file không thuộc cấu trúc thông thường của component, module hoặc plugin.
+A **file extension** installs or updates a collection of files that does not use the normal component, module, or plugin structure.
 
-Nó có thể chứa:
+It may contain:
 
 - Framework files.
-- Fonts hoặc assets.
-- File hệ thống dùng chung.
-- File hỗ trợ cho extension khác.
+- Fonts or assets.
+- Shared system files.
+- Supporting files required by other extensions.
 
-## 4. Core, Third-party và Custom là gì?
+File extensions are less common, but they should not be omitted from an inventory.
 
-Đây là **nguồn gốc (origin)** của extension, không phải extension type.
+[Back to Table of Contents](#table-of-contents)
 
-| Origin | Ý nghĩa | Ví dụ |
+<a id="extension-origins"></a>
+## 4. Extension Origins
+
+Core, third-party, and custom describe an extension's **origin**, not its technical type.
+
+| Origin | Meaning | Examples |
 |---|---|---|
-| Joomla Core | Có sẵn trong bộ cài Joomla chính thức | `com_content`, `com_users`, `mod_menu` |
-| Third-party | Do vendor bên ngoài phát triển và được cài thêm | Akeeba Backup, JCE Editor |
-| Custom | Được viết riêng cho website hoặc công ty | `com_dealer`, `mod_vehicle_finder` |
-| Unknown – Need verification | Chưa đủ bằng chứng để xác định | Thiếu author, tài liệu và source history |
+| Joomla Core | Included in the official Joomla distribution | `com_content`, `com_users`, `mod_menu` |
+| Third-party | Developed by an external vendor and installed separately | Akeeba Backup, JCE Editor |
+| Custom | Developed specifically for the website or organization | `com_dealer`, `mod_vehicle_finder` |
+| Unknown – Need verification | Available evidence is insufficient | Missing author, documentation, and source history |
 
-Bất kỳ extension type nào cũng có thể là Core, Third-party hoặc Custom:
+Any extension type can have any origin:
 
 | Extension | Type | Origin |
 |---|---|---|
@@ -176,21 +238,24 @@ Bất kỳ extension type nào cũng có thể là Core, Third-party hoặc Cust
 | `plg_system_cache` | Plugin | Joomla Core |
 | `plg_system_akeeba` | Plugin | Third-party |
 
-## 5. Cách kiểm tra extension trong Joomla 3 Backend
+[Back to Table of Contents](#table-of-contents)
 
-Đăng nhập Administrator:
+<a id="how-to-check-extensions-in-joomla-3"></a>
+## 5. How to Check Extensions in Joomla 3
+
+Open the Joomla administrator interface:
 
 ```text
 https://your-domain.com/administrator
 ```
 
-Sau đó vào:
+Then navigate to:
 
 ```text
 Extensions → Manage → Manage
 ```
 
-Đây là màn hình chính để lấy danh sách extension đã đăng ký. Dùng bộ lọc **Type** để kiểm tra lần lượt:
+This is the primary screen for collecting the registered extension inventory. Filter by **Type** and review all eight types:
 
 - Component.
 - Module.
@@ -201,10 +266,10 @@ Extensions → Manage → Manage
 - Package.
 - File.
 
-Nên ghi nhận các trường:
+Capture these fields where available:
 
 - Name.
-- Technical Name hoặc Element.
+- Technical Name or Element.
 - Type.
 - Folder.
 - Client.
@@ -214,131 +279,158 @@ Nên ghi nhận các trường:
 - Protected.
 - Extension ID.
 
-Không nên chỉ kiểm tra menu **Components**, vì menu này không hiển thị đầy đủ module, plugin, template, library và các loại còn lại.
+Do not use only the **Components** menu for an inventory. It does not provide a complete list of modules, plugins, templates, languages, libraries, packages, or file extensions.
 
-## 6. Cách xác định Core, Third-party và Custom
+[Back to Table of Contents](#table-of-contents)
 
-Không có một dấu hiệu đơn lẻ nào đảm bảo chính xác 100%. Cần kết hợp nhiều bằng chứng.
+<a id="how-to-identify-extension-origin"></a>
+## 6. How to Identify Core, Third-Party, and Custom Extensions
 
-| Dấu hiệu | Joomla Core | Third-party | Custom |
+No single field proves an extension's origin with complete certainty. Combine several sources of evidence.
+
+| Evidence | Joomla Core | Third-party | Custom |
 |---|---|---|---|
-| Author | Joomla! Project | Tên vendor bên ngoài | Công ty hoặc developer nội bộ |
-| Có trong bộ cài Joomla sạch | Có | Không | Không |
-| Protected | Thường có | Thường không | Thường không |
-| Update Site | Joomla server | Vendor server | Server nội bộ hoặc không có |
-| Documentation | Joomla Docs | Website vendor | Tài liệu nội bộ |
-| Technical Name | Tên tiêu chuẩn Joomla | Tên sản phẩm/vendor | Tên dự án/nghiệp vụ |
-| Source history | Joomla source | Vendor package | Repository dự án |
+| Author | Joomla! Project | External vendor | Internal company or developer |
+| Included in a clean Joomla installation | Yes | No | No |
+| Protected | Often Yes | Usually No | Usually No |
+| Update Site | Joomla server | Vendor server | Internal server or none |
+| Documentation | Joomla documentation | Vendor documentation | Internal documentation |
+| Technical Name | Standard Joomla name | Product or vendor name | Project or business-domain name |
+| Source history | Joomla source | Vendor package/repository | Project repository |
 
-### Quy trình xác định an toàn
+### Safe verification process
 
-1. Kiểm tra `Author`, `Version`, `Element` trong **Manage**.
-2. So sánh với bộ cài mặc định của đúng phiên bản Joomla.
-3. Kiểm tra `Extensions → Manage → Update Sites`.
-4. Tìm vendor và tài liệu chính thức.
-5. Kiểm tra file manifest XML.
-6. Kiểm tra Git history, source repository và tài liệu dự án.
-7. Nếu vẫn chưa chắc chắn, đánh dấu `Unknown – Need verification`.
+1. Check `Author`, `Version`, and `Element` in **Manage**.
+2. Compare the extension with a clean installation of the exact Joomla version.
+3. Review `Extensions → Manage → Update Sites`.
+4. Find the vendor and its official documentation.
+5. Inspect the extension manifest XML file.
+6. Review Git history, the project repository, and internal documentation.
+7. If the evidence is still insufficient, classify it as `Unknown – Need verification`.
 
-Không nên kết luận chỉ dựa vào:
+Do not classify an extension based only on:
 
-- Extension ID thấp.
+- A low Extension ID.
 - `Protected = Yes`.
-- Plugin folder là `system`.
-- Tên extension có chữ `custom`.
-- Không có Update Site.
+- The `system` plugin folder.
+- The word `custom` in its name.
+- The absence of an Update Site.
 
-Đây chỉ là dấu hiệu tham khảo.
+These are indicators, not proof.
 
-## 7. Install, Manage và Update có phải extension type không?
+[Back to Table of Contents](#table-of-contents)
 
-**Không.** Đây là các màn hình quản lý extension.
+<a id="management-screens"></a>
+## 7. Install, Manage, and Update Screens
 
-| Màn hình | Chức năng |
+**Install**, **Manage**, and **Update** are management screens, not extension types.
+
+| Screen | Purpose |
 |---|---|
-| Install | Cài extension mới |
-| Manage | Xem và quản lý extension đã đăng ký |
-| Update | Hiển thị extension đang có phiên bản mới |
-| Discover | Tìm source extension có trên server nhưng chưa được đăng ký |
-| Database | Kiểm tra database schema |
-| Warnings | Hiển thị cảnh báo cấu hình |
-| Install Languages | Cài thêm gói ngôn ngữ |
-| Update Sites | Quản lý URL dùng để kiểm tra phiên bản mới |
+| Install | Install a new extension |
+| Manage | View and manage registered extensions |
+| Update | Display extensions with an available update |
+| Discover | Find extension source code present on the server but not registered correctly |
+| Database | Check or repair the Joomla database schema |
+| Warnings | Display installation environment warnings |
+| Install Languages | Install language packages |
+| Update Sites | Manage URLs used to check for extension updates |
 
-Luồng thông thường:
+Typical lifecycle:
 
 ```text
-Install
-  ↓
-Extension xuất hiện trong Manage
-  ↓
-Update Site kiểm tra phiên bản
-  ↓
-Có phiên bản mới thì extension xuất hiện trong Update
+Install an extension
+        ↓
+The extension appears in Manage
+        ↓
+Its Update Site checks for a newer version
+        ↓
+If an update exists, it appears in Update
 ```
 
-Vì vậy:
+Therefore:
 
-- **Manage**: danh sách extension đã đăng ký.
-- **Update**: chỉ extension đang có bản cập nhật.
-- **Install**: nơi cài extension mới.
-- **Discover**: tìm extension đã được copy lên server nhưng chưa cài đúng quy trình.
+- **Manage** contains registered extensions.
+- **Update** contains only extensions with detected updates.
+- **Install** is used to add extensions.
+- **Discover** identifies extension code copied to the server without a complete installation process.
 
-## 8. Cấu trúc report đề xuất
+[Back to Table of Contents](#table-of-contents)
+
+<a id="recommended-report-structure"></a>
+## 8. Recommended Report Structure
 
 | Extension Name | Technical Name | Type | Client/Folder | Origin | Version | Status | Upgrade Risk |
 |---|---|---|---|---|---|---|---|
-| Content | `com_content` | Component | Site/Admin | Joomla Core | 3.x | Enabled | Theo quy trình nâng cấp Joomla |
-| Akeeba Backup | `com_akeeba` | Component | Administrator | Third-party | 7.x | Enabled | Kiểm tra tương thích từ vendor |
-| Vehicle Finder | `mod_vehicle_finder` | Module | Site | Custom | 1.0 | Enabled | Cần review source |
-| Custom Tracking | `plg_system_customtracking` | Plugin | `system` | Custom | Unknown | Enabled | Rủi ro cao |
+| Content | `com_content` | Component | Site/Admin | Joomla Core | 3.x | Enabled | Covered by the Joomla upgrade process |
+| Akeeba Backup | `com_akeeba` | Component | Administrator | Third-party | 7.x | Enabled | Verify vendor compatibility |
+| Vehicle Finder | `mod_vehicle_finder` | Module | Site | Custom | 1.0 | Enabled | Source review required |
+| Custom Tracking | `plg_system_customtracking` | Plugin | `system` | Custom | Unknown | Enabled | High risk |
 
-## 9. Checklist audit extension
+Keep **Type** and **Origin** in separate columns. This prevents labels such as Component or System from being incorrectly treated as evidence of ownership.
 
-- [ ] Mở `Extensions → Manage → Manage`.
-- [ ] Lọc và kiểm tra đủ 8 extension type.
-- [ ] Kiểm tra cả Site và Administrator client.
-- [ ] Kiểm tra extension Enabled và Disabled.
-- [ ] Ghi nhận Author, Version, Element và Status.
-- [ ] Kiểm tra Update Sites.
-- [ ] Chạy Discover nhưng không cài ngay khi chưa xác minh.
-- [ ] Kiểm tra package và toàn bộ extension con.
-- [ ] Kiểm tra template override.
-- [ ] Dùng `Unknown – Need verification` khi chưa đủ bằng chứng.
+[Back to Table of Contents](#table-of-contents)
 
-## 10. Công thức ghi nhớ
+<a id="extension-audit-checklist"></a>
+## 9. Extension Audit Checklist
 
-```text
-Type   = Extension hoạt động như thế nào?
-Origin = Extension do ai cung cấp?
-Client = Extension chạy ở frontend hay backend?
-Folder = Plugin thuộc nhóm sự kiện nào?
-Status = Extension đang bật hay tắt?
-Screen = Bạn đang thực hiện thao tác gì?
-```
+- [ ] Open `Extensions → Manage → Manage`.
+- [ ] Filter and inspect all eight extension types.
+- [ ] Check both Site and Administrator clients.
+- [ ] Include enabled and disabled extensions.
+- [ ] Record Author, Version, Element, Client, Folder, and Status.
+- [ ] Review Update Sites.
+- [ ] Run Discover, but do not install discovered items before verification and backup.
+- [ ] Record packages and all child extensions.
+- [ ] Review template overrides separately.
+- [ ] Use `Unknown – Need verification` when evidence is insufficient.
+- [ ] Check vendor support and Joomla/PHP compatibility before upgrading.
+- [ ] Review custom source code and dependencies.
 
-## Kết luận
+[Back to Table of Contents](#table-of-contents)
 
-Joomla 3 có **8 extension type**: Component, Module, Plugin, Template, Language, Library, Package và File.
-
-Mỗi extension cần được phân loại theo hai cột riêng:
+<a id="quick-reference"></a>
+## 10. Quick Reference
 
 ```text
-Extension Type + Origin
+Type   = How does the extension work?
+Origin = Who provides and maintains the extension?
+Client = Does it run on the Site or Administrator side?
+Folder = Which event group does a plugin belong to?
+Status = Is the extension enabled or disabled?
+Screen = Which management operation is being performed?
 ```
 
-Origin nên dùng một trong bốn giá trị:
+[Back to Table of Contents](#table-of-contents)
+
+<a id="conclusion"></a>
+## 11. Conclusion
+
+Joomla 3 has **eight extension types**: Component, Module, Plugin, Template, Language, Library, Package, and File.
+
+For an accurate inventory, classify every extension with at least two separate values:
+
+```text
+Extension Type + Extension Origin
+```
+
+Use one of these origin values:
 
 - Joomla Core.
 - Third-party.
 - Custom.
 - Unknown – Need verification.
 
-Backend UI giúp lấy danh sách và cung cấp bằng chứng ban đầu. Để xác định chính xác extension custom, cần kiểm tra thêm manifest XML, Update Site, source code, Git history và tài liệu dự án.
+The Joomla administrator interface provides the initial inventory and useful metadata. Accurate classification—especially for custom extensions—also requires checking manifest XML files, Update Sites, source code, Git history, vendor information, and project documentation.
 
-## Tài liệu tham khảo
+[Back to Table of Contents](#table-of-contents)
+
+<a id="references"></a>
+## 12. References
 
 - [Joomla Extension Types](https://docs.joomla.org/Extension_types_%28general_definitions%29)
 - [Joomla 3 Extension Manager](https://docs.joomla.org/Help310%3AExtensions_Extension_Manager_Manage)
 - [Joomla Manifest Files](https://docs.joomla.org/manifest_files)
 - [Joomla Discover](https://docs.joomla.org/Help310%3AExtensions_Extension_Manager_Discover)
+
+[Back to Table of Contents](#table-of-contents)
