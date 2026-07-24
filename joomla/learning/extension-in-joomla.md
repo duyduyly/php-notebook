@@ -24,8 +24,9 @@ This document explains what Joomla extensions are, the eight extension types ava
 9. [Extension Audit Checklist](#extension-audit-checklist)
 10. [Quick Reference](#quick-reference)
 11. [How Many Extension Categories Are There?](#how-many-extension-categories)
-12. [Conclusion](#conclusion)
-13. [References](#references)
+12. [What Is an Extension Family?](#extension-family)
+13. [Conclusion](#conclusion)
+14. [References](#references)
 
 ---
 
@@ -58,6 +59,7 @@ Many built-in Joomla features are also implemented as extensions. Therefore, an 
 | Origin | Who provides and maintains it? | Joomla Core, Third-party, Custom |
 | Client | Where does it run? | Site, Administrator |
 | Folder/Group | Which event group does a plugin belong to? | system, content, user |
+| Family | Which product ecosystem or dependency group does it belong to? | AcyMailing, HikaShop, Custom Product Management |
 | Status | Is the extension active? | Enabled, Disabled |
 | Management screen | What operation is being performed? | Install, Manage, Update |
 
@@ -547,8 +549,128 @@ Keep `Status` in a separate column. This structure prevents Custom extension and
 
 [Back to Table of Contents](#table-of-contents)
 
+<a id="extension-family"></a>
+## 12. What Is an Extension Family?
+
+An **Extension Family** is a reporting and inventory concept used to group related Joomla extensions that belong to the same product, business feature, installation package, or dependency set.
+
+It is **not an official Joomla extension type**. Joomla still registers each family member separately as a Component, Module, Plugin, Template, Language, Library, Package, or File extension.
+
+Example:
+
+```text
+FAM-001: AcyMailing
+├── com_acymailing
+├── mod_acymailing
+├── plg_acymailing_tagsubscriber
+├── plg_acymailing_tagsubscription
+└── plg_acymailing_urltracker
+```
+
+The family groups these records for analysis, but it does not replace their individual extension types.
+
+### Family, type, and origin are separate dimensions
+
+| Dimension | Question it answers | Example |
+|---|---|---|
+| Extension Type | What technical role does it perform? | Component, Module, Plugin |
+| Extension Origin | Who supplies and maintains it? | Core, Third-party, Custom |
+| Extension Family | Which product or dependency group does it belong to? | AcyMailing |
+| Status | Is it enabled, disabled, active, or unused? | Enabled, In Use |
+
+Example inventory:
+
+| Extension | Type | Origin | Family |
+|---|---|---|---|
+| `com_acymailing` | Component | Third-party | AcyMailing |
+| `mod_acymailing` | Module | Third-party | AcyMailing |
+| `plg_acymailing_tagsubscriber` | Plugin | Third-party | AcyMailing |
+| `com_company_product` | Component | Custom | Product Management |
+| `plg_webservices_companyproduct` | Plugin | Custom | Product Management |
+
+### Which extension types can belong to a family?
+
+All eight Joomla extension types can be family members:
+
+| Extension type | Can belong to a family? | Typical role |
+|---|---:|---|
+| Component | Yes | Main application or administration interface |
+| Module | Yes | Display block or frontend entry point |
+| Plugin | Yes | Events, content processing, authentication, or integration |
+| Template | Yes | Product-specific presentation |
+| Language | Yes | Translation package |
+| Library | Yes | Shared framework or reusable code |
+| Package | Yes | Installer bundle for the family |
+| File | Yes | Shared assets or supporting files |
+
+The most common family structure is:
+
+```text
+Component + Modules + Plugins + Libraries
+```
+
+Third-party products commonly form families because one vendor package may install several related extensions. Custom project features can also form families even when their extensions are deployed separately.
+
+Joomla Core extensions can be grouped by feature—for example, Smart Search may include `com_finder`, `mod_finder`, and finder plugins—but Core families are usually unnecessary when a report covers only Third-party and Custom extensions.
+
+### When to assign the same Family ID
+
+Assign extensions to the same family when one or more of these conditions are supported by evidence:
+
+- They belong to the same named product.
+- They are installed by the same package.
+- A main component has supporting modules, plugins, or libraries.
+- They share a library, schema, configuration, or update lifecycle.
+- They must normally be upgraded, tested, or removed together.
+- One member depends on another member to work correctly.
+- Custom extensions jointly implement the same business feature.
+
+Do not group extensions only because they:
+
+- Have the same technical type.
+- Belong to the same plugin group such as `system` or `content`.
+- Have the same vendor but represent independent products.
+- Have similar names without a confirmed functional or dependency relationship.
+
+### Integration extensions
+
+An integration can connect two separate families. For example:
+
+```text
+plg_acymailing_hikashop
+Primary Family: AcyMailing
+Related Family: HikaShop
+Relationship: Integration
+```
+
+For migration reporting, either assign the integration its own Family ID or retain the primary family and add relationship columns. The second approach usually makes dependencies clearer:
+
+| Extension | Primary Family | Related Family | Relationship |
+|---|---|---|---|
+| `plg_acymailing_hikashop` | AcyMailing | HikaShop | Integration |
+
+### Recommended family fields in an inventory
+
+| Field | Purpose |
+|---|---|
+| Family ID | Stable report identifier, such as `FAM-001` |
+| Family Name | Product or business-feature name |
+| Family Role | Main, Supporting, Shared Library, or Integration |
+| Primary Family | Main product that owns the extension |
+| Related Family | Another product required by an integration |
+| Relationship | Dependency, Integration, Optional Add-on, or Shared Library |
+| Evidence | Package manifest, vendor documentation, dependency, or source history |
+
+Use a Family ID only when the relationship is known. If the evidence is insufficient, leave the family as `Unknown – Need verification` instead of grouping by guesswork.
+
+> An Extension Family is a report-level grouping. It helps plan installation, upgrade, migration, dependency analysis, and regression testing, but Joomla continues to install and manage each registered extension according to its actual technical type.
+
+[Back to Table of Contents](#table-of-contents)
+
+---
+
 <a id="conclusion"></a>
-## 12. Conclusion
+## 13. Conclusion
 
 Joomla 3 has **eight extension types**: Component, Module, Plugin, Template, Language, Library, Package, and File.
 
@@ -570,7 +692,7 @@ The Joomla administrator interface provides the initial inventory and useful met
 [Back to Table of Contents](#table-of-contents)
 
 <a id="references"></a>
-## 13. References
+## 14. References
 
 - [Joomla Extension Types](https://docs.joomla.org/Extension_types_%28general_definitions%29)
 - [Joomla 3 Extension Manager](https://docs.joomla.org/Help310%3AExtensions_Extension_Manager_Manage)
