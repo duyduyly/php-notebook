@@ -1,5 +1,21 @@
 # How to Install Joomla Extensions
 
+## Table of Contents
+
+- [1. Purpose](#1-purpose)
+- [2. Installation methods at a glance](#2-installation-methods-at-a-glance)
+- [3. Upload Package File](#3-upload-package-file)
+- [4. Install from Folder](#4-install-from-folder)
+- [5. Install from URL](#5-install-from-url)
+- [6. Install from Web](#6-install-from-web)
+- [7. Discover Install](#7-discover-install)
+- [8. Install through a parent package](#8-install-through-a-parent-package)
+- [9. Examples by extension source](#9-examples-by-extension-source)
+- [10. How to choose the correct method](#10-how-to-choose-the-correct-method)
+- [11. Post-installation checklist](#11-post-installation-checklist)
+- [12. Safety recommendations](#12-safety-recommendations)
+- [13. Key takeaways](#13-key-takeaways)
+
 ## 1. Purpose
 
 This guide explains how Joomla extensions are installed, with practical examples for components, modules, plugins, templates, libraries, and packages.
