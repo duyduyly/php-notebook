@@ -306,12 +306,17 @@ Only simple assets such as images or independent CSS may be copied directly. Cor
 
 ## 8. Recommended Migration Tickets
 
+### Initial inventory tickets
+
+| ID | Ticket | Priority |
+|---|---|---|
+| THEME-001 | Inventory old template files | P0 |
+| THEME-002 | Inventory component and module overrides | P0 |
+
 ### Phase 1: Discovery
 
 | Ticket | Scope |
 |---|---|
-| THEME-001 | Inventory template files, layouts, and dependencies |
-| THEME-002 | Inventory component and module overrides |
 | THEME-003 | Identify used module positions and menu assignments |
 
 ### Phase 2: Joomla 6 foundation
