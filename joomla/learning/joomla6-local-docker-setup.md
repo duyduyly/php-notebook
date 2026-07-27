@@ -1,26 +1,41 @@
-# Joomla 6 Local Setup với Docker
+# Joomla 6 Local Setup with Docker
 
-## Mục tiêu
+A beginner-friendly guide to create a reusable Docker wrapper, add the Joomla source code, run the installer, and generate `configuration.php`.
 
-Tạo một Docker wrapper để chạy Joomla 6 local. Source Joomla được tách riêng trong thư mục `src/` và không cần Composer.
+## Table of Contents
 
-Flow tổng quát:
+- [1. Setup Flow](#1-setup-flow)
+- [2. Project Structure](#2-project-structure)
+- [3. Create the Wrapper](#3-create-the-wrapper)
+- [4. Download and Add Joomla](#4-download-and-add-joomla)
+- [5. Understand the Installation Folder](#5-understand-the-installation-folder)
+- [6. Start the Project](#6-start-the-project)
+- [7. Complete the Joomla Installer](#7-complete-the-joomla-installer)
+- [8. How configuration.php Is Created](#8-how-configurationphp-is-created)
+- [9. Fix configuration.php Write Errors](#9-fix-configurationphp-write-errors)
+- [10. Access the Website](#10-access-the-website)
+- [11. Reset the Installation](#11-reset-the-installation)
+- [12. Final Checklist](#12-final-checklist)
+
+---
+
+## 1. Setup Flow
 
 ```text
-Tạo Docker wrapper
-→ Tải Joomla Full Package
-→ Giải nén source vào src/
-→ Chạy Docker
-→ Mở Joomla Installer
-→ Cấu hình website và database
-→ Joomla tạo bảng dữ liệu
-→ Joomla tạo configuration.php
-→ Đăng nhập Administrator
+Create Docker wrapper
+→ Download Joomla Full Package
+→ Extract Joomla into src/
+→ Start Docker containers
+→ Open Joomla Installer
+→ Configure site and database
+→ Joomla creates database tables
+→ Joomla creates configuration.php
+→ Open the website and Administrator panel
 ```
 
 ---
 
-## 1. Tạo cấu trúc wrapper
+## 2. Project Structure
 
 ```text
 joomla6-wrapper/
@@ -38,16 +53,20 @@ joomla6-wrapper/
 └── docker-compose.yml
 ```
 
-Tạo thư mục:
+The Docker files are the reusable wrapper. The Joomla source code is placed inside `src/`.
+
+---
+
+## 3. Create the Wrapper
+
+### 3.1 Create folders
 
 ```bash
 mkdir -p joomla6-wrapper/{docker/apache,docker/php,mysql/init,src}
 cd joomla6-wrapper
 ```
 
----
-
-## 2. Tạo file `.env`
+### 3.2 Create `.env`
 
 ```env
 APP_PORT=8080
@@ -60,9 +79,7 @@ MYSQL_PASSWORD=joomla_password
 MYSQL_ROOT_PASSWORD=root_password
 ```
 
----
-
-## 3. Tạo `Dockerfile`
+### 3.3 Create `Dockerfile`
 
 ```dockerfile
 FROM php:8.4-apache
@@ -85,11 +102,7 @@ COPY docker/php/php.ini /usr/local/etc/php/conf.d/joomla.ini
 WORKDIR /var/www/html
 ```
 
----
-
-## 4. Tạo PHP config
-
-File `docker/php/php.ini`:
+### 3.4 Create `docker/php/php.ini`
 
 ```ini
 memory_limit = 512M
@@ -102,13 +115,9 @@ display_errors = On
 error_reporting = E_ALL
 ```
 
-`display_errors = On` chỉ nên dùng ở local.
+Use `display_errors = On` only for local development.
 
----
-
-## 5. Tạo Apache config
-
-File `docker/apache/000-default.conf`:
+### 3.5 Create `docker/apache/000-default.conf`
 
 ```apache
 <VirtualHost *:80>
@@ -127,9 +136,7 @@ File `docker/apache/000-default.conf`:
 </VirtualHost>
 ```
 
----
-
-## 6. Tạo `docker-compose.yml`
+### 3.6 Create `docker-compose.yml`
 
 ```yaml
 services:
@@ -189,25 +196,40 @@ volumes:
   mysql_data:
 ```
 
-Không thêm option sau với MySQL 8.4:
+Do not add this option when using MySQL 8.4:
 
 ```yaml
 --default-authentication-plugin=mysql_native_password
 ```
 
+### 3.7 Create `.gitignore`
+
+```gitignore
+/src/*
+!/src/.gitkeep
+.env
+.DS_Store
+.idea/
+.vscode/
+```
+
 ---
 
-## 7. Tải và giải nén Joomla
+## 4. Download and Add Joomla
 
-Tải Joomla Full Package tại:
+Download the latest Joomla Full Package:
 
 https://downloads.joomla.org/latest?utm_source=chatgpt.com
 
-Chọn bản **Full Package**, không chọn Upgrade Package.
+Choose **Full Package**, not **Upgrade Package**.
 
-Giải nén toàn bộ source trực tiếp vào `src/`.
+Extract all Joomla files directly into:
 
-Cấu trúc đúng:
+```text
+joomla6-wrapper/src/
+```
+
+Correct structure:
 
 ```text
 src/
@@ -222,67 +244,74 @@ src/
 └── htaccess.txt
 ```
 
-Không để source bị lồng thêm một cấp thư mục.
-
-Sai:
+Incorrect structure:
 
 ```text
 src/Joomla_6.x.x-Stable-Full_Package/index.php
 ```
 
-Đúng:
+Correct structure:
 
 ```text
 src/index.php
 ```
 
----
+Verify the source:
 
-## 8. Giải thích thư mục `installation`
-
-`src/installation/` là bộ cài đặt ban đầu của Joomla.
-
-Nó thực hiện các việc sau:
-
-- Hiển thị màn hình cài đặt.
-- Tạo tài khoản Administrator.
-- Kiểm tra PHP và database.
-- Tạo các bảng Joomla.
-- Tạo file `configuration.php`.
-
-Trước khi cài:
-
-```text
-installation/       có
-configuration.php   chưa có
+```bash
+ls src/index.php
+ls src/installation
 ```
-
-Sau khi cài thành công:
-
-```text
-configuration.php   đã được tạo
-installation/       được xóa hoặc không còn sử dụng
-```
-
-Không xóa `installation/` trước khi hoàn tất cài đặt.
-
-Không tự tạo file `configuration.php` rỗng.
 
 ---
 
-## 9. Khởi động project
+## 5. Understand the Installation Folder
+
+The `src/installation/` folder contains the Joomla web installer.
+
+It is responsible for:
+
+- displaying the installation screens;
+- creating the Administrator account;
+- checking PHP and database connectivity;
+- creating Joomla database tables;
+- generating `configuration.php`.
+
+Before installation:
+
+```text
+installation/       exists
+configuration.php   does not exist
+```
+
+After installation:
+
+```text
+configuration.php   exists
+installation/       is removed or no longer used
+```
+
+Do not delete `installation/` before the setup is complete.
+
+Do not create an empty `configuration.php` file manually.
+
+---
+
+## 6. Start the Project
+
+Build and start the containers:
 
 ```bash
 docker compose up -d --build
 ```
 
-Kiểm tra container:
+Check their status:
 
 ```bash
 docker compose ps
 ```
 
-Kết quả mong đợi:
+Expected result:
 
 ```text
 joomla6-app            running
@@ -290,42 +319,53 @@ joomla6-db             running (healthy)
 joomla6-phpmyadmin     running
 ```
 
+Useful log commands:
+
+```bash
+docker compose logs -f joomla
+docker compose logs -f mysql
+```
+
+Verify the Joomla source inside the container:
+
+```bash
+docker compose exec joomla ls -la /var/www/html
+```
+
 ---
 
-## 10. Mở Joomla Installer
+## 7. Complete the Joomla Installer
 
-Truy cập:
+Open:
 
 ```text
 http://localhost:8080
 ```
 
-Các bước cài đặt:
+### Step 1: Site Configuration
 
-### Bước 1: Site Configuration
-
-Ví dụ:
+Example:
 
 ```text
 Site Name: Joomla 6 Local
 ```
 
-### Bước 2: Administrator Account
+### Step 2: Administrator Account
 
-Ví dụ:
+Example:
 
 ```text
 Real Name: Local Administrator
 Username: admin
-Password: mật khẩu mạnh
+Password: use a strong password
 Email: admin@example.com
 ```
 
-Tài khoản này dùng để đăng nhập Joomla Admin, không phải tài khoản MySQL.
+This account is for Joomla Administrator. It is not the MySQL account.
 
-### Bước 3: Database Configuration
+### Step 3: Database Configuration
 
-Điền theo `.env`:
+Use these values:
 
 | Field | Value |
 |---|---|
@@ -334,12 +374,12 @@ Tài khoản này dùng để đăng nhập Joomla Admin, không phải tài kho
 | Username | `joomla` |
 | Password | `joomla_password` |
 | Database Name | `joomla6` |
-| Table Prefix | Giữ giá trị Joomla tạo sẵn |
+| Table Prefix | Keep the generated value |
 | Connection Encryption | Default |
 
-Trong Docker, host phải là `mysql` vì đây là tên service trong `docker-compose.yml`.
+The database host must be `mysql` because that is the Docker Compose service name.
 
-Không dùng:
+Do not use:
 
 ```text
 localhost
@@ -347,41 +387,43 @@ localhost:3307
 host.docker.internal
 ```
 
-Port `3307` chỉ dành cho kết nối từ máy host vào container. Joomla container kết nối MySQL nội bộ qua `mysql:3306`.
+`3307` is the host-machine port. Joomla connects to MySQL inside Docker through:
 
----
+```text
+mysql:3306
+```
 
-## 11. Nếu Joomla yêu cầu xác minh database host
+### Database host verification
 
-Joomla có thể xem hostname `mysql` là remote host và yêu cầu xác minh quyền sở hữu.
+Joomla may treat `mysql` as a remote database host and ask you to verify ownership.
 
-Hãy làm đúng hướng dẫn trên màn hình, thường là tạo hoặc xóa một file có tên ngẫu nhiên trong:
+Follow the exact instruction shown by the installer. It normally asks you to create or remove a randomly named file inside:
 
 ```text
 src/installation/
 ```
 
-Ví dụ:
+Example:
 
 ```bash
-touch src/installation/<ten-file-joomla-yeu-cau>
+touch src/installation/<exact-file-name-from-joomla>
 ```
 
-Không tự đặt tên file. Dùng chính xác tên Joomla hiển thị.
+Use the exact filename displayed by Joomla.
 
 ---
 
-## 12. File `configuration.php`
+## 8. How configuration.php Is Created
 
-Sau khi bấm **Install Joomla**, Joomla sẽ:
+After you click **Install Joomla**, Joomla will:
 
-1. Kết nối database.
-2. Tạo các bảng Joomla.
-3. Tạo tài khoản Administrator.
-4. Lưu cấu hình website.
-5. Tạo file `src/configuration.php`.
+1. connect to MySQL;
+2. create the Joomla tables;
+3. create the Administrator account;
+4. save the site settings;
+5. generate `src/configuration.php`.
 
-Các giá trị database quan trọng trong file:
+Important database settings inside the generated file look similar to this:
 
 ```php
 public $dbtype = 'mysqli';
@@ -392,45 +434,59 @@ public $db = 'joomla6';
 public $dbprefix = 'abc12_';
 ```
 
-Không tự đổi `dbprefix` sau khi cài vì prefix phải khớp với tên các bảng trong database.
+The prefix is added to Joomla table names, for example:
+
+```text
+abc12_users
+abc12_content
+abc12_extensions
+```
+
+Do not change `dbprefix` after installation unless you also rename every related database table.
 
 ---
 
-## 13. Nếu Joomla không tạo được `configuration.php`
+## 9. Fix configuration.php Write Errors
 
-Kiểm tra quyền ghi:
+Test whether Apache can write to the Joomla folder:
 
 ```bash
 docker compose exec -u www-data joomla touch /var/www/html/test-write.txt
 ```
 
-Nếu lệnh bị lỗi, cấp quyền lại ở local:
+If the command fails, update the local permissions:
 
 ```bash
 docker compose exec joomla chown -R www-data:www-data /var/www/html
 ```
 
-Xóa file test:
+Remove the test file:
 
 ```bash
 docker compose exec joomla rm -f /var/www/html/test-write.txt
 ```
 
-Nếu installer hiển thị nội dung cấu hình để copy thủ công:
+If Joomla displays the configuration content instead of creating the file:
 
-1. Tạo `src/configuration.php`.
-2. Copy đúng toàn bộ nội dung Joomla cung cấp.
-3. Kiểm tra syntax:
+1. Create `src/configuration.php`.
+2. Paste the complete content generated by Joomla.
+3. Validate the PHP syntax:
 
 ```bash
 docker compose exec joomla php -l /var/www/html/configuration.php
 ```
 
-Không nên tự viết file từ đầu.
+Expected output:
+
+```text
+No syntax errors detected in /var/www/html/configuration.php
+```
+
+Do not write the configuration file from scratch unless necessary.
 
 ---
 
-## 14. Truy cập sau khi cài
+## 10. Access the Website
 
 Frontend:
 
@@ -450,33 +506,45 @@ phpMyAdmin:
 http://localhost:8081
 ```
 
+After installation, verify that the file exists:
+
+```bash
+ls -la src/configuration.php
+```
+
 ---
 
-## 15. Reset để cài lại
+## 11. Reset the Installation
+
+To remove the database and start again:
 
 ```bash
 docker compose down -v
 rm -f src/configuration.php
 ```
 
-Sau đó đảm bảo `src/installation/` vẫn tồn tại rồi chạy lại:
+Make sure `src/installation/` still exists. If it was removed, extract it again from the Joomla Full Package.
+
+Start the project again:
 
 ```bash
 docker compose up -d --build
 ```
 
-Lưu ý: `docker compose down -v` sẽ xóa toàn bộ dữ liệu database.
+Warning: `docker compose down -v` permanently removes the Docker database volume.
 
 ---
 
-## Checklist
+## 12. Final Checklist
 
-- [ ] Đã tải Joomla Full Package.
-- [ ] `src/index.php` tồn tại.
-- [ ] `src/installation/` tồn tại trước khi cài.
-- [ ] MySQL container ở trạng thái healthy.
-- [ ] Database host trong installer là `mysql`.
-- [ ] User, password và database khớp `.env`.
-- [ ] Joomla đã tạo các bảng database.
-- [ ] `src/configuration.php` đã được tạo.
-- [ ] Truy cập được `/administrator`.
+- [ ] Docker Desktop is running.
+- [ ] Joomla Full Package was downloaded.
+- [ ] `src/index.php` exists.
+- [ ] `src/installation/` exists before installation.
+- [ ] MySQL container is healthy.
+- [ ] Joomla opens at `http://localhost:8080`.
+- [ ] Database host is `mysql`.
+- [ ] Database credentials match `.env`.
+- [ ] Joomla creates its database tables.
+- [ ] `src/configuration.php` is generated.
+- [ ] Frontend and Administrator pages are accessible.
