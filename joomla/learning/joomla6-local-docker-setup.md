@@ -6,7 +6,7 @@ A beginner-friendly guide to create a reusable Docker wrapper, add the Joomla so
 
 - [1. Setup Flow](#1-setup-flow)
 - [2. Project Structure](#2-project-structure)
-- [3. Create the Wrapper](#3-create-the-wrapper)
+- [3. Create the Docker Wrapper](#3-create-the-docker-wrapper)
 - [4. Download and Add Joomla](#4-download-and-add-joomla)
 - [5. Understand the Installation Folder](#5-understand-the-installation-folder)
 - [6. Start the Project](#6-start-the-project)
@@ -27,8 +27,8 @@ Create Docker wrapper
 → Extract Joomla into src/
 → Start Docker containers
 → Open Joomla Installer
-→ Configure site and database
-→ Joomla creates database tables
+→ Configure the website and database
+→ Joomla creates its database tables
 → Joomla creates configuration.php
 → Open the website and Administrator panel
 ```
@@ -53,11 +53,11 @@ joomla6-wrapper/
 └── docker-compose.yml
 ```
 
-The Docker files are the reusable wrapper. The Joomla source code is placed inside `src/`.
+The Docker files form the reusable wrapper. Extract the Joomla source code directly into `src/`.
 
 ---
 
-## 3. Create the Wrapper
+## 3. Create the Docker Wrapper
 
 ### 3.1 Create folders
 
@@ -145,6 +145,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: joomla6-app
+    environment:
+      JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK: "1"
     ports:
       - "${APP_PORT}:80"
     volumes:
@@ -196,7 +198,7 @@ volumes:
   mysql_data:
 ```
 
-Do not add this option when using MySQL 8.4:
+Do not add this removed MySQL 8.4 option:
 
 ```yaml
 --default-authentication-plugin=mysql_native_password
@@ -244,13 +246,15 @@ src/
 └── htaccess.txt
 ```
 
-Incorrect structure:
+Do not keep an extra package folder inside `src/`.
+
+Incorrect:
 
 ```text
 src/Joomla_6.x.x-Stable-Full_Package/index.php
 ```
 
-Correct structure:
+Correct:
 
 ```text
 src/index.php
@@ -267,15 +271,13 @@ ls src/installation
 
 ## 5. Understand the Installation Folder
 
-The `src/installation/` folder contains the Joomla web installer.
+The `src/installation/` folder contains the Joomla web installer. It:
 
-It is responsible for:
-
-- displaying the installation screens;
-- creating the Administrator account;
-- checking PHP and database connectivity;
-- creating Joomla database tables;
-- generating `configuration.php`.
+- displays the installation screens;
+- creates the Administrator account;
+- checks PHP and database connectivity;
+- creates Joomla database tables;
+- generates `configuration.php`.
 
 Before installation:
 
@@ -291,27 +293,18 @@ configuration.php   exists
 installation/       is removed or no longer used
 ```
 
-Do not delete `installation/` before the setup is complete.
-
-Do not create an empty `configuration.php` file manually.
+Do not delete `installation/` before setup is complete, and do not create an empty `configuration.php` manually.
 
 ---
 
 ## 6. Start the Project
 
-Build and start the containers:
-
 ```bash
 docker compose up -d --build
-```
-
-Check their status:
-
-```bash
 docker compose ps
 ```
 
-Expected result:
+Expected services:
 
 ```text
 joomla6-app            running
@@ -319,16 +312,11 @@ joomla6-db             running (healthy)
 joomla6-phpmyadmin     running
 ```
 
-Useful log commands:
+Useful checks:
 
 ```bash
 docker compose logs -f joomla
 docker compose logs -f mysql
-```
-
-Verify the Joomla source inside the container:
-
-```bash
 docker compose exec joomla ls -la /var/www/html
 ```
 
@@ -344,15 +332,11 @@ http://localhost:8080
 
 ### Step 1: Site Configuration
 
-Example:
-
 ```text
 Site Name: Joomla 6 Local
 ```
 
 ### Step 2: Administrator Account
-
-Example:
 
 ```text
 Real Name: Local Administrator
@@ -361,11 +345,9 @@ Password: use a strong password
 Email: admin@example.com
 ```
 
-This account is for Joomla Administrator. It is not the MySQL account.
+This is the Joomla Administrator account, not the MySQL account.
 
 ### Step 3: Database Configuration
-
-Use these values:
 
 | Field | Value |
 |---|---|
@@ -377,39 +359,62 @@ Use these values:
 | Table Prefix | Keep the generated value |
 | Connection Encryption | Default |
 
-The database host must be `mysql` because that is the Docker Compose service name.
+> **Docker Host Name note:** Joomla says: “Enter the host name, usually `localhost` or a name provided by your host.” When Joomla and MySQL run in Docker, enter the MySQL **Docker Compose service name** or container hostname instead. In this example, use `mysql`.
 
-Do not use:
+The service name comes from:
 
-```text
-localhost
-localhost:3307
-host.docker.internal
+```yaml
+services:
+  mysql:
 ```
 
-`3307` is the host-machine port. Joomla connects to MySQL inside Docker through:
+Joomla therefore connects internally through:
 
 ```text
 mysql:3306
 ```
 
-### Database host verification
+Do not use `localhost`, `localhost:3307`, or `host.docker.internal` for this wrapper. Port `3307` is only the host-machine port used by external database tools.
 
-Joomla may treat `mysql` as a remote database host and ask you to verify ownership.
+### Database host verification warning
 
-Follow the exact instruction shown by the installer. It normally asks you to create or remove a randomly named file inside:
+Joomla may display:
 
 ```text
-src/installation/
+Warning
+You are trying to use a database host which is not on your local server.
+For security reasons, you need to verify the ownership of your web hosting account.
 ```
 
-Example:
+This happens because Joomla sees `mysql` as a non-local hostname, even though it is a local Docker service.
+
+For a trusted local Docker environment, keep this variable under the `joomla` service:
+
+```yaml
+environment:
+  JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK: "1"
+```
+
+Recreate the container after adding it:
 
 ```bash
-touch src/installation/<exact-file-name-from-joomla>
+docker compose down
+docker compose up -d --build --force-recreate
 ```
 
-Use the exact filename displayed by Joomla.
+Verify the variable:
+
+```bash
+docker compose exec joomla printenv JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK
+```
+
+Expected output:
+
+```text
+1
+```
+
+Alternatively, follow Joomla's on-screen instruction to create or remove the exact randomly named verification file inside `src/installation/`.
 
 ---
 
@@ -423,7 +428,7 @@ After you click **Install Joomla**, Joomla will:
 4. save the site settings;
 5. generate `src/configuration.php`.
 
-Important database settings inside the generated file look similar to this:
+Important generated values look similar to:
 
 ```php
 public $dbtype = 'mysqli';
@@ -434,7 +439,7 @@ public $db = 'joomla6';
 public $dbprefix = 'abc12_';
 ```
 
-The prefix is added to Joomla table names, for example:
+The prefix is added to Joomla table names, such as:
 
 ```text
 abc12_users
@@ -454,7 +459,7 @@ Test whether Apache can write to the Joomla folder:
 docker compose exec -u www-data joomla touch /var/www/html/test-write.txt
 ```
 
-If the command fails, update the local permissions:
+If it fails:
 
 ```bash
 docker compose exec joomla chown -R www-data:www-data /var/www/html
@@ -466,11 +471,11 @@ Remove the test file:
 docker compose exec joomla rm -f /var/www/html/test-write.txt
 ```
 
-If Joomla displays the configuration content instead of creating the file:
+If Joomla displays configuration content instead of creating the file:
 
 1. Create `src/configuration.php`.
 2. Paste the complete content generated by Joomla.
-3. Validate the PHP syntax:
+3. Validate it:
 
 ```bash
 docker compose exec joomla php -l /var/www/html/configuration.php
@@ -481,8 +486,6 @@ Expected output:
 ```text
 No syntax errors detected in /var/www/html/configuration.php
 ```
-
-Do not write the configuration file from scratch unless necessary.
 
 ---
 
@@ -506,7 +509,7 @@ phpMyAdmin:
 http://localhost:8081
 ```
 
-After installation, verify that the file exists:
+Verify the generated configuration file:
 
 ```bash
 ls -la src/configuration.php
@@ -523,15 +526,13 @@ docker compose down -v
 rm -f src/configuration.php
 ```
 
-Make sure `src/installation/` still exists. If it was removed, extract it again from the Joomla Full Package.
-
-Start the project again:
+Make sure `src/installation/` exists. If Joomla removed it, extract it again from the Full Package.
 
 ```bash
 docker compose up -d --build
 ```
 
-Warning: `docker compose down -v` permanently removes the Docker database volume.
+> **Warning:** `docker compose down -v` permanently removes the Docker database volume.
 
 ---
 
@@ -543,8 +544,9 @@ Warning: `docker compose down -v` permanently removes the Docker database volume
 - [ ] `src/installation/` exists before installation.
 - [ ] MySQL container is healthy.
 - [ ] Joomla opens at `http://localhost:8080`.
-- [ ] Database host is `mysql`.
+- [ ] Database host is the Docker service name: `mysql`.
 - [ ] Database credentials match `.env`.
+- [ ] The database-host warning is disabled locally or manually verified.
 - [ ] Joomla creates its database tables.
 - [ ] `src/configuration.php` is generated.
 - [ ] Frontend and Administrator pages are accessible.
