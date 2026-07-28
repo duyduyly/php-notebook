@@ -1,31 +1,29 @@
-# Admin Tools 7.8.9 Installation and Verification Guide for Joomla 6
+# Admin Tools 7.8.9 Installation, Usage, and Verification Guide for Joomla 6
 
-This guide explains how to install **Akeeba Admin Tools 7.8.9** on **Joomla 6**, configure it safely, verify the installation, troubleshoot common problems, and recover access if a security rule blocks the Joomla administrator area.
+This guide explains how to install, configure, use, verify, troubleshoot, and safely operate **Akeeba Admin Tools 7.8.9** on **Joomla 6**.
 
-> **Important:** Admin Tools is not only a plugin. It is distributed as a Joomla **package extension** containing a component and several supporting plugins. Installing the complete package is the recommended method.
+> **Important:** Admin Tools is not only a plugin. It is distributed as a Joomla **package extension** containing a component and several supporting plugins.
 
-> **Security note:** Install and configure Admin Tools on a staging environment before enabling it on production. Incorrect WAF, IP, administrator protection, or web-server rules can block valid users, APIs, AJAX requests, payment callbacks, or the Joomla administrator area.
+> **Security warning:** Configure Admin Tools on staging first. Incorrect WAF, IP, administrator-protection, or web-server rules can block valid users, APIs, AJAX requests, payment callbacks, webhooks, or the complete Joomla administrator area.
 
 ## Table of Contents
 
 1. [Extension Information](#1-extension-information)
 2. [Official Download and Documentation](#2-official-download-and-documentation)
-3. [Prerequisites](#3-prerequisites)
-4. [Recommended Installation Using Joomla Upload Package File](#4-recommended-installation-using-joomla-upload-package-file)
-5. [Alternative Installation Using Install from Folder](#5-alternative-installation-using-install-from-folder)
-6. [Alternative Installation Using Joomla Discover](#6-alternative-installation-using-joomla-discover)
-7. [Initial Setup](#7-initial-setup)
-8. [Safe Configuration Order](#8-safe-configuration-order)
-9. [Verify That Installation Was Successful](#9-verify-that-installation-was-successful)
-10. [Functional Test Checklist](#10-functional-test-checklist)
-11. [Web Application Firewall Validation](#11-web-application-firewall-validation)
-12. [Web-Server Configuration](#12-web-server-configuration)
-13. [Update Configuration](#13-update-configuration)
-14. [Deployment to Another Environment](#14-deployment-to-another-environment)
-15. [Troubleshooting](#15-troubleshooting)
-16. [Emergency Recovery](#16-emergency-recovery)
-17. [Uninstallation](#17-uninstallation)
-18. [Production Readiness Checklist](#18-production-readiness-checklist)
+3. [Main Features](#3-main-features)
+4. [Prerequisites](#4-prerequisites)
+5. [Install Using Joomla Upload Package File](#5-install-using-joomla-upload-package-file)
+6. [Install Using Install from Folder](#6-install-using-install-from-folder)
+7. [Install Using Joomla Discover](#7-install-using-joomla-discover)
+8. [Initial Setup](#8-initial-setup)
+9. [How to Use Admin Tools](#9-how-to-use-admin-tools)
+10. [Safe Configuration Order](#10-safe-configuration-order)
+11. [Verify the Installation](#11-verify-the-installation)
+12. [Functional Test Checklist](#12-functional-test-checklist)
+13. [Troubleshooting and Emergency Recovery](#13-troubleshooting-and-emergency-recovery)
+14. [Production Operation Guide](#14-production-operation-guide)
+15. [Migration from Admin Tools 5.3.2](#15-migration-from-admin-tools-532)
+16. [Final Checklist](#16-final-checklist)
 
 ---
 
@@ -39,24 +37,20 @@ This guide explains how to install **Akeeba Admin Tools 7.8.9** on **Joomla 6**,
 | Target CMS | Joomla 6.0 / 6.1 |
 | Extension format | Joomla package extension |
 | Editions | Core and Professional |
-| Recommended installation method | Upload Package File |
-| Configuration strategy | Fresh configuration with selective migration of old rules |
+| Recommended installation | Upload Package File |
+| Configuration strategy | Fresh configuration with selective migration |
 | Testing priority | Critical |
 
-Admin Tools can affect every incoming request before Joomla finishes processing it. Treat it as a security-critical extension rather than a normal content plugin.
+Admin Tools can affect incoming requests before Joomla completes request processing. Treat it as a security-critical extension rather than a normal content plugin.
 
 ---
 
 ## 2. Official Download and Documentation
 
-### Official links
-
 - Latest Admin Tools downloads: <https://www.akeeba.com/download/admintools.html>
 - Admin Tools 7.8.9 release page: <https://www.akeeba.com/download/admintools/7-8-9.html>
-- Official documentation: <https://www.akeeba.com/documentation/admin-tools-joomla.html>
+- Official Admin Tools documentation: <https://www.akeeba.com/documentation/admin-tools-joomla.html>
 - Joomla extension installation documentation: <https://docs.joomla.org/Installing_an_extension>
-
-### Package selection
 
 Download the edition that matches the project license:
 
@@ -65,109 +59,231 @@ Admin Tools Core
 Admin Tools Professional
 ```
 
-A Core package normally follows a filename similar to:
+A Core package normally has a filename similar to:
 
 ```text
 pkg_admintools-7.8.9-core.zip
 ```
 
-The Professional package is available from an Akeeba account with an active subscription.
+The Professional package requires an eligible Akeeba account and subscription.
 
-### Important package rules
+### Package rules
 
 - Do not rename files inside the ZIP archive.
 - Do not remove nested ZIP packages.
-- Do not upload an extracted component directory through **Upload Package File**.
-- Do not install Core over Professional unless intentionally changing editions and following Akeeba's instructions.
-- Keep a copy of the original package for repeatable deployments.
+- Do not extract the package directly into the Joomla root.
+- Do not install Core over Professional unless intentionally changing editions.
+- Keep the original installer package for repeatable deployments.
+- Never commit an Akeeba Download ID or subscription credential to Git.
 
 ---
 
-## 3. Prerequisites
+## 3. Main Features
 
-Before installation, confirm the following:
+### 3.1 Web Application Firewall
+
+The Web Application Firewall, or WAF, inspects requests before Joomla finishes processing them.
+
+It can help detect or block:
+
+- Suspicious request patterns.
+- Common SQL injection attempts.
+- File inclusion attempts.
+- Repeated failed administrator logins.
+- Forbidden administrator usernames.
+- Known malicious IP addresses.
+- Direct access to restricted files.
+- Abnormal request parameters.
+
+Menu path:
+
+```text
+Components → Admin Tools → Web Application Firewall
+```
+
+The WAF is the most important Admin Tools feature, but it can also create false positives. Always test forms, APIs, AJAX, uploads, callbacks, and webhooks after changing WAF settings.
+
+### 3.2 Administrator Protection
+
+Admin Tools can protect `/administrator` with additional controls:
+
+- Administrator Secret URL Parameter.
+- Administrator Exclusive Allow IP List.
+- HTTP password protection on supported Apache or LiteSpeed servers.
+- Failed-login monitoring.
+- Automatic IP blocking.
+- Forbidden username blocking.
+
+Example secret URL:
+
+```text
+https://example.com/administrator?secureadmin
+```
+
+Do not enable an exclusive administrator IP allowlist when your IP changes frequently, such as on mobile networks, home Internet, or changing VPN endpoints.
+
+### 3.3 Security Exceptions and Blocked Request Logs
+
+The security log helps identify why a request was blocked.
+
+Typical information includes:
+
+- Date and time.
+- Source IP.
+- URL and HTTP method.
+- Component or endpoint.
+- User agent.
+- Security exception reason.
+
+Use this log first when a valid form, API, upload, webhook, or administrator feature returns HTTP `403`.
+
+### 3.4 IP Blocking
+
+Admin Tools can manage:
+
+- Permanently denied IP addresses.
+- Allowed IP addresses.
+- Administrator-only IP allowlists.
+- Automatically blocked IP addresses.
+- Automatic block history.
+
+Do not permanently block an IP based on one unverified request. Proxy, CDN, office, and mobile IP addresses may be shared or may change.
+
+### 3.5 Web-Server Configuration Makers
+
+Use the correct feature for the actual web server:
+
+| Web server | Admin Tools feature |
+|---|---|
+| Apache / LiteSpeed | `.htaccess Maker` |
+| Nginx | NginX Configuration Maker |
+| Microsoft IIS | `web.config Maker` |
+
+These tools can add rules for:
+
+- Blocking sensitive files.
+- Disabling directory listing.
+- Restricting PHP execution in selected directories.
+- HTTPS redirection.
+- Domain canonicalization.
+- Security headers.
+- Direct-file-access protection.
+
+Generate web-server rules only after Joomla-level testing is complete.
+
+### 3.6 PHP File Change Scanner
+
+The scanner can detect files that are:
+
+- Newly created.
+- Modified.
+- Deleted.
+- Potentially suspicious.
+
+A high threat score does not automatically prove that a file is malware. Legitimate extension and custom-code files may contain functions that require manual review.
+
+Use Git history, Joomla core packages, extension packages, and vendor checksums when reviewing scan results.
+
+### 3.7 Permission Repair
+
+Admin Tools can help restore configured file and directory permissions.
+
+Common values are:
+
+```text
+Files:       0644
+Directories: 0755
+```
+
+Do not use `0777` as a general fix.
+
+In Docker, permission issues may also depend on volume ownership, container UID/GID, Apache or PHP-FPM users, and host filesystem behavior.
+
+### 3.8 Maintenance and Automation
+
+Depending on the installed edition and configuration, Admin Tools may assist with:
+
+- Cache cleanup.
+- Temporary-directory cleanup.
+- Security-log cleanup.
+- Session maintenance.
+- Scheduled file scans.
+- Joomla Scheduled Tasks integration.
+- CLI or cron-based automation.
+
+### 3.9 URL Redirection
+
+Redirect management is useful when Joomla 3 URLs change during migration to Joomla 6.
+
+Example:
+
+```text
+/old-contact-page → /contact-us
+```
+
+Use permanent `301` redirects only when the new destination is final. Avoid redirect loops.
+
+---
+
+## 4. Prerequisites
+
+Before installation, confirm:
 
 - [ ] Joomla 6 is installed and working.
 - [ ] You can log in as a Super User.
-- [ ] The PHP version is supported by both Joomla 6 and Admin Tools 7.8.9.
-- [ ] The Joomla temporary directory is valid and writable.
-- [ ] Joomla can write to its extension directories.
+- [ ] The PHP version is supported.
+- [ ] Joomla temporary and log paths are valid.
+- [ ] Joomla can write to extension directories.
 - [ ] The database user can create and alter tables.
-- [ ] The website has a current source-code backup.
-- [ ] The website has a current database backup.
-- [ ] You have direct filesystem or container access for emergency recovery.
-- [ ] Existing `.htaccess`, Nginx, or IIS configuration has been backed up.
+- [ ] A source-code backup exists.
+- [ ] A database backup exists.
+- [ ] Direct filesystem or container access is available.
+- [ ] Existing `.htaccess`, Nginx, or IIS configuration is backed up.
 
-### Check Joomla paths
-
-In the Joomla administrator area, open:
+Check paths in:
 
 ```text
 System → Global Configuration → Server
 ```
 
-Verify that the temporary path exists and is writable.
-
-The configured temporary path is also available in `configuration.php`:
+Example `configuration.php` values:
 
 ```php
 public $tmp_path = '/absolute/path/to/tmp';
 public $log_path = '/absolute/path/to/administrator/logs';
 ```
 
-### Recommended backup commands
-
-Example MySQL backup:
+Example database backup:
 
 ```bash
 mysqldump -u DB_USER -p DB_NAME > before-admin-tools.sql
 ```
 
-Example filesystem backup for an Apache website:
+Example Apache configuration backup:
 
 ```bash
 cp .htaccess .htaccess.before-admin-tools
 ```
 
-For a Git-managed project:
-
-```bash
-git status
-git add .
-git commit -m "Backup before installing Admin Tools 7.8.9"
-```
-
-Do not commit credentials, production database dumps, private keys, or Akeeba Download IDs into Git.
-
 ---
 
-## 4. Recommended Installation Using Joomla Upload Package File
+## 5. Install Using Joomla Upload Package File
 
-This is the recommended and safest installation method.
+This is the recommended installation method.
 
 ### Step 1: Download the package
 
-Download Admin Tools 7.8.9 from the official Akeeba download page.
-
-Keep the downloaded package as a ZIP file, for example:
-
-```text
-pkg_admintools-7.8.9-core.zip
-```
+Download Admin Tools 7.8.9 from the official Akeeba website. Keep the installer as a ZIP file.
 
 ### Step 2: Log in to Joomla
-
-Open:
 
 ```text
 https://your-domain.example/administrator
 ```
 
-Log in using a Super User account.
+Use a Super User account.
 
-### Step 3: Open the extension installer
-
-Navigate to:
+### Step 3: Open the installer
 
 ```text
 System → Install → Extensions
@@ -177,11 +293,11 @@ System → Install → Extensions
 
 Under **Upload Package File**:
 
-1. Drag the Admin Tools ZIP file into the upload area, or select it manually.
-2. Wait until Joomla finishes uploading and installing the package.
+1. Select or drag the Admin Tools ZIP package.
+2. Wait for Joomla to upload and install it.
 3. Do not refresh or close the browser during installation.
 
-A successful installation should display a message similar to:
+Expected message:
 
 ```text
 Installation of the package was successful.
@@ -189,27 +305,19 @@ Installation of the package was successful.
 
 ### Step 5: Open Admin Tools
 
-Navigate to:
-
 ```text
 Components → Admin Tools
 ```
 
-Allow Admin Tools to complete any first-run database or configuration initialization.
+Allow the first-run initialization to complete.
 
 ### Step 6: Clear Joomla cache
-
-Navigate to:
 
 ```text
 System → Maintenance → Clear Cache
 ```
 
-Clear relevant administrator and site cache entries.
-
-### Step 7: Verify installed extensions
-
-Navigate to:
+### Step 7: Verify child extensions
 
 ```text
 System → Manage → Extensions
@@ -225,38 +333,26 @@ Confirm that the package, component, and supporting plugins are present.
 
 ---
 
-## 5. Alternative Installation Using Install from Folder
+## 6. Install Using Install from Folder
 
-Use this method when browser upload limits prevent normal ZIP upload.
+Use this method when browser upload limits prevent normal upload.
 
-### Step 1: Copy the package to the server
-
-Copy the original Admin Tools ZIP package to a server directory accessible by Joomla, for example:
-
-```text
-/path/to/joomla/tmp/pkg_admintools-7.8.9-core.zip
-```
-
-### Step 2: Extract the package into a temporary folder
-
-Example:
+### Step 1: Extract the package into a temporary directory
 
 ```bash
 mkdir -p /path/to/joomla/tmp/admin-tools-install
 unzip pkg_admintools-7.8.9-core.zip -d /path/to/joomla/tmp/admin-tools-install
 ```
 
-Do not extract the files directly into the Joomla root directory.
+Do not extract directly into the Joomla root.
 
-### Step 3: Open Install from Folder
-
-Navigate to:
+### Step 2: Open Install from Folder
 
 ```text
 System → Install → Extensions → Install from Folder
 ```
 
-Enter the absolute extracted directory path:
+Enter:
 
 ```text
 /path/to/joomla/tmp/admin-tools-install
@@ -264,52 +360,44 @@ Enter the absolute extracted directory path:
 
 Click **Check and Install**.
 
-### Step 4: Clean temporary files
-
-After successful installation, remove the extracted temporary installer directory:
+### Step 3: Remove temporary files
 
 ```bash
 rm -rf /path/to/joomla/tmp/admin-tools-install
 ```
 
-Keep the original package in a secure deployment-artifact location if required.
-
 ---
 
-## 6. Alternative Installation Using Joomla Discover
+## 7. Install Using Joomla Discover
 
-### When Discover should be used
+### When Discover is appropriate
 
-Joomla Discover is useful when extension files already exist in the correct Joomla directories but the extension records are missing from the database. Common cases include:
+Use Discover when extension files already exist in the correct Joomla directories but extension database records are missing.
 
-- Files were deployed through Git, rsync, Docker image, or another deployment pipeline.
-- A previous installation was interrupted after copying files.
-- A database was recreated without reinstalling extensions.
-- An extension exists in the filesystem but is not listed in Joomla Extension Manager.
+Examples:
 
-### Important limitation
+- Files were deployed using Git, rsync, or a Docker image.
+- Installation stopped after copying files.
+- A database was recreated.
+- Extension files exist but Joomla does not list the extension.
 
-**Discover is not the preferred first installation method for Admin Tools.** Admin Tools is a package containing multiple extensions and installation scripts. Uploading the complete package lets Joomla process dependencies and manifests in the expected order.
+> **Discover is not the preferred first installation method for Admin Tools.** Package installation is safer because it executes manifests, dependencies, and installation scripts in the expected order.
 
-Use Discover only when the files have already been placed correctly and normal package installation is not possible.
-
-### 6.1 Prepare the package files
-
-Do not copy the outer package ZIP directly into the Joomla root.
-
-First inspect the package in a temporary directory:
+### Step 1: Inspect package contents
 
 ```bash
 mkdir -p /tmp/admin-tools-package
 unzip pkg_admintools-7.8.9-core.zip -d /tmp/admin-tools-package
-find /tmp/admin-tools-package -maxdepth 3 -type f
+find /tmp/admin-tools-package -maxdepth 5 -type f
+find /tmp/admin-tools-package -maxdepth 5 -name '*.xml'
+find /tmp/admin-tools-package -maxdepth 5 -name '*.zip'
 ```
 
-A Joomla package may contain nested installable archives and a package manifest. Each nested extension archive must be handled according to its own manifest.
+### Step 2: Read each extension manifest
 
-### 6.2 Copy extension files to their target directories
+Do not guess target directories or plugin folder names. Read each XML manifest and follow its `<files>`, `<folder>`, `<filename>`, and `<media>` definitions.
 
-The exact target is defined by each extension manifest. Typical Joomla locations include:
+Typical Joomla targets may include:
 
 ```text
 administrator/components/com_admintools/
@@ -322,45 +410,18 @@ language/<language-tag>/
 administrator/language/<language-tag>/
 ```
 
-Do not guess plugin folder names. Read the XML manifest inside each nested package and use its `<files>`, `<folder>`, `<filename>`, `<media>`, and destination definitions.
+### Step 3: Preserve ownership and permissions
 
-Example inspection commands:
-
-```bash
-find /tmp/admin-tools-package -name '*.xml' -maxdepth 5
-find /tmp/admin-tools-package -name '*.zip' -maxdepth 5
-```
-
-When a nested ZIP exists, extract it separately before copying its files:
-
-```bash
-mkdir -p /tmp/admin-tools-component
-unzip component-package.zip -d /tmp/admin-tools-component
-```
-
-### 6.3 Preserve ownership and permissions
-
-After copying files, apply the same ownership used by the Joomla web server.
-
-Example for a Debian-based Apache container:
+Example only:
 
 ```bash
 chown -R www-data:www-data administrator/components/com_admintools
 chown -R www-data:www-data media/com_admintools
 ```
 
-Use project-specific ownership. Do not blindly apply `777` permissions.
+Use project-specific ownership. Do not apply `777` permissions.
 
-Typical safe defaults are:
-
-```text
-Directories: 755
-Files:       644
-```
-
-### 6.4 Run Joomla Discover
-
-In Joomla administrator, navigate to:
+### Step 4: Run Discover
 
 ```text
 System → Install → Discover
@@ -369,34 +430,32 @@ System → Install → Discover
 Then:
 
 1. Click **Discover**.
-2. Search for entries related to Admin Tools or Akeeba.
-3. Select the component first if dependency ordering requires it.
-4. Install the discovered component.
-5. Repeat Discover.
-6. Install the supporting plugins.
-7. Install the package record last if it is discoverable and required.
+2. Search for Admin Tools or Akeeba entries.
+3. Install the component and required plugins according to dependencies.
+4. Repeat Discover after each installation if necessary.
+5. Stop if Joomla reports missing dependencies or installation-script errors.
+6. Use the original package installer when Discover cannot complete installation safely.
 
-The exact order may depend on the package manifest. If Joomla reports a missing dependency or installation script error, stop and use the normal package installer instead.
-
-### 6.5 Rebuild the update sites
-
-Navigate to:
+### Step 5: Rebuild update sites
 
 ```text
 System → Update → Update Sites
 ```
 
-Run the available rebuild action if Admin Tools update-site records are missing.
+Rebuild update sites if required, then clear the extension-update cache.
 
-Then navigate to:
+### Discover acceptance criteria
 
-```text
-System → Update → Extensions
-```
+- [ ] Admin Tools opens without an exception.
+- [ ] All required plugins are registered.
+- [ ] Database schema initializes successfully.
+- [ ] Update sites exist.
+- [ ] No missing-file warnings appear.
+- [ ] Frontend and administrator requests work normally.
 
-Clear the update cache and check for updates.
+---
 
-### 6.6 Validate database schema
+## 8. Initial Setup
 
 Open:
 
@@ -404,315 +463,201 @@ Open:
 Components → Admin Tools
 ```
 
-If the component reports missing tables, schema mismatch, or incomplete installation, reinstall the original package through **Upload Package File**. Do not manually invent database tables from another Admin Tools version.
+Run the Quick Setup Wizard once with conservative settings.
 
-### Discover installation acceptance criteria
-
-Discover installation is acceptable only when all of the following are true:
-
-- [ ] Admin Tools opens without an exception.
-- [ ] All required plugins are listed in Extension Manager.
-- [ ] Database tables and schema initialize successfully.
-- [ ] Update sites are registered.
-- [ ] No missing-file warnings appear.
-- [ ] Joomla administrator and frontend requests work normally.
-
----
-
-## 7. Initial Setup
-
-After installation, navigate to:
-
-```text
-Components → Admin Tools
-```
-
-If a Quick Setup Wizard is displayed, use conservative settings first.
-
-### Recommended first-run settings
-
-Enable or retain basic protections such as:
+### Enable first
 
 - Security exception logging.
-- Protection from clearly malicious request patterns.
-- Basic administrator-login monitoring.
+- Basic malicious-request protection.
+- Failed administrator-login monitoring.
 - Standard request filtering recommended by the vendor.
 
-### Settings to postpone
-
-Do not enable all advanced options during the first configuration session. Postpone these until staging tests are complete:
+### Postpone until testing is complete
 
 - Administrator Exclusive Allow IP List.
 - Administrator Secret URL Parameter.
-- Aggressive automatic IP blocking.
 - Country blocking.
-- Immediate email notification for every blocked request.
+- Aggressive automatic IP blocking.
+- Immediate email for every blocked request.
 - Strict direct-file-access restrictions.
 - New `.htaccess`, Nginx, or IIS rules.
 - Broad upload restrictions.
 
-### Why conservative setup is required
-
-A security feature can be technically functional but still break legitimate project behavior. Admin Tools rules may affect:
-
-- Joomla Web Services API.
-- `com_ajax` requests.
-- AcyMailing subscription forms and callbacks.
-- HikaShop cart, checkout, and payment callbacks.
-- RSForm Pro form submission and file upload.
-- JCE media upload.
-- SP Page Builder editor requests.
-- Cron jobs and Joomla Scheduled Tasks.
-- External webhook integrations.
+Keep an authenticated administrator tab open while enabling stronger protection.
 
 ---
 
-## 8. Safe Configuration Order
+## 9. How to Use Admin Tools
 
-Configure Admin Tools in the following order:
+### 9.1 Configure the WAF
 
-```text
-1. Install the package
-2. Verify the component and plugins
-3. Enable security exception logging
-4. Test frontend and administrator behavior
-5. Enable basic WAF protection
-6. Test APIs, AJAX, forms, uploads, and callbacks
-7. Add narrow exceptions for confirmed false positives
-8. Configure administrator protection
-9. Configure automatic IP blocking
-10. Generate web-server rules last
-11. Run complete regression testing
-12. Deploy to production
-```
-
-Do not enable administrator IP restrictions, a secret URL, and strict web-server rules at the same time. Enable and verify one protection layer at a time.
-
----
-
-## 9. Verify That Installation Was Successful
-
-### 9.1 Check the component
-
-Navigate to:
+Open:
 
 ```text
-Components → Admin Tools
+Components → Admin Tools → Web Application Firewall → Configure WAF
 ```
 
-Success criteria:
+Recommended process:
 
-- The Admin Tools dashboard opens.
-- No PHP fatal error is displayed.
-- No missing database table error is displayed.
-- The installed version is shown as 7.8.9.
-- Configuration pages can be opened and saved.
+1. Enable logging.
+2. Enable one group of protections.
+3. Save the configuration.
+4. Test frontend and administrator functions.
+5. Review the Security Exceptions Log.
+6. Fix false positives before enabling the next group.
 
-### 9.2 Check Extension Manager
+Do not change many unrelated rules at once. Incremental changes make troubleshooting possible.
 
-Navigate to:
+### 9.2 Review blocked requests
 
-```text
-System → Manage → Extensions
-```
+Open the blocked-request or security-exception log from the WAF section.
 
-Search for:
+For every suspicious or valid blocked request, record:
 
-```text
-Admin Tools
-```
-
-Confirm that the expected package, component, and plugins are installed.
-
-Record at least:
-
-| Field | Expected result |
-|---|---|
-| Name | Admin Tools / related Akeeba entry |
-| Status | Enabled where required |
-| Type | Package, Component, Plugin |
-| Version | 7.8.9 or package-specific matching version |
-| Author | Akeeba Ltd |
-
-### 9.3 Check plugins
-
-Navigate to:
-
-```text
-System → Manage → Plugins
-```
-
-Search for:
-
-```text
-Admin Tools
-```
-
-Verify required plugins are enabled. A Task plugin is needed only for related scheduled-task functionality.
-
-### 9.4 Check database tables
-
-Use the actual Joomla table prefix instead of `#__`.
-
-Example inspection query:
-
-```sql
-SHOW TABLES LIKE '%admintools%';
-```
-
-Do not require a hard-coded table count because the schema may differ by edition and release. The important result is that the component opens and does not report missing schema.
-
-### 9.5 Check logs
-
-Review:
-
-```text
-System → Maintenance → System Information
-System → Manage → Extensions
-Components → Admin Tools → Security Exceptions Log
-```
-
-Also inspect the Joomla log directory configured in `configuration.php`.
-
-### 9.6 Check extension updates
-
-Navigate to:
-
-```text
-System → Update → Extensions
-```
-
-Clear the update cache and check for updates. Admin Tools should have an active official update site.
-
----
-
-## 10. Functional Test Checklist
-
-### Joomla administrator
-
-- [ ] Log in successfully using a valid Super User account.
-- [ ] Log out and log in again.
-- [ ] A single invalid login does not unexpectedly block the developer IP.
-- [ ] Global Configuration opens and saves.
-- [ ] Extension Manager opens.
-- [ ] Plugin Manager opens.
-- [ ] Media Manager opens.
-- [ ] An image can be uploaded.
-- [ ] Template settings open and save.
-- [ ] Joomla Scheduled Tasks open and run.
-- [ ] Joomla extension update checking works.
-
-### Joomla frontend
-
-- [ ] The homepage loads without HTTP 403 or 500.
-- [ ] CSS and JavaScript assets load.
-- [ ] Images load.
-- [ ] SEF URLs work.
-- [ ] Login and logout work.
-- [ ] Search works.
-- [ ] Contact or custom forms submit successfully.
-- [ ] AJAX-based features work.
-- [ ] File uploads work where expected.
-
-### Project extensions
-
-- [ ] AcyMailing subscription form works.
-- [ ] AcyMailing sends a test email.
-- [ ] HikaShop cart and checkout work.
-- [ ] HikaShop payment callbacks are accepted.
-- [ ] RSForm Pro forms submit successfully.
-- [ ] RSForm Pro upload fields work.
-- [ ] JCE file browser and uploads work.
-- [ ] SP Page Builder editor opens and saves.
-- [ ] DJ Image Slider assets load.
-- [ ] JCH Optimize does not produce blocked asset URLs.
-- [ ] Custom components and plugins work.
-
-### API and integrations
-
-- [ ] Joomla API endpoints under `/api/index.php/v1/` work.
-- [ ] `com_ajax` endpoints work.
-- [ ] External webhooks are accepted.
-- [ ] Cron endpoints work.
-- [ ] Payment provider callbacks work.
-- [ ] Reverse proxy or CDN reports the correct client IP.
-
----
-
-## 11. Web Application Firewall Validation
-
-After enabling WAF protection, repeat all functional tests and review:
-
-```text
-Components → Admin Tools → Web Application Firewall → Security Exceptions Log
-```
-
-For each blocked request, record:
-
-- Request date and time.
-- URL and HTTP method.
+- Request time.
+- URL.
+- HTTP method.
 - Component or endpoint.
-- Security exception reason.
-- Request source IP.
+- Source IP.
+- Exception reason.
 - Whether the request was legitimate.
-- The narrow exception applied, if any.
 
-### Correct false-positive handling
+### 9.3 Handle a legitimate request blocked by WAF
 
-Use the narrowest possible exception based on the affected component, endpoint, or request condition.
+Example: an RSForm Pro submission returns `403 Forbidden`.
 
-Avoid these unsafe approaches:
+1. Reproduce the error and note the exact time.
+2. Open the Security Exceptions Log.
+3. Find the matching request.
+4. Confirm the user, URL, component, and request are legitimate.
+5. Create the narrowest supported exception.
+6. Submit the form again.
+7. Confirm unrelated suspicious requests remain blocked.
+
+Avoid:
 
 ```text
-Disable the complete WAF permanently
-Whitelist every POST request
-Whitelist all API endpoints
-Whitelist an entire third-party network without validation
-Ignore repeated 403 responses
+Disabling the complete WAF
+Allowing every POST request
+Whitelisting every API endpoint
+Whitelisting an entire network without verification
 ```
 
-After adding an exception, reproduce the exact request and confirm that unrelated malicious-looking requests remain blocked.
+### 9.4 Configure administrator protection
 
----
+Configure one feature at a time:
 
-## 12. Web-Server Configuration
+1. Failed-login monitoring.
+2. Automatic blocking with a moderate threshold.
+3. Secret URL parameter, if required.
+4. IP restriction only when reliable static IP access exists.
+5. HTTP password protection only on a supported server.
 
-Admin Tools Professional can generate configuration for supported web servers. Generate these rules only after Joomla and extension-level testing is complete.
+After every change:
 
-### 12.1 Apache or LiteSpeed
+- Open a private browser window.
+- Test the correct administrator URL.
+- Test login and logout.
+- Confirm filesystem recovery access remains available.
 
-Back up the current file:
+### 9.5 Configure automatic IP blocking
+
+A reasonable starting policy is:
+
+```text
+Block after:        5–10 violations
+Observation period: 10–30 minutes
+Block duration:     15–60 minutes
+```
+
+These are starting values, not mandatory vendor defaults. Adjust them based on traffic, false positives, proxy architecture, and security requirements.
+
+### 9.6 Configure email notifications
+
+First verify Joomla email:
+
+```text
+System → Global Configuration → Server → Mail → Send Test Mail
+```
+
+Prefer alerts for important events:
+
+- Successful or failed backend login when relevant.
+- Automatic IP blocking.
+- Important security exceptions.
+- Suspicious file changes.
+
+Do not send an email for every blocked bot request. High-volume notifications can overload mail delivery or PHP workers.
+
+### 9.7 Use PHP File Change Scanner
+
+Create a baseline after Joomla and all extensions are stable:
+
+```text
+Components → Admin Tools → PHP File Change Scanner → Scan Now
+```
+
+Review results using this priority:
+
+| Result | Recommended action |
+|---|---|
+| Expected Joomla update | Verify version or checksum |
+| Expected extension update | Compare with vendor package |
+| Custom-code change | Compare with Git |
+| PHP file in upload directory | Investigate immediately |
+| Unknown new PHP file | Quarantine and investigate |
+| Obfuscated code | High-priority review |
+
+Do not immediately delete suspicious files. Back them up or move them outside the web root before analysis.
+
+### 9.8 Schedule scans and maintenance
+
+Open:
+
+```text
+System → Scheduled Tasks
+```
+
+Use the available Admin Tools task types for file scans or maintenance. Confirm the related Task plugin is enabled.
+
+Run the task manually once before relying on cron or scheduled execution.
+
+### 9.9 Use `.htaccess` Maker
+
+For Apache or LiteSpeed only:
 
 ```bash
 cp .htaccess .htaccess.before-admin-tools
 ```
 
-Open:
+Then open:
 
 ```text
 Components → Admin Tools → .htaccess Maker
 ```
 
-Generate conservative rules first. Immediately test:
+Enable conservative rules first. Immediately test:
 
-- Frontend.
+- Homepage.
 - Administrator.
-- Static assets.
+- CSS, JavaScript, and images.
 - API endpoints.
 - Uploads.
+- Forms.
+- Payment callbacks.
 - Webhooks.
 
-Restore the previous file if necessary:
+Rollback if necessary:
 
 ```bash
 cp .htaccess.before-admin-tools .htaccess
 ```
 
-### 12.2 Nginx
+### 9.10 Use Nginx Configuration Maker
 
-Nginx does not read `.htaccess`. Generate the Nginx configuration and include it in the relevant `server` block according to the deployment architecture.
+Nginx does not read `.htaccess`.
 
-Validate configuration before reload:
+Generate the configuration, add it to the correct Nginx server block, and test:
 
 ```bash
 nginx -t
@@ -724,242 +669,241 @@ Reload only after validation succeeds:
 sudo systemctl reload nginx
 ```
 
-For Docker, update the mounted configuration and reload or restart the Nginx container according to the project deployment process.
+For Docker, update the mounted configuration and restart or reload the appropriate container.
 
-### 12.3 Microsoft IIS
+### 9.11 Use permission repair
 
-Back up `web.config` before using the IIS configuration maker. Validate rewrite and access-control behavior after generation.
+Before running Fix Permissions:
+
+1. Confirm expected file and directory permission values.
+2. Confirm the PHP or web-server user.
+3. Check Docker UID/GID and volume ownership.
+4. Back up or commit current filesystem changes.
+5. Run the repair.
+6. Test uploads, cache, logs, and extension installation.
+
+### 9.12 Export settings
+
+After configuration is stable, export or document the Admin Tools settings.
+
+Review environment-specific values before importing elsewhere:
+
+- Domain.
+- HTTPS state.
+- IP allowlists.
+- Proxy settings.
+- Secret administrator URL.
+- Notification email.
+- Filesystem paths.
+- Web-server type.
+
+Do not blindly import production IP or secret configuration into local development.
 
 ---
 
-## 13. Update Configuration
+## 10. Safe Configuration Order
 
-### Core edition
+```text
+1. Install the package
+2. Verify the component and plugins
+3. Enable security exception logging
+4. Test frontend and administrator behavior
+5. Enable basic WAF protection
+6. Test APIs, AJAX, forms, uploads, and callbacks
+7. Add narrow exceptions for confirmed false positives
+8. Configure administrator protection
+9. Configure automatic IP blocking
+10. Create the PHP File Scanner baseline
+11. Configure scheduled tasks
+12. Generate web-server rules last
+13. Run complete regression testing
+14. Export the final configuration
+15. Deploy to production
+```
 
-Use Joomla extension updates:
+Do not enable IP restrictions, a secret administrator URL, aggressive auto-blocking, and strict web-server rules simultaneously.
+
+---
+
+## 11. Verify the Installation
+
+### Component check
+
+```text
+Components → Admin Tools
+```
+
+Success criteria:
+
+- Dashboard opens.
+- No PHP fatal error appears.
+- No missing-table error appears.
+- Version 7.8.9 is shown.
+- Configuration pages can be opened and saved.
+
+### Extension check
+
+```text
+System → Manage → Extensions
+```
+
+Search for Admin Tools and verify the expected package, component, and plugins.
+
+| Field | Expected result |
+|---|---|
+| Name | Admin Tools or related Akeeba entry |
+| Status | Enabled where required |
+| Type | Package, Component, Plugin |
+| Version | 7.8.9 or matching child version |
+| Author | Akeeba Ltd |
+
+### Plugin check
+
+```text
+System → Manage → Plugins
+```
+
+Search for Admin Tools. Enable only plugins required for the features in use.
+
+### Database check
+
+Use the real Joomla table prefix:
+
+```sql
+SHOW TABLES LIKE '%admintools%';
+```
+
+Do not require a fixed table count. The component must open without reporting an incomplete schema.
+
+### Update-site check
 
 ```text
 System → Update → Extensions
 ```
 
-### Professional edition
-
-Configure the Akeeba update authentication or Download ID according to the active Akeeba subscription and current vendor documentation.
-
-Security rules:
-
-- Do not commit the Download ID to a public repository.
-- Do not place it in screenshots or public documentation.
-- Use environment-specific secret management where possible.
-- Remove production credentials from cloned development databases.
-
-After configuration:
-
-1. Clear the Joomla update cache.
-2. Check for updates.
-3. Confirm that the official Admin Tools update site is enabled.
-4. Confirm Joomla can retrieve update metadata without authentication errors.
+Clear the update cache and check for updates. Confirm the official Admin Tools update site is enabled.
 
 ---
 
-## 14. Deployment to Another Environment
+## 12. Functional Test Checklist
 
-### Recommended strategy
+### Joomla administrator
 
-Treat the original Admin Tools package as a deployment dependency.
+- [ ] Valid Super User login succeeds.
+- [ ] Logout and login work.
+- [ ] One invalid login does not unexpectedly block the developer.
+- [ ] Global Configuration opens and saves.
+- [ ] Extension Manager opens.
+- [ ] Media Manager and uploads work.
+- [ ] Template settings open and save.
+- [ ] Scheduled Tasks open and run.
 
-For each target environment:
+### Joomla frontend
 
-1. Deploy Joomla source code and database according to the project process.
-2. Install the original Admin Tools package through Joomla or an approved automation process.
-3. Apply environment-specific Admin Tools configuration.
-4. Do not copy production IP allowlists into local development.
-5. Do not copy production Download IDs into public configuration.
-6. Rebuild web-server configuration for the target server.
-7. Run the full verification checklist.
+- [ ] Homepage loads without `403` or `500`.
+- [ ] CSS, JavaScript, and images load.
+- [ ] SEF URLs work.
+- [ ] Login and logout work.
+- [ ] Search works.
+- [ ] Forms submit successfully.
+- [ ] AJAX features work.
+- [ ] File uploads work.
 
-### Git considerations
+### Project extensions
 
-Installing a Joomla extension changes both files and database records. Committing extension files alone does not reproduce the complete installation.
+- [ ] AcyMailing subscription and test email work.
+- [ ] HikaShop cart and checkout work.
+- [ ] Payment callbacks are accepted.
+- [ ] RSForm Pro submissions and uploads work.
+- [ ] JCE media browser and uploads work.
+- [ ] SP Page Builder opens and saves.
+- [ ] DJ Image Slider assets load.
+- [ ] JCH Optimize does not generate blocked asset URLs.
+- [ ] Custom components and plugins work.
 
-A deployment process must account for:
+### API and integrations
 
-- Extension files.
-- Joomla `#__extensions` records.
-- Admin Tools database tables.
-- Plugin enabled state.
-- Update-site records.
-- Configuration values.
-- Web-server rules.
-
-Do not assume that copying a Joomla database from another environment is always safe. IP addresses, domains, proxy settings, secret URLs, paths, and notification email addresses may be environment-specific.
+- [ ] `/api/index.php/v1/` endpoints work.
+- [ ] `com_ajax` endpoints work.
+- [ ] Webhooks work.
+- [ ] Cron endpoints work.
+- [ ] Reverse proxy or CDN passes the correct client IP.
 
 ---
 
-## 15. Troubleshooting
+## 13. Troubleshooting and Emergency Recovery
 
-### 15.1 Upload size error
-
-Symptoms:
-
-```text
-The uploaded file exceeds the upload_max_filesize directive
-Maximum PHP upload size exceeded
-```
-
-Check PHP settings:
-
-```ini
-upload_max_filesize = 16M
-post_max_size = 16M
-memory_limit = 256M
-```
-
-Restart or reload the PHP service after changing configuration. Alternatively, use **Install from Folder**.
-
-### 15.2 Temporary directory error
-
-Symptoms:
-
-```text
-JFolder::create: Could not create directory
-Unable to write entry
-Path does not have a valid package
-```
-
-Verify:
-
-- `configuration.php` contains the correct absolute temporary path.
-- The directory exists.
-- The web-server user can write to it.
-- The disk is not full.
-
-Example:
-
-```bash
-mkdir -p /path/to/joomla/tmp
-chown -R www-data:www-data /path/to/joomla/tmp
-chmod 755 /path/to/joomla/tmp
-```
-
-Adjust user and path for the actual environment.
-
-### 15.3 HTTP 403 after setup
+### HTTP 403
 
 Possible causes:
 
 - WAF false positive.
 - Administrator IP restriction.
-- Secret administrator URL setting.
-- Generated `.htaccess` or Nginx rule.
-- Incorrect reverse-proxy client IP detection.
+- Secret administrator URL.
+- Generated web-server rule.
+- Incorrect proxy IP detection.
 
 Actions:
 
 1. Check the Security Exceptions Log.
-2. Identify the exact blocked endpoint.
+2. Identify the exact endpoint and reason.
 3. Disable only the suspected rule.
 4. Reproduce the request.
-5. Add a narrow exception only when the request is confirmed legitimate.
+5. Add a narrow exception only for a verified legitimate request.
 
-### 15.4 HTTP 500 after generating `.htaccess`
-
-Restore the previous file:
+### HTTP 500 after `.htaccess` generation
 
 ```bash
 cp .htaccess.before-admin-tools .htaccess
 ```
 
-Then review unsupported Apache directives and server modules before regenerating rules.
+Review unsupported Apache directives or missing modules before regenerating.
 
-### 15.5 CSS, JavaScript, or images are blocked
-
-Check browser developer tools for HTTP 403 responses. Review direct-file-access rules and Security Exceptions Log.
-
-Do not disable all protection before determining the affected path.
-
-### 15.6 API or webhook fails
+### API, webhook, or form failure
 
 Capture:
 
 - URL.
 - HTTP method.
-- Request headers.
-- Response status.
-- Response body.
-- Admin Tools security exception reason.
+- Headers.
+- Response status and body.
+- Admin Tools exception reason.
 
-Create a narrow exception for the verified endpoint. Retest invalid requests to ensure the exception is not too broad.
+Create an endpoint-specific exception only after verifying the request.
 
-### 15.7 Extension appears in files but not Joomla
+### Restore access to administrator
 
-Use:
+Before enabling strong protection, keep a logged-in administrator session open and verify filesystem access.
 
-```text
-System → Install → Discover
-```
+For Apache, restore the previous `.htaccess`.
 
-If Discover does not list the extension, verify that its manifest is in the correct directory and that the extracted file structure matches the Joomla manifest.
-
-### 15.8 Component opens with missing tables
-
-Reinstall the exact original Admin Tools package through **Upload Package File**. Joomla extension reinstall normally refreshes files and runs required installation/update logic without requiring manual SQL edits.
-
-Always back up first.
-
----
-
-## 16. Emergency Recovery
-
-### Recovery principle
-
-Before enabling strong administrator protection, keep an authenticated administrator browser session open and confirm direct filesystem access is available.
-
-### 16.1 Restore web-server configuration
-
-For Apache:
-
-```bash
-cp .htaccess.before-admin-tools .htaccess
-```
-
-For Nginx, remove or disable the generated include, validate with `nginx -t`, and reload Nginx.
-
-### 16.2 Locate Admin Tools plugin directories
-
-Use filesystem search instead of guessing folder names:
+Locate Admin Tools paths instead of guessing:
 
 ```bash
 find plugins -maxdepth 3 -iname '*admintools*' -print
 find administrator -maxdepth 4 -iname '*admintools*' -print
 ```
 
-### 16.3 Temporarily disable the system plugin directory
-
-Only after identifying the exact Admin Tools system plugin directory, rename it temporarily. Example pattern:
+Temporarily rename only the confirmed Admin Tools system plugin directory when necessary:
 
 ```bash
-mv plugins/system/IDENTIFIED_ADMIN_TOOLS_DIRECTORY \
-   plugins/system/IDENTIFIED_ADMIN_TOOLS_DIRECTORY.disabled
+mv plugins/system/CONFIRMED_ADMIN_TOOLS_DIRECTORY \
+   plugins/system/CONFIRMED_ADMIN_TOOLS_DIRECTORY.disabled
 ```
-
-Then try to open Joomla administrator again.
 
 After access is restored:
 
-1. Disable or correct the offending rule.
+1. Correct the offending rule.
 2. Restore the plugin directory name.
 3. Clear Joomla and browser cache.
-4. Confirm the plugin is enabled correctly.
-5. Repeat frontend and administrator tests.
+4. Confirm the plugin is enabled.
+5. Repeat frontend and administrator testing.
 
-Do not rename unrelated Joomla system, services, authentication, or user plugins.
+Do not rename unrelated system, services, authentication, or user plugins.
 
-### 16.4 Database fallback
+### Database fallback
 
-Direct database modification should be a last resort. Back up the database first and identify the exact extension record using queries rather than hard-coded IDs.
-
-Example inspection query:
+Use direct database modification only as a last resort and only after backup.
 
 ```sql
 SELECT extension_id, name, type, element, folder, enabled
@@ -968,107 +912,51 @@ WHERE name LIKE '%Admin Tools%'
    OR element LIKE '%admintools%';
 ```
 
-Replace `PREFIX_` with the real Joomla database prefix. Do not modify records until the exact system plugin has been identified.
+Replace `PREFIX_` with the real Joomla prefix. Identify the exact record before making any change.
 
 ---
 
-## 17. Uninstallation
+## 14. Production Operation Guide
 
-Before uninstalling Admin Tools:
+### Daily or when alerted
 
-1. Back up the website and database.
-2. Export or document required configuration.
-3. Restore or replace generated `.htaccess`, Nginx, or IIS rules.
-4. Confirm no deployment automation depends on Admin Tools CLI or scheduled tasks.
-5. Confirm removing the extension will not leave the administrator protected by an unknown external rule.
+- Review unusual administrator login alerts.
+- Investigate new HTTP `403` errors.
+- Confirm critical APIs, webhooks, and payment callbacks.
+- Review automatically blocked IP addresses when users report access problems.
 
-Navigate to:
+### Weekly
 
-```text
-System → Manage → Extensions
-```
+- Review Security Exceptions and blocked-request logs.
+- Check for false positives.
+- Review automatically blocked IP addresses.
+- Check Joomla and extension updates.
+- Review scheduled-task failures.
 
-Search for the **Admin Tools package** and uninstall the package instead of removing individual child plugins first.
+### Monthly
 
-After uninstalling:
+- Run or review a complete file-change scan.
+- Review WAF exceptions and remove obsolete entries.
+- Export or document the current configuration.
+- Verify backup and rollback procedures.
+- Review administrator accounts.
+- Retest web-server rules after major extension or server changes.
 
-- Clear Joomla cache.
-- Verify frontend and administrator access.
-- Check remaining Akeeba-related entries.
-- Check scheduled tasks.
-- Check update sites.
-- Review the database for leftovers only if there is a confirmed uninstall problem.
+### After every extension or Joomla update
 
-Do not manually delete database tables unless backup and retention requirements are understood.
-
----
-
-## 18. Production Readiness Checklist
-
-### Installation
-
-- [ ] The official Admin Tools 7.8.9 package was used.
-- [ ] The selected Core or Professional edition matches the project license.
-- [ ] Installation completed without Joomla errors.
-- [ ] The Admin Tools dashboard opens.
-- [ ] Required component and plugins are present.
-- [ ] The installed version is verified.
-- [ ] Update-site configuration works.
-
-### Configuration
-
-- [ ] Security exception logging is enabled.
-- [ ] WAF was enabled gradually.
-- [ ] Administrator protection was tested without lockout.
-- [ ] Automatic IP blocking was tested.
-- [ ] Proxy or CDN client IP detection is correct.
-- [ ] Notification email does not overload PHP workers or mail delivery.
-- [ ] Environment-specific IP and URL settings were reviewed.
-
-### Regression testing
-
-- [ ] Joomla frontend passes testing.
-- [ ] Joomla administrator passes testing.
-- [ ] API endpoints pass testing.
-- [ ] AJAX requests pass testing.
-- [ ] Forms and uploads pass testing.
-- [ ] AcyMailing passes testing.
-- [ ] HikaShop and payment callbacks pass testing.
-- [ ] RSForm Pro passes testing.
-- [ ] JCE passes testing.
-- [ ] SP Page Builder passes testing.
-- [ ] Custom extensions pass testing.
-- [ ] Cron jobs and Scheduled Tasks pass testing.
-
-### Recovery
-
-- [ ] Source and database backups are available.
-- [ ] The previous web-server configuration is available.
-- [ ] The team knows how to locate and temporarily disable the Admin Tools system plugin.
-- [ ] Direct filesystem or container access is available.
-- [ ] Rollback was tested on staging.
-
-### Final acceptance
-
-Admin Tools is ready for production only when:
-
-```text
-Installation status: Successful
-Joomla frontend test: Passed
-Joomla administrator test: Passed
-API and integration test: Passed
-WAF false-positive review: Completed
-Web-server configuration test: Passed
-Rollback procedure: Verified
-```
+- Test frontend and administrator access.
+- Test forms, APIs, AJAX, uploads, and webhooks.
+- Review new file-scanner results.
+- Review security logs for new false positives.
+- Regenerate web-server rules only when necessary.
 
 ---
 
-## Recommended Migration Approach from Joomla 3
+## 15. Migration from Admin Tools 5.3.2
 
-For a rebuilt Joomla 6 project, install Admin Tools 7.8.9 as a fresh package and recreate security rules carefully.
+For a rebuilt Joomla 6 project, install Admin Tools 7.8.9 as a fresh package and recreate security configuration carefully.
 
-Do not blindly import every Admin Tools 5.3.2 rule because the following may have changed:
+Do not blindly import all Admin Tools 5.3.2 settings because these may have changed:
 
 - Joomla request routing.
 - Administrator URLs.
@@ -1079,10 +967,84 @@ Do not blindly import every Admin Tools 5.3.2 rule because the following may hav
 - Server and reverse-proxy architecture.
 - Payment and webhook integrations.
 
-Migrate only reviewed items such as confirmed blocklists or narrow exceptions that remain valid in Joomla 6.
+Migrate only reviewed values, such as confirmed blocklists or narrow exceptions that remain valid.
+
+Recommended approach:
+
+```text
+1. Install Admin Tools 7.8.9 on Joomla 6 staging
+2. Run conservative initial setup
+3. Recreate WAF rules gradually
+4. Retest every project extension
+5. Recreate administrator protection
+6. Generate new server-level rules
+7. Export the validated Joomla 6 configuration
+8. Deploy to production
+```
+
+---
+
+## 16. Final Checklist
+
+### Installation
+
+- [ ] Official Admin Tools 7.8.9 package was used.
+- [ ] Correct Core or Professional edition was selected.
+- [ ] Installation completed without Joomla errors.
+- [ ] Dashboard opens.
+- [ ] Required component and plugins exist.
+- [ ] Version is verified.
+- [ ] Update site works.
+
+### Configuration
+
+- [ ] Security logging is enabled.
+- [ ] WAF was enabled gradually.
+- [ ] Administrator protection was tested without lockout.
+- [ ] Automatic IP blocking was tested.
+- [ ] Proxy or CDN client-IP detection is correct.
+- [ ] Email notification volume is controlled.
+- [ ] File Scanner baseline exists.
+- [ ] Environment-specific IP and URL values were reviewed.
+
+### Regression testing
+
+- [ ] Frontend passes.
+- [ ] Administrator passes.
+- [ ] APIs pass.
+- [ ] AJAX passes.
+- [ ] Forms and uploads pass.
+- [ ] AcyMailing passes.
+- [ ] HikaShop and payment callbacks pass.
+- [ ] RSForm Pro passes.
+- [ ] JCE passes.
+- [ ] SP Page Builder passes.
+- [ ] Custom extensions pass.
+- [ ] Cron and Scheduled Tasks pass.
+
+### Recovery
+
+- [ ] Source and database backups exist.
+- [ ] Previous web-server configuration exists.
+- [ ] Direct filesystem or container access is available.
+- [ ] The team knows how to temporarily disable the confirmed Admin Tools system plugin.
+- [ ] Rollback was tested on staging.
+
+### Final acceptance
+
+```text
+Installation status: Successful
+Joomla frontend test: Passed
+Joomla administrator test: Passed
+API and integration test: Passed
+WAF false-positive review: Completed
+File Scanner baseline: Created
+Web-server configuration test: Passed
+Rollback procedure: Verified
+```
 
 ## Final Recommendation
 
-Use **Upload Package File** for the normal installation. Use **Install from Folder** when upload limits prevent browser installation. Use **Discover** only for recovery or controlled file-based deployments where extension files are already in the correct Joomla directories.
+Use **Upload Package File** for normal installation. Use **Install from Folder** when upload limits prevent browser installation. Use **Discover** only for recovery or controlled file-based deployment.
 
-Always configure Admin Tools gradually and validate every security layer before enabling it in production.
+Configure Admin Tools gradually. Validate each security layer before enabling the next one, and never treat “enable every option” as a secure production strategy.
