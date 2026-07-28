@@ -1,278 +1,232 @@
-# AcyMailing 10.11.1 Installation and Test Guide for Joomla 6
+# AcyMailing 10.11.1 Installation and Verification Guide for Joomla 6
 
-Hướng dẫn này mô tả cách:
+This guide covers how to install AcyMailing 10.11.1 on Joomla 6, deploy it to another environment, verify the installation, and manage test subscribers.
 
-- Cài đặt AcyMailing 10.11.1 trên Joomla 6.
-- Deploy source sang môi trường khác bằng Git và Joomla Discover.
-- Kiểm tra extension đã cài đặt và hoạt động đúng.
-- Tạo, đổi hoặc thay thế subscriber test trong Joomla backend.
-
-> **Lưu ý:** Trong AcyMailing, tài khoản nhận email được gọi là **subscriber/user**. Nó không nhất thiết là tài khoản đăng nhập Joomla.
+> **Terminology:** In AcyMailing, an email recipient is called a **user** or **subscriber**. An AcyMailing subscriber does not have to be a Joomla login account.
 
 ## Table of Contents
 
-- [1. Prerequisites](#1-prerequisites)
-- [2. Install AcyMailing on Local](#2-install-acymailing-on-local)
-- [3. Push Source to Git](#3-push-source-to-git)
-- [4. Install on Development](#4-install-on-development)
-- [5. Test the Installation](#5-test-the-installation)
-- [6. Create a Test Subscriber](#6-create-a-test-subscriber)
-- [7. Change or Replace a Subscriber](#7-change-or-replace-a-subscriber)
-- [8. Final Checklist](#8-final-checklist)
-- [9. Troubleshooting](#9-troubleshooting)
+1. [Prerequisites](#1-prerequisites)
+2. [Install AcyMailing Locally](#2-install-acymailing-locally)
+3. [Commit the Installed Files](#3-commit-the-installed-files)
+4. [Install on Another Environment](#4-install-on-another-environment)
+5. [Verify the Installation](#5-verify-the-installation)
+6. [Create a Test Subscriber](#6-create-a-test-subscriber)
+7. [Change or Replace a Subscriber](#7-change-or-replace-a-subscriber)
+8. [Final Verification Checklist](#8-final-verification-checklist)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
 ## 1. Prerequisites
 
-Kiểm tra trước khi cài đặt:
+Confirm the following before installation:
 
-```text
-[ ] Joomla 6 đã chạy bình thường
-[ ] Database đã kết nối
-[ ] PHP version tương thích với Joomla 6
-[ ] Có file cài đặt AcyMailing 10.11.1 chính thức
-[ ] Đã backup database
-[ ] Git working tree sạch
-```
+- [ ] Joomla 6 is running correctly.
+- [ ] The database connection works.
+- [ ] The PHP version meets the Joomla 6 requirements.
+- [ ] The official AcyMailing 10.11.1 installation package is available.
+- [ ] The database has been backed up.
+- [ ] The Git working tree is clean.
 
-Kiểm tra Git:
+Check the repository status:
 
 ```bash
 git status
 ```
 
-Tạo branch riêng:
+Create a dedicated branch:
 
 ```bash
 git checkout -b feature/install-acymailing-10.11.1
 ```
 
-Không commit các file chứa thông tin nhạy cảm:
+Do not commit sensitive or environment-specific data, including:
 
-```text
-configuration.php
-.env
-SMTP password
-API key
-License key
-Database backup
-Subscriber production data
-```
+- `configuration.php`
+- `.env`
+- SMTP passwords
+- API keys
+- License keys
+- Database backups
+- Production subscriber data
 
 ---
 
-## 2. Install AcyMailing on Local
+## 2. Install AcyMailing Locally
 
-### Step 1: Mở Extension Installer
+### 2.1 Open the Joomla extension installer
 
-Trong Joomla Administrator:
-
-```text
-System
-→ Install
-→ Extensions
-```
-
-### Step 2: Upload package
-
-Chọn:
+In Joomla Administrator, go to:
 
 ```text
-Upload Package File
+System → Install → Extensions
 ```
 
-Upload file chính thức, ví dụ:
+### 2.2 Upload the installation package
+
+Select **Upload Package File**, then upload the official package, for example:
 
 ```text
 acymailing_10.11.1.zip
 ```
 
-Không giải nén ZIP rồi copy thủ công vào source Joomla.
+Do not extract the ZIP file and manually copy its contents into Joomla. The package installer registers the extensions, executes database scripts, and installs dependencies.
 
-### Step 3: Kiểm tra kết quả
+### 2.3 Confirm the installation
 
-Đi đến:
-
-```text
-System
-→ Manage
-→ Extensions
-```
-
-Tìm:
+Go to:
 
 ```text
-AcyMailing
+System → Manage → Extensions
 ```
 
-Sau đó mở:
+Search for `AcyMailing`, then open:
 
 ```text
-Components
-→ AcyMailing
+Components → AcyMailing
 ```
 
-Kết quả mong đợi:
+Expected results:
 
-```text
-[ ] Component AcyMailing tồn tại
-[ ] Plugin và module liên quan đã được cài đặt
-[ ] Extension cần thiết đang Enabled
-[ ] Version hiển thị là 10.11.1
-[ ] Dashboard mở không có lỗi HTTP 500
-```
+- [ ] The AcyMailing component is installed.
+- [ ] Related plugins and modules are installed.
+- [ ] Required extensions are enabled.
+- [ ] The displayed version is `10.11.1`.
+- [ ] The dashboard opens without an HTTP 500 error.
 
 ---
 
-## 3. Push Source to Git
+## 3. Commit the Installed Files
 
-Kiểm tra các file được tạo sau khi cài đặt:
+Review the files created or changed by the installation:
 
 ```bash
 git status --short
 git diff --stat
 ```
 
-AcyMailing có thể tạo file trong các thư mục:
+AcyMailing may add files under these directories:
 
 ```text
 administrator/components/
+administrator/language/
 components/
+language/
+libraries/
 media/
 modules/
 plugins/
-language/
-administrator/language/
-libraries/
 ```
 
-Tìm file liên quan:
+Find AcyMailing-related files:
 
 ```bash
 find administrator components media modules plugins libraries \
   -iname '*acym*' 2>/dev/null
 ```
 
-Commit và push:
+Stage only the files shown by `git status`:
 
 ```bash
 git add administrator components media modules plugins language libraries
 
 git commit -m "feat: install AcyMailing 10.11.1 for Joomla 6"
-
 git push origin feature/install-acymailing-10.11.1
 ```
 
-Điều chỉnh danh sách `git add` theo kết quả thực tế của `git status`.
+Adjust the `git add` paths to match the actual installation output.
 
-> Không commit file ZIP của bản trả phí vào public repository.
+> Do not commit a paid AcyMailing ZIP package to a public repository.
 
 ---
 
-## 4. Install on Development
+## 4. Install on Another Environment
 
-### Recommended method: Install the official ZIP
+### Recommended: Install the official ZIP package
 
-Phương án an toàn nhất trên development:
+The safest approach for development, staging, and production is:
 
 ```text
 Joomla Administrator
 → System
 → Install
 → Extensions
-→ Upload AcyMailing ZIP
+→ Upload Package File
 ```
 
-AcyMailing là package gồm nhiều extension, vì vậy cài lại ZIP chính thức an toàn hơn chỉ dùng Discover.
+AcyMailing is distributed as a package containing multiple Joomla extensions. Installing the official ZIP ensures that manifests, dependencies, and database scripts are processed correctly.
 
-### Alternative method: Git source + Discover
+### Alternative: Deploy files with Git and use Discover
 
-Chỉ dùng khi team đã kiểm chứng trên database Joomla 6 sạch.
+Use this method only after validating it on a clean Joomla 6 database.
 
-Sau khi pull source:
+After pulling the source code, go to:
 
 ```text
-System
-→ Install
-→ Discover
-→ Discover
+System → Install → Discover → Discover
 ```
 
-Tìm:
+Search for:
 
 ```text
 AcyMailing
 acym
 ```
 
-Nếu Joomla phát hiện nhiều extension, cài tất cả extension liên quan.
-
-Thứ tự ưu tiên khi không có package entry:
+Install every related extension found by Joomla. If no package entry is available, use this order:
 
 ```text
-Library
-→ Component
-→ Plugin
-→ Module
+Library → Component → Plugin → Module
 ```
 
-Sau đó:
+Then clear the Joomla cache:
 
 ```text
-System
-→ Maintenance
-→ Clear Cache
+System → Maintenance → Clear Cache
 ```
 
-> Nếu component tồn tại nhưng thiếu database table hoặc dependency, hãy restore database và cài lại ZIP chính thức.
+> If the component exists but database tables or dependencies are missing, restore the database and reinstall AcyMailing from the official ZIP package.
 
 ---
 
-## 5. Test the Installation
+## 5. Verify the Installation
 
-### 5.1 Test extension registration
+### 5.1 Verify registered extensions
 
-Đi đến:
-
-```text
-System
-→ Manage
-→ Extensions
-```
-
-Tìm `AcyMailing` và xác nhận:
+Go to:
 
 ```text
-[ ] Main component tồn tại
-[ ] Plugin liên quan tồn tại
-[ ] Module liên quan tồn tại nếu package có cung cấp
-[ ] Extension cần thiết đang Enabled
-[ ] Version là 10.11.1
+System → Manage → Extensions
 ```
 
-### 5.2 Test dashboard
+Search for `AcyMailing` and confirm:
 
-Mở:
+- [ ] The main component exists.
+- [ ] Related plugins exist.
+- [ ] Related modules exist when included in the package.
+- [ ] Required extensions are enabled.
+- [ ] The displayed version is `10.11.1`.
+
+### 5.2 Verify the administrator pages
+
+Open:
 
 ```text
-Components
-→ AcyMailing
+Components → AcyMailing
 ```
 
-Các trang sau phải mở được:
+Check that these pages load successfully:
 
-```text
-Dashboard
-Users
-Lists
-Campaigns
-Templates
-Configuration
-Queue
-```
+- Dashboard
+- Users
+- Lists
+- Campaigns
+- Templates
+- Configuration
+- Queue
 
-Không được có các lỗi:
+There should be no errors such as:
 
 ```text
 HTTP 500
@@ -282,17 +236,17 @@ Plugin not found
 Missing dependency
 ```
 
-### 5.3 Test database
+### 5.3 Verify the database
 
-Thay `yourprefix_` bằng database prefix thực tế.
+Replace `yourprefix_` with the actual Joomla database prefix.
+
+Check the AcyMailing tables:
 
 ```sql
 SHOW TABLES LIKE 'yourprefix_acym_%';
 ```
 
-Phải có các bảng AcyMailing.
-
-Kiểm tra extension record:
+Check the registered Joomla extensions:
 
 ```sql
 SELECT
@@ -309,96 +263,75 @@ WHERE name LIKE '%AcyMailing%'
 ORDER BY type, name;
 ```
 
-### 5.4 Test Joomla mail configuration
+### 5.4 Verify Joomla mail configuration
 
-Đi đến:
-
-```text
-System
-→ Global Configuration
-→ Server
-→ Mail
-```
-
-Nhấn:
+Go to:
 
 ```text
-Send Test Mail
+System → Global Configuration → Server → Mail
 ```
 
-Nếu Joomla không gửi được test mail, hãy sửa SMTP trước khi test campaign của AcyMailing.
+Select **Send Test Mail**.
 
-### 5.5 Test AcyMailing email
+Fix the Joomla SMTP or mail configuration before testing AcyMailing campaigns if this test fails.
 
-Đi đến:
+### 5.5 Send an AcyMailing test email
+
+Go to:
 
 ```text
-Components
-→ AcyMailing
-→ Configuration
-→ Mail settings
+Components → AcyMailing → Configuration → Mail settings
 ```
 
-Gửi một test email đến địa chỉ của bạn.
+Send a test email and confirm:
 
-Kiểm tra:
+- [ ] AcyMailing reports a successful send.
+- [ ] The email arrives in the inbox or spam folder.
+- [ ] The sender name and sender email are correct.
+- [ ] The HTML content renders correctly.
+- [ ] Links use the correct website domain.
 
-```text
-[ ] AcyMailing báo gửi thành công
-[ ] Email xuất hiện trong Inbox hoặc Spam
-[ ] From Name và From Email đúng
-[ ] Nội dung HTML hiển thị đúng
-[ ] Link trong email dùng đúng domain
-```
+### 5.6 Test a campaign
 
-### 5.6 Test campaign flow
+1. Create a test list.
+2. Create a test subscriber.
+3. Add the subscriber to the test list.
+4. Create a simple campaign.
+5. Send it to the test list.
+6. Confirm that the email arrives.
+7. Check that the queue contains no errors.
+8. Test the unsubscribe link.
 
-Thực hiện lần lượt:
+Expected results:
 
-1. Tạo test list.
-2. Tạo test subscriber.
-3. Thêm subscriber vào test list.
-4. Tạo một campaign đơn giản.
-5. Gửi campaign đến test list.
-6. Kiểm tra email đã nhận.
-7. Kiểm tra Queue không bị lỗi.
-8. Kiểm tra link unsubscribe hoạt động.
+- [ ] The campaign is sent successfully.
+- [ ] The subscriber receives the email.
+- [ ] The queue item changes from pending to sent.
+- [ ] The unsubscribe page opens correctly.
+- [ ] The subscriber is removed from the correct list.
 
-Kết quả đạt yêu cầu:
+### 5.7 Test the frontend subscription form
 
-```text
-[ ] Campaign gửi thành công
-[ ] Subscriber nhận được email
-[ ] Queue chuyển từ Pending sang Sent
-[ ] Unsubscribe link mở đúng
-[ ] Subscriber được unsubscribe khỏi đúng list
-```
+When the website uses an AcyMailing subscription form:
 
-### 5.7 Test frontend subscription form
-
-Nếu website có form đăng ký newsletter:
-
-1. Publish AcyMailing subscription module.
-2. Mở frontend.
-3. Đăng ký bằng email test mới.
-4. Kiểm tra user xuất hiện trong AcyMailing Users.
-5. Kiểm tra user thuộc đúng list.
-6. Kiểm tra confirmation email nếu bật double opt-in.
+1. Publish the AcyMailing subscription module.
+2. Open the website frontend.
+3. Subscribe with a new test email address.
+4. Confirm that the subscriber appears under **AcyMailing → Users**.
+5. Confirm that the subscriber belongs to the correct list.
+6. Confirm the email address when double opt-in is enabled.
 
 ---
 
 ## 6. Create a Test Subscriber
 
-Trong Joomla Administrator:
+Go to:
 
 ```text
-Components
-→ AcyMailing
-→ Users
-→ New
+Components → AcyMailing → Users → New
 ```
 
-Nhập:
+Example values:
 
 ```text
 Name: Test User
@@ -407,9 +340,9 @@ Active: Yes
 Confirmed: Yes
 ```
 
-Sau đó thêm user vào test list trong phần subscription/list assignment.
+Save the subscriber, then assign it to the test list.
 
-Có thể dùng Gmail plus addressing để tạo nhiều subscriber test nhưng vẫn nhận email trong cùng một inbox:
+For Gmail accounts, plus addressing can create multiple test subscribers while delivering all messages to the same inbox:
 
 ```text
 yourname+acym-active@gmail.com
@@ -421,133 +354,128 @@ yourname+acym-unsubscribe@gmail.com
 
 ## 7. Change or Replace a Subscriber
 
-### Case 1: Đổi email của subscriber hiện tại
+Choose the action based on the required result.
 
-Dùng khi muốn giữ nguyên subscription và chỉ đổi địa chỉ email.
+| Requirement | Recommended action |
+|---|---|
+| Keep the current subscriptions but use a new email address | Edit the existing subscriber |
+| Preserve the old test history | Create a new subscriber |
+| Stop messages from one list only | Unsubscribe from that list |
+| Permanently remove the subscriber | Delete the subscriber |
+| The subscriber is synchronized with Joomla | Update the Joomla user first |
+
+### 7.1 Change the email address of an existing subscriber
+
+Use this option to keep the current list subscriptions and replace only the email address.
 
 ```text
 Components
 → AcyMailing
 → Users
-→ mở subscriber
-→ đổi Email
+→ Open the subscriber
+→ Change Email
 → Save & Close
 ```
 
-Sau khi lưu, kiểm tra:
+Verify:
+
+- [ ] The new email address is saved.
+- [ ] The subscriber remains assigned to the correct lists.
+- [ ] `Active` is set to `Yes`.
+- [ ] `Confirmed` is set to `Yes` when required.
+- [ ] New campaigns are delivered to the new email address.
+
+### 7.2 Create a separate test subscriber
+
+Use this option when the existing subscriber and its test history should remain unchanged.
 
 ```text
-[ ] Email mới đã được cập nhật
-[ ] Subscriber vẫn thuộc đúng list
-[ ] Active = Yes
-[ ] Confirmed = Yes nếu cần
-[ ] Campaign gửi đến email mới
+Components → AcyMailing → Users → New
 ```
 
-### Case 2: Giữ user cũ và tạo subscriber test mới
+Create the subscriber and assign it to the required test list.
 
-Dùng khi muốn giữ lịch sử test cũ.
+This is the preferred method for testing different states such as active, unconfirmed, unsubscribed, or bounced users.
+
+### 7.3 Stop the old email from receiving messages
+
+The subscriber does not need to be deleted. Unsubscribe it from the relevant list:
 
 ```text
 Components
 → AcyMailing
 → Users
-→ New
-```
-
-Tạo subscriber mới và thêm vào test list.
-
-Đây là phương án được đề xuất cho môi trường test vì có thể kiểm tra nhiều trạng thái khác nhau.
-
-### Case 3: Không muốn email cũ tiếp tục nhận mail
-
-Không cần xóa user. Chỉ cần unsubscribe khỏi list:
-
-```text
-Components
-→ AcyMailing
-→ Users
-→ mở subscriber
-→ Subscription
-→ Unsubscribe khỏi test list
+→ Open the subscriber
+→ Subscriptions
+→ Unsubscribe from the test list
 → Save
 ```
 
-Phân biệt các thao tác:
+Action comparison:
 
 | Action | Result |
 |---|---|
-| Change email | Giữ subscriber hiện tại và chuyển sang email mới |
-| Unsubscribe | User vẫn tồn tại nhưng không nhận email từ list đó |
-| Delete | Xóa subscriber khỏi AcyMailing |
+| Change email | Keeps the subscriber and its subscriptions but uses a new address |
+| Unsubscribe | Keeps the subscriber but stops messages from the selected list |
+| Delete | Removes the subscriber from AcyMailing |
 
-### Case 4: Subscriber liên kết với Joomla user account
+### 7.4 Update a subscriber linked to a Joomla user
 
-Nếu subscriber có `CMS user ID` hoặc liên kết với tài khoản Joomla, nên đổi email trong Joomla trước:
-
-```text
-Users
-→ Manage
-→ mở Joomla user
-→ đổi Email
-→ Save & Close
-```
-
-Sau đó kiểm tra lại:
+When the subscriber has a CMS user ID or is synchronized with Joomla, update the Joomla account first:
 
 ```text
-Components
-→ AcyMailing
-→ Users
+Users → Manage → Open the Joomla user → Change Email → Save & Close
 ```
 
-Không nên chỉ đổi email trong AcyMailing nếu hệ thống đang đồng bộ user từ Joomla, vì lần đồng bộ tiếp theo có thể ghi đè dữ liệu.
+Then confirm the updated value under:
+
+```text
+Components → AcyMailing → Users
+```
+
+Do not update only the AcyMailing record when Joomla synchronization is enabled. A later synchronization may overwrite the email address.
 
 ---
 
-## 8. Final Checklist
+## 8. Final Verification Checklist
 
-AcyMailing được xem là cài đặt thành công khi:
+The installation is complete when all applicable checks pass:
 
-```text
-[ ] AcyMailing xuất hiện trong Joomla Extensions
-[ ] Dashboard mở không lỗi
-[ ] Version hiển thị là 10.11.1
-[ ] Database tables đã được tạo
-[ ] Joomla gửi được test mail
-[ ] AcyMailing gửi được test email
-[ ] Tạo được list và subscriber
-[ ] Gửi được campaign
-[ ] Queue xử lý thành công
-[ ] Frontend subscription form hoạt động nếu được sử dụng
-[ ] Unsubscribe hoạt động
-[ ] Có thể đổi hoặc thay thế subscriber từ backend
-[ ] Joomla logs không có lỗi nghiêm trọng
-```
+- [ ] AcyMailing appears in Joomla Extensions.
+- [ ] The AcyMailing dashboard opens without errors.
+- [ ] Version `10.11.1` is displayed.
+- [ ] AcyMailing database tables exist.
+- [ ] Joomla can send a test email.
+- [ ] AcyMailing can send a test email.
+- [ ] A test list and subscriber can be created.
+- [ ] A campaign can be sent successfully.
+- [ ] The queue processes messages successfully.
+- [ ] The frontend subscription form works when used.
+- [ ] The unsubscribe flow works.
+- [ ] Subscribers can be changed or replaced from the backend.
+- [ ] Joomla logs contain no critical AcyMailing errors.
 
-### Smoke test nhanh sau mỗi lần deploy
+### Post-deployment smoke test
 
-```text
-1. Mở Components → AcyMailing.
-2. Gửi một test email.
-3. Kiểm tra test subscriber và test list.
-4. Gửi một campaign nhỏ.
-5. Kiểm tra email, Queue và unsubscribe.
-```
+1. Open **Components → AcyMailing**.
+2. Send a test email.
+3. Check the test subscriber and test list.
+4. Send a small test campaign.
+5. Verify delivery, queue processing, and unsubscribe behavior.
 
 ---
 
 ## 9. Troubleshooting
 
-### Dashboard báo HTTP 500
+### AcyMailing dashboard returns HTTP 500
 
-Kiểm tra Joomla log và Docker log:
+Check the Joomla and container logs:
 
 ```bash
 docker compose logs --tail=200 joomla
 ```
 
-Tìm các lỗi:
+Look for:
 
 ```text
 Missing class
@@ -556,29 +484,25 @@ Missing database table
 PHP compatibility error
 ```
 
-### Component tồn tại nhưng thiếu database table
+### The component exists but database tables are missing
 
-Khuyến nghị:
+1. Restore the database backup if the installation state is inconsistent.
+2. Reinstall AcyMailing with the official ZIP package.
+3. Recheck `#__extensions` and `#__acym_%` tables.
 
-1. Restore database backup nếu trạng thái không nhất quán.
-2. Cài lại AcyMailing bằng ZIP chính thức.
-3. Kiểm tra lại `#__extensions` và `#__acym_*`.
+Do not manually insert records into `#__extensions` or manually create AcyMailing tables as a normal deployment method.
 
-Không tự chèn record vào `#__extensions` hoặc tự tạo bảng AcyMailing như phương án deploy thông thường.
+### Joomla Discover does not find AcyMailing
 
-### Discover không tìm thấy AcyMailing
+Confirm:
 
-Kiểm tra:
+- [ ] All source files were pulled.
+- [ ] The extension manifest XML files exist.
+- [ ] Files are in the correct Joomla extension directories.
+- [ ] The web server can read the files.
+- [ ] The extension is not already registered in `#__extensions`.
 
-```text
-[ ] Source đã được pull đầy đủ
-[ ] Manifest XML tồn tại
-[ ] File nằm đúng Joomla extension directories
-[ ] Web server có quyền đọc file
-[ ] Extension chưa tồn tại trong #__extensions
-```
-
-Tìm manifest:
+Find AcyMailing manifest files:
 
 ```bash
 find administrator components modules plugins libraries \
@@ -586,17 +510,15 @@ find administrator components modules plugins libraries \
   | grep -i acym
 ```
 
-### Joomla gửi mail được nhưng AcyMailing không gửi được
+### Joomla mail works but AcyMailing does not send
 
-Kiểm tra:
+Check:
 
-```text
-AcyMailing Configuration
-SMTP settings
-From Email
-Reply-to Email
-Queue
-Cron/Scheduled Task
-Spam folder
-Mail provider logs
-```
+- AcyMailing mail configuration
+- SMTP credentials and encryption settings
+- Sender email address
+- Reply-to email address
+- Queue status
+- Cron job or scheduled task
+- Spam folder
+- Mail provider logs
