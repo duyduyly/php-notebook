@@ -1,5 +1,36 @@
 # Advanced Module Manager 12.0.2 Migration and Security Report for Joomla 6
 
+> **Migration target:** Joomla 3 → Joomla 6  
+> **Extension:** Advanced Module Manager  
+> **Target version:** 12.0.2  
+> **Vendor:** Regular Labs
+
+---
+
+## Table of Contents
+
+- [Conclusion](#conclusion)
+- [1. Extension Information](#1-extension-information)
+- [2. Purpose and Main Features](#2-purpose-and-main-features)
+  - [2.1 Feature Matrix](#21-feature-matrix)
+  - [2.2 Common Integrations](#22-common-integrations)
+- [3. Version Comparison](#3-version-comparison)
+- [4. Latest Version and Release Information](#4-latest-version-and-release-information)
+- [5. Security Assessment](#5-security-assessment)
+  - [5.1 CVE-2026-63683](#51-cve-2026-63683)
+  - [5.2 Important Security Rule](#52-important-security-rule)
+  - [5.3 Target-Version Statement](#53-target-version-statement)
+- [6. Joomla 3 to Joomla 6 Migration Guidance](#6-joomla-3-to-joomla-6-migration-guidance)
+- [7. Installation and Upgrade Notes](#7-installation-and-upgrade-notes)
+- [8. Free and Professional Edition Mapping](#8-free-and-professional-edition-mapping)
+- [9. Upgrading from Free to Professional](#9-upgrading-from-free-to-professional)
+- [10. Detailed Functional and Regression Test Checklist](#10-detailed-functional-and-regression-test-checklist)
+- [11. Recommended Migration Report Entry](#11-recommended-migration-report-entry)
+- [12. Official Sources](#12-official-sources)
+- [Final Recommendation](#final-recommendation)
+
+---
+
 ## Conclusion
 
 For a Joomla 3 to Joomla 6 migration, upgrade **Advanced Module Manager 7.5.1** to **Advanced Module Manager 12.0.2**.
@@ -139,13 +170,15 @@ This matters when Advanced Module Manager conditions are used for:
 - Country or geolocation-based module visibility.
 - Restricting sensitive modules by network location.
 
-### Important security rule
+### 5.2 Important Security Rule
 
-Module visibility conditions must not be treated as the main authorization mechanism for sensitive content.
+> **Security warning**
+>
+> Module visibility conditions must not be treated as the main authorization mechanism for sensitive content.
 
 Use Joomla ACL, component-level permission checks, authenticated API authorization, and server-side validation for real access control.
 
-### 5.2 Target-version statement
+### 5.3 Target-Version Statement
 
 No public advisory reviewed for this report identifies version 12.0.2 as affected by CVE-2026-63683. This does not guarantee that the release has no undiscovered vulnerabilities; it only confirms that 12.0.2 is outside the currently published affected range.
 
@@ -279,7 +312,7 @@ Installing the Free edition on Joomla 6 can remove access to conditions that exi
 
 ## 9. Upgrading from Free to Professional
 
-Advanced Module Manager is available in **Free** and **Professional (Pro)** editions.
+Advanced Module Manager is available in **Free** and **Professional** editions.
 
 The Professional edition unlocks additional assignment conditions and advanced features while preserving existing settings and module configuration.
 
