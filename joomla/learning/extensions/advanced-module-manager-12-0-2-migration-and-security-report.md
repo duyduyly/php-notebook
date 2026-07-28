@@ -277,7 +277,132 @@ Professional-only capabilities include items such as:
 
 Installing the Free edition on Joomla 6 can remove access to conditions that existed in a Joomla 3 Professional installation.
 
-## 9. Detailed Functional and Regression Test Checklist
+## 9. Upgrading from Free to Professional
+
+Advanced Module Manager is available in **Free** and **Professional (Pro)** editions.
+
+The Professional edition unlocks additional assignment conditions and advanced features while preserving existing settings and module configuration.
+
+> **Note**
+>
+> Upgrading from Free to Professional does **not** require uninstalling the Free edition. Existing configuration and module assignments should be preserved. Back up the website and perform the change on staging before applying it to production.
+
+### 9.1 Method 1 — Upgrade via Regular Labs Extension Manager (Recommended)
+
+#### Step 1 — Install the Free Edition
+
+Install the Free package through Joomla Extension Installer:
+
+```text
+System → Install → Extensions
+```
+
+Upload the ZIP package and complete the installation.
+
+#### Step 2 — Purchase a Professional License
+
+Purchase an **Advanced Module Manager Professional** license or an eligible Regular Labs bundle from the Regular Labs website.
+
+#### Step 3 — Obtain the Download Key
+
+Log in to the Regular Labs account associated with the license and copy the **Download Key**.
+
+```text
+RegularLabs.com → Account → Download Keys
+```
+
+#### Step 4 — Open Regular Labs Extension Manager
+
+In Joomla Administrator, open:
+
+```text
+Components → Regular Labs Extension Manager
+```
+
+#### Step 5 — Activate the License
+
+Paste the Download Key into the relevant license or download-key field and save the configuration.
+
+#### Step 6 — Upgrade to Professional
+
+Run the available update check:
+
+```text
+Check for Updates
+```
+
+Install the Professional update offered by Regular Labs Extension Manager. The Professional package should replace or upgrade the Free edition without requiring an uninstall.
+
+### 9.2 Method 2 — Install the Professional Package Directly
+
+Use this method when the Professional installation package has already been downloaded from the licensed Regular Labs account.
+
+1. Open Joomla Administrator.
+2. Go to:
+
+```text
+System → Install → Extensions
+```
+
+3. Upload the Professional ZIP package.
+4. Allow Joomla to install it over the existing Free edition.
+5. Do not uninstall the Free edition first.
+6. Clear Joomla and browser cache if the Professional options do not appear immediately.
+
+### 9.3 Upgrade Verification Checklist
+
+After upgrading, verify the following:
+
+- [ ] The installed package is identified as the Professional edition.
+- [ ] The extension version matches the intended Professional release.
+- [ ] The Download Key is valid when Regular Labs Extension Manager is used.
+- [ ] Joomla reports no installation or update errors.
+- [ ] Existing module assignments are preserved.
+- [ ] Existing modules continue to function correctly.
+- [ ] Extension configuration can still be saved.
+- [ ] Joomla logs and the browser console contain no related errors.
+
+### 9.4 Verify Professional Features
+
+Navigate to:
+
+```text
+Content → Site Modules
+```
+
+Edit a module and confirm that the Professional assignment and rendering options required by the project are available.
+
+Typical Professional-only capabilities may include:
+
+- Geolocation conditions.
+- IP-address conditions.
+- Detailed date and time conditions.
+- Custom PHP conditions.
+- Third-party content assignments.
+- Article custom-field conditions.
+- Advanced module rendering controls, including supported HTML before/after options.
+
+The exact options can vary by Advanced Module Manager version, Joomla version, installed Regular Labs plugins, and license level. Verify the specific conditions used by the project rather than relying only on the presence of one Professional option.
+
+### 9.5 Joomla 3 to Joomla 6 Migration Notes
+
+When the Joomla 3 website currently uses **Advanced Module Manager Professional**, use the following migration process:
+
+1. Inventory all Professional-only conditions used on Joomla 3.
+2. Install the latest Joomla 6-compatible Professional package.
+3. Activate the license using the Download Key, or install the Professional package directly.
+4. Confirm that the target site remains on the Professional edition.
+5. Verify all migrated module assignments and converted Condition Sets.
+6. Test every Professional-only condition used by the project, especially:
+   - Geolocation.
+   - IP address.
+   - Custom PHP.
+   - Date and time.
+   - Third-party component assignments.
+7. Confirm that frontend and backend module behavior remains unchanged after migration.
+8. Do not replace a Joomla 3 Professional installation with the Free edition when the project depends on Professional-only rules.
+
+## 10. Detailed Functional and Regression Test Checklist
 
 Run these tests on the Joomla 6 staging environment after installation and after migrating existing module conditions.
 
@@ -463,7 +588,7 @@ Additional regression checks:
 - [ ] Third-party component integrations used by the project still work.
 - [ ] No module condition is being used as the only authorization control.
 
-## 10. Recommended Migration Report Entry
+## 11. Recommended Migration Report Entry
 
 | Field | Recommended value |
 |---|---|
@@ -480,7 +605,7 @@ Additional regression checks:
 | Priority | Critical |
 | Risk | Medium |
 
-## 11. Official Sources
+## 12. Official Sources
 
 - Product page: <https://regularlabs.com/advancedmodulemanager>
 - Download and latest version: <https://regularlabs.com/advancedmodulemanager/download>
@@ -489,6 +614,7 @@ Additional regression checks:
 - Installation guide: <https://docs.regularlabs.com/advancedmodulemanager/getting-started/installation>
 - Installation FAQ: <https://docs.regularlabs.com/advancedmodulemanager/faqs/installation>
 - Joomla 3 migration guidance: <https://docs.regularlabs.com/advancedmodulemanager/faqs/upgrading-from-joomla3-to-joomla4>
+- Regular Labs account and licenses: <https://regularlabs.com/account>
 - CVE-2026-63683: <https://nvd.nist.gov/vuln/detail/CVE-2026-63683>
 
 ## Final Recommendation
