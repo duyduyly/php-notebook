@@ -143,6 +143,64 @@ When updating Advanced Module Manager:
 
 For Professional updates, configure the Regular Labs Download Key in the Regular Labs Extension Manager or install the Professional package over the existing version.
 
+### Method 1. Install via Joomla Extension Installer (Recommended)
+
+#### Steps
+
+1. Download the extension ZIP package from the official vendor website.
+2. Log in to Joomla Administrator.
+3. Go to:
+
+```text
+System → Install → Extensions
+```
+
+4. Upload the ZIP package.
+5. Wait until Joomla reports **Installation was successful**.
+6. Clear Joomla cache if required.
+
+#### Verification
+
+- Extension appears in **System → Manage → Extensions**.
+- Correct version is installed.
+- Extension is enabled, if applicable.
+- No installation or database errors occur.
+- Extension opens successfully.
+
+### Method 2. Install via Discover (Source Code Already Exists)
+
+> Use this method only when the extension source code has already been copied into the Joomla installation.
+
+#### Steps
+
+1. Copy the extension source code into the Joomla directory.
+2. Go to:
+
+```text
+System → Install → Discover
+```
+
+3. Click **Discover**.
+4. Select the extension.
+5. Click **Install**.
+6. Clear Joomla cache if required.
+
+#### Verification
+
+- Extension is listed in **System → Manage → Extensions**.
+- Correct version is installed.
+- Required plugins, modules, and components are registered.
+- Extension works correctly.
+- No PHP or database errors occur.
+
+### Functional Test Checklist
+
+- [ ] Backend menu is accessible.
+- [ ] Configuration can be saved.
+- [ ] Frontend functionality works correctly.
+- [ ] Backend functionality works correctly.
+- [ ] No errors appear in Joomla logs or the browser console.
+
 ## 8. Free and Professional Edition Mapping
 
 Keep the same edition during migration when the project depends on Professional-only rules.
