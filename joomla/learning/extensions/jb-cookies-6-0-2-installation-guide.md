@@ -1172,3 +1172,1177 @@ Approve only after Bootstrap-template compatibility, browser display,
 multilingual content, and actual cookie-consent behavior have passed
 testing.
 ```
+
+---
+
+# Additional Guide: Features and Configuration
+
+# JB Cookies — Features and Configuration Guide for Joomla 6
+
+## 1. Extension này dùng để làm gì?
+
+**JB Cookies**, còn được gọi là **JoomBall Cookies**, là một Joomla site module dùng để:
+
+* Hiển thị thông báo website đang sử dụng cookie.
+* Cho phép người dùng chấp nhận hoặc từ chối cookie.
+* Hiển thị màn hình cấu hình cookie preferences.
+* Phân loại cookie theo từng nhóm.
+* Liên kết hoặc hiển thị nội dung Cookie Policy.
+* Hỗ trợ website đa ngôn ngữ.
+* Lưu lựa chọn consent mà không cần tải lại trang.
+* Hiển thị giao diện responsive trên desktop và mobile.
+
+Extension element:
+
+```text
+mod_jbcookies
+```
+
+Loại extension:
+
+```text
+Site Module
+```
+
+JB Cookies phù hợp với website cần một giao diện cookie consent đơn giản, nhẹ và tích hợp trực tiếp vào Joomla. Extension được công bố hỗ trợ Joomla 3, 4, 5 và 6.
+
+---
+
+## 2. Extension hỗ trợ những gì?
+
+### 2.1 Cookie consent notice
+
+JB Cookies hiển thị thông báo cookie khi người dùng truy cập website lần đầu.
+
+Thông báo có thể gồm:
+
+* Tiêu đề.
+* Nội dung giải thích.
+* Nút chấp nhận cookie.
+* Nút từ chối cookie.
+* Nút mở cookie preferences.
+* Link hoặc popup chứa thông tin bổ sung.
+
+Joomla Extensions Directory mô tả extension có chức năng chấp nhận hoặc từ chối cookie, preference selection và confirmation không cần reload trang.
+
+### 2.2 Cookie preferences
+
+Extension cung cấp giao diện để người dùng xem và chọn các nhóm cookie.
+
+Ví dụ:
+
+* Essential cookies.
+* Functional cookies.
+* Analytics cookies.
+* Marketing cookies.
+* Third-party cookies.
+
+Phiên bản 6.0.2 có cải thiện việc hiển thị và sắp xếp các nhóm cookie theo dữ liệu do administrator cấu hình trong module.
+
+### 2.3 Cookie discovery
+
+JB Cookies có khả năng tìm các cookie đang tồn tại trên homepage và đưa chúng vào phần quản lý cookie preferences.
+
+Tuy nhiên, việc scan homepage không đảm bảo phát hiện toàn bộ cookie trên website.
+
+Một số cookie chỉ xuất hiện khi:
+
+* Người dùng đăng nhập.
+* Mở một trang cụ thể.
+* Xem video YouTube.
+* Gửi form.
+* Thêm sản phẩm vào cart.
+* Truy cập trang checkout.
+* Google Tag Manager kích hoạt một event.
+* Một third-party script được load sau tương tác.
+
+Vì vậy, cookie discovery chỉ nên được sử dụng như dữ liệu ban đầu. Website vẫn cần được kiểm tra thủ công bằng browser Developer Tools.
+
+### 2.4 Multilingual support
+
+JB Cookies hỗ trợ website đa ngôn ngữ. Các ngôn ngữ đã được cài trong Joomla được hiển thị trong phần cấu hình module để administrator nhập nội dung riêng cho từng ngôn ngữ.
+
+Repository chính thức liệt kê sẵn nhiều language package, gồm:
+
+* English.
+* Spanish.
+* Catalan.
+* Italian.
+* German.
+* Dutch.
+* Polish.
+* Portuguese.
+* Swedish.
+* Greek.
+* French.
+
+Có thể bổ sung nội dung tiếng Việt trực tiếp trong module hoặc tạo Joomla language override nếu extension chưa cung cấp file `vi-VN`.
+
+### 2.5 Bootstrap responsive interface
+
+JB Cookies sử dụng Bootstrap cho:
+
+* Modal.
+* Buttons.
+* Background colors.
+* Responsive layout.
+* Desktop và mobile display.
+
+Vendor yêu cầu template có Bootstrap, ví dụ Joomla core template hoặc Helix Ultimate.
+
+### 2.6 Additional information
+
+Extension hỗ trợ bật hoặc tắt phần thông tin bổ sung.
+
+Nội dung bổ sung có thể dùng để:
+
+* Giải thích cookie là gì.
+* Mô tả mục đích sử dụng cookie.
+* Link tới Cookie Policy.
+* Link tới Privacy Policy.
+* Hiển thị chi tiết các nhóm cookie.
+
+### 2.7 Article popup
+
+JB Cookies hỗ trợ mở Joomla article trong Bootstrap modal thay vì chuyển người dùng sang một trang mới.
+
+Chức năng này phù hợp để hiển thị:
+
+* Cookie Policy.
+* Privacy Policy.
+* Data Protection Notice.
+* Cookie-category explanation.
+
+### 2.8 Module cache
+
+Extension hỗ trợ Joomla module cache. Joomla Extensions Directory liệt kê module cache là một trong các chức năng được hỗ trợ.
+
+Caching có thể giảm việc render lại module, nhưng cần test kỹ vì consent là dữ liệu khác nhau theo từng browser hoặc người dùng.
+
+### 2.9 Display position and icon alignment
+
+Repository chính thức liệt kê khả năng đặt icon hoặc giao diện theo hướng:
+
+* Left.
+* Right.
+
+Module có thể được publish tại position `debug` hoặc một module position tồn tại trên mọi trang.
+
+---
+
+## 3. JB Cookies mạnh nhất ở điểm nào?
+
+### 3.1 Dễ cài đặt và cấu hình
+
+JB Cookies là một module, không phải một component lớn. Vì vậy quy trình setup tương đối đơn giản:
+
+```text
+Install module
+→ Create module instance
+→ Configure languages
+→ Configure cookie groups
+→ Publish on all pages
+```
+
+Extension phù hợp với website muốn triển khai cookie notice nhanh mà không cần một hệ thống consent-management phức tạp.
+
+### 3.2 Hỗ trợ đa ngôn ngữ tốt
+
+Đây là một trong những điểm mạnh rõ nhất.
+
+Module tự lấy danh sách language đã được cài trong Joomla và cho phép nhập nội dung riêng theo từng ngôn ngữ. Điều này phù hợp với website doanh nghiệp hoạt động ở nhiều quốc gia.
+
+### 3.3 Tích hợp Bootstrap tốt
+
+JB Cookies tận dụng Bootstrap có sẵn trong Joomla hoặc template, nên:
+
+* Không cần một UI framework riêng.
+* Giao diện dễ tương thích với Joomla frontend.
+* Modal và button có thể dùng style Bootstrap.
+* Responsive khá thuận tiện.
+
+### 3.4 Cookie groups và preference selection
+
+Khác với cookie notice chỉ có nút “Accept”, JB Cookies hỗ trợ nhóm cookie và cho người dùng mở phần Settings để chọn preferences. Joomla Extensions Directory ghi rõ extension hỗ trợ preference selection và cookie rejection.
+
+### 3.5 Không reload trang sau khi xác nhận
+
+Người dùng có thể accept hoặc reject mà không cần reload toàn bộ page. Điều này tạo trải nghiệm tốt hơn và giảm gián đoạn khi truy cập website.
+
+### 3.6 Miễn phí và có source code công khai
+
+JB Cookies được phân phối miễn phí, có repository GitHub công khai và release history rõ ràng.
+
+Điều này thuận tiện cho:
+
+* Audit source code.
+* Theo dõi bug fix.
+* Tự kiểm tra compatibility.
+* Fork hoặc tạo template override khi cần.
+
+---
+
+## 4. Giới hạn của extension
+
+JB Cookies không nên được hiểu là một giải pháp pháp lý hoàn chỉnh chỉ vì nó hiển thị cookie banner.
+
+Cần phân biệt hai chức năng:
+
+```text
+Consent UI
+```
+
+và:
+
+```text
+Actual script and cookie blocking
+```
+
+JB Cookies có thể cung cấp giao diện accept, reject và settings. Tuy nhiên, website cần kiểm tra riêng xem:
+
+* Google Analytics có chạy trước consent không.
+* Google Tag Manager có tạo cookie trước consent không.
+* Meta Pixel có load trước consent không.
+* YouTube iframe có tạo cookie trước consent không.
+* Script marketing có bị block sau khi người dùng chọn Reject không.
+
+Nếu third-party scripts được hard-code trực tiếp trong template, JB Cookies có thể không tự động chặn chúng nếu không có thêm integration.
+
+Do đó, extension mạnh ở:
+
+* Cookie notice.
+* Multilingual content.
+* Consent interface.
+* Cookie groups.
+* Bootstrap modal.
+
+Nhưng không nên mặc định rằng nó là một Consent Management Platform đầy đủ giống các nền tảng chuyên dụng.
+
+---
+
+# 5. Setup từng chức năng
+
+## 5.1 Cấu hình module cơ bản
+
+### Mục đích
+
+Tạo module JB Cookies và hiển thị trên toàn website.
+
+### Các bước
+
+1. Đăng nhập Joomla Administrator:
+
+```text
+https://your-domain.example/administrator
+```
+
+2. Mở:
+
+```text
+Content
+→ Site Modules
+```
+
+3. Tìm module:
+
+```text
+JB Cookies
+```
+
+4. Nếu chưa có module instance, chọn:
+
+```text
+New
+→ JB Cookies
+```
+
+5. Cấu hình:
+
+```text
+Title: Cookie Consent
+Show Title: Hide
+Status: Published
+Access: Public
+Language: All
+```
+
+6. Chọn position:
+
+```text
+debug
+```
+
+Nếu custom template không có position `debug`, chọn một position:
+
+* Có trên mọi page.
+* Không nằm trong container nhỏ.
+* Không bị hidden trên mobile.
+* Được render gần cuối HTML page.
+
+7. Trong Menu Assignment, chọn:
+
+```text
+On all pages
+```
+
+8. Nhấn:
+
+```text
+Save
+```
+
+### Kết quả mong đợi
+
+* Module được publish.
+* Cookie notice xuất hiện khi browser chưa có consent cookie.
+* Module xuất hiện trên tất cả frontend pages.
+
+---
+
+## 5.2 Cấu hình nội dung thông báo cookie
+
+### Mục đích
+
+Hiển thị nội dung giải thích cookie cho người truy cập.
+
+### Các bước
+
+1. Mở JB Cookies module.
+2. Tìm tab nội dung hoặc language configuration.
+3. Chọn ngôn ngữ cần cấu hình.
+4. Nhập tiêu đề:
+
+```text
+Cookie Settings
+```
+
+5. Nhập nội dung:
+
+```text
+We use essential cookies to operate this website and optional cookies
+to improve performance and user experience. You can accept, reject,
+or configure your cookie preferences.
+```
+
+6. Cấu hình button labels:
+
+```text
+Accept button: Accept all
+Reject button: Reject optional cookies
+Settings button: Cookie settings
+```
+
+7. Nhấn Save.
+
+### Nội dung tiếng Việt đề xuất
+
+```text
+Tiêu đề:
+Cài đặt cookie
+
+Nội dung:
+Trang web sử dụng cookie thiết yếu để vận hành và cookie tùy chọn để
+cải thiện hiệu suất cũng như trải nghiệm người dùng. Bạn có thể chấp
+nhận, từ chối hoặc tùy chỉnh lựa chọn cookie.
+
+Nút chấp nhận:
+Chấp nhận tất cả
+
+Nút từ chối:
+Từ chối cookie tùy chọn
+
+Nút cài đặt:
+Cài đặt cookie
+```
+
+### Kết quả mong đợi
+
+Cookie notice hiển thị đầy đủ:
+
+* Tiêu đề.
+* Nội dung.
+* Accept.
+* Reject.
+* Settings.
+
+---
+
+## 5.3 Cấu hình đa ngôn ngữ
+
+### Mục đích
+
+Hiển thị cookie notice theo ngôn ngữ frontend hiện tại.
+
+### Các bước
+
+1. Xác nhận Joomla đã cài các ngôn ngữ cần dùng:
+
+```text
+System
+→ Install
+→ Languages
+```
+
+2. Xác nhận content languages đã được publish:
+
+```text
+System
+→ Manage
+→ Content Languages
+```
+
+3. Mở:
+
+```text
+Content
+→ Site Modules
+→ JB Cookies
+```
+
+4. Mở tab:
+
+```text
+Languages
+```
+
+5. Các ngôn ngữ đã cài trong Joomla sẽ được hiển thị.
+6. Chọn từng ngôn ngữ.
+7. Nhập riêng:
+
+* Title.
+* Description.
+* Accept label.
+* Reject label.
+* Settings label.
+* Additional information.
+* Cookie group descriptions.
+
+8. Lưu module.
+9. Chuyển frontend sang từng ngôn ngữ để test.
+
+### Kết quả mong đợi
+
+* English page hiển thị English consent.
+* Vietnamese page hiển thị Vietnamese consent.
+* Không xuất hiện raw language key như:
+
+```text
+MOD_JBCOOKIES_ACCEPT
+```
+
+---
+
+## 5.4 Cấu hình nút Accept
+
+### Mục đích
+
+Cho phép người dùng chấp nhận cookie.
+
+### Các bước
+
+1. Mở JB Cookies module.
+2. Tìm phần button hoặc consent action.
+3. Bật nút Accept.
+4. Nhập label:
+
+```text
+Accept all
+```
+
+5. Chọn Bootstrap button class nếu có:
+
+```text
+btn-success
+```
+
+hoặc:
+
+```text
+btn-primary
+```
+
+6. Save module.
+7. Mở website bằng private browser.
+8. Nhấn Accept.
+9. Reload page.
+10. Kiểm tra banner không xuất hiện lại.
+
+### Kiểm tra kỹ thuật
+
+Mở:
+
+```text
+Developer Tools
+→ Application
+→ Cookies
+```
+
+Kiểm tra consent cookie đã được tạo.
+
+### Kết quả mong đợi
+
+* Banner đóng sau khi accept.
+* Consent state được lưu.
+* Optional cookie groups được đánh dấu accepted.
+* Banner không hiện lại ngay sau reload.
+
+---
+
+## 5.5 Cấu hình nút Reject
+
+### Mục đích
+
+Cho phép người dùng từ chối cookie không thiết yếu.
+
+### Các bước
+
+1. Mở module.
+2. Bật Reject button.
+3. Nhập label:
+
+```text
+Reject optional cookies
+```
+
+4. Chọn button style:
+
+```text
+btn-secondary
+```
+
+hoặc:
+
+```text
+btn-outline-secondary
+```
+
+5. Save.
+6. Xóa toàn bộ browser cookies.
+7. Reload page.
+8. Nhấn Reject.
+9. Mở Developer Tools.
+10. Kiểm tra optional cookies.
+
+### Kết quả mong đợi
+
+* Consent choice được lưu.
+* Banner đóng.
+* Essential Joomla session cookies vẫn hoạt động.
+* Analytics hoặc marketing cookies không được tạo, nếu website đã tích hợp cơ chế blocking đúng.
+
+### Lưu ý
+
+Nếu Google Analytics vẫn chạy sau khi Reject, cần kiểm tra:
+
+* Google Tag Manager consent mode.
+* Template scripts.
+* Custom HTML modules.
+* Analytics plugins.
+* Third-party embeds.
+
+Không nên kết luận đó chỉ là lỗi của JB Cookies.
+
+---
+
+## 5.6 Cấu hình Cookie Settings
+
+### Mục đích
+
+Cho phép người dùng chọn cookie theo nhóm.
+
+### Các bước
+
+1. Mở module.
+2. Bật nút:
+
+```text
+Settings
+```
+
+3. Nhập label:
+
+```text
+Cookie settings
+```
+
+4. Bật Bootstrap modal.
+5. Tạo hoặc cấu hình cookie groups.
+6. Save.
+7. Clear cookies.
+8. Reload frontend.
+9. Nhấn Settings.
+10. Kiểm tra modal.
+
+### Kết quả mong đợi
+
+* Modal mở đúng.
+* Các nhóm cookie được hiển thị.
+* Group được sắp xếp đúng.
+* Người dùng có thể bật/tắt optional groups.
+* Người dùng có thể lưu preferences.
+* Preferences vẫn được giữ sau reload.
+
+Phiên bản 6.0.2 có sửa và cải thiện việc hiển thị, sắp xếp các cookie groups do người dùng cấu hình.
+
+---
+
+## 5.7 Cấu hình Essential Cookies group
+
+### Mục đích
+
+Mô tả cookie bắt buộc để website hoạt động.
+
+### Ví dụ cookie
+
+```text
+Joomla session cookie
+CSRF-related cookie
+Authentication cookie
+Language preference cookie
+Shopping cart session cookie
+```
+
+### Các bước
+
+1. Mở cookie-group configuration.
+2. Tạo group:
+
+```text
+Essential Cookies
+```
+
+3. Nhập description:
+
+```text
+These cookies are required for the website to operate and cannot be
+disabled through the cookie settings.
+```
+
+4. Đặt trạng thái:
+
+```text
+Always enabled
+```
+
+5. Không cho phép user tắt group này, nếu module hỗ trợ khóa trạng thái.
+6. Thêm các cookie đã xác định là essential.
+7. Save.
+
+### Kết quả mong đợi
+
+* Essential group luôn bật.
+* User không thể disable.
+* Login, forms và Joomla session vẫn hoạt động sau khi Reject optional cookies.
+
+---
+
+## 5.8 Cấu hình Analytics Cookies group
+
+### Mục đích
+
+Quản lý cookie dùng để đo traffic và hành vi người dùng.
+
+### Ví dụ
+
+```text
+Google Analytics
+Matomo
+Microsoft Clarity
+Hotjar
+```
+
+### Các bước
+
+1. Tạo group:
+
+```text
+Analytics Cookies
+```
+
+2. Nhập description:
+
+```text
+These cookies help us understand how visitors use the website and
+improve its performance.
+```
+
+3. Đặt trạng thái mặc định:
+
+```text
+Disabled until consent
+```
+
+4. Thêm cookie names, ví dụ:
+
+```text
+_ga
+_gid
+_ga_*
+```
+
+5. Kết nối việc load analytics script với consent state.
+6. Save.
+7. Clear cookies.
+8. Reload website.
+9. Không accept.
+10. Kiểm tra `_ga` chưa được tạo.
+11. Accept analytics.
+12. Reload và kiểm tra `_ga` được tạo.
+
+### Kết quả mong đợi
+
+Analytics chỉ hoạt động sau khi người dùng đồng ý.
+
+---
+
+## 5.9 Cấu hình Marketing Cookies group
+
+### Mục đích
+
+Quản lý cookie quảng cáo hoặc tracking bên thứ ba.
+
+### Ví dụ
+
+```text
+Meta Pixel
+Google Ads
+LinkedIn Insight Tag
+TikTok Pixel
+```
+
+### Các bước
+
+1. Tạo group:
+
+```text
+Marketing Cookies
+```
+
+2. Nhập description:
+
+```text
+These cookies are used to measure advertising performance and provide
+more relevant marketing content.
+```
+
+3. Đặt mặc định:
+
+```text
+Disabled until consent
+```
+
+4. Thêm known cookie names.
+5. Chỉ load marketing scripts sau consent.
+6. Save.
+7. Test Reject.
+8. Kiểm tra không có marketing network request.
+9. Test Accept.
+10. Kiểm tra scripts được load.
+
+### Kết quả mong đợi
+
+Marketing scripts không chạy trước consent.
+
+---
+
+## 5.10 Cấu hình Additional Information
+
+### Mục đích
+
+Hiển thị nội dung giải thích thêm ngoài notice chính.
+
+### Các bước
+
+1. Mở module.
+2. Tìm option:
+
+```text
+Additional Information
+```
+
+3. Chọn:
+
+```text
+Show
+```
+
+4. Nhập nội dung:
+
+```text
+You can change your cookie preferences at any time by opening the
+Cookie Settings panel.
+```
+
+5. Có thể thêm link:
+
+```text
+Read our Cookie Policy
+```
+
+6. Save.
+
+Repository chính thức liệt kê Additional Information với hai trạng thái Hide hoặc Show.
+
+### Kết quả mong đợi
+
+Thông tin bổ sung xuất hiện trong notice hoặc settings modal.
+
+---
+
+## 5.11 Cấu hình Cookie Policy article
+
+### Mục đích
+
+Hiển thị chính sách cookie chi tiết.
+
+### Các bước
+
+1. Vào:
+
+```text
+Content
+→ Articles
+→ New
+```
+
+2. Tạo article:
+
+```text
+Title: Cookie Policy
+Status: Published
+Access: Public
+```
+
+3. Nội dung nên gồm:
+
+* Cookie là gì.
+* Website dùng cookie nào.
+* Mục đích từng nhóm.
+* Cookie duration.
+* Third-party providers.
+* Cách thay đổi consent.
+* Contact information.
+
+4. Save article.
+5. Mở JB Cookies module.
+6. Chọn article vừa tạo trong field liên quan.
+7. Chọn cách mở:
+
+```text
+Popup modal: Yes
+```
+
+8. Save.
+
+JB Cookies hỗ trợ lựa chọn hiển thị Joomla article trong popup Bootstrap modal.
+
+### Kết quả mong đợi
+
+Người dùng click Cookie Policy và article mở trong modal mà không rời page.
+
+---
+
+## 5.12 Cấu hình Bootstrap colors
+
+### Mục đích
+
+Điều chỉnh màu notice và buttons theo Bootstrap.
+
+### Các bước
+
+1. Mở module.
+2. Tìm phần Background Color.
+3. Chọn một Bootstrap background class, ví dụ:
+
+```text
+bg-light
+bg-dark
+bg-primary
+bg-secondary
+```
+
+4. Cấu hình link hoặc button colors:
+
+```text
+btn-primary
+btn-success
+btn-secondary
+btn-outline-light
+```
+
+5. Save.
+6. Test desktop và mobile.
+7. Kiểm tra contrast.
+
+Repository chính thức ghi rõ extension sử dụng Bootstrap backgrounds và Bootstrap button colors.
+
+### Kết quả mong đợi
+
+* Text dễ đọc.
+* Button có contrast tốt.
+* Không bị custom template ghi đè làm mất màu.
+
+---
+
+## 5.13 Cấu hình icon position
+
+### Mục đích
+
+Đặt icon mở lại Cookie Settings ở bên trái hoặc bên phải.
+
+### Các bước
+
+1. Mở module.
+2. Tìm option:
+
+```text
+Position icon
+```
+
+3. Chọn:
+
+```text
+Left
+```
+
+hoặc:
+
+```text
+Right
+```
+
+4. Save.
+5. Reload frontend.
+6. Kiểm tra icon không che:
+
+* Chat widget.
+* Back-to-top button.
+* Mobile navigation.
+* Accessibility controls.
+
+Repository liệt kê hai lựa chọn position icon là Left và Right.
+
+### Kết quả mong đợi
+
+Người dùng có thể mở lại Cookie Settings sau khi đã lưu consent.
+
+---
+
+## 5.14 Cấu hình module cache
+
+### Mục đích
+
+Giảm thời gian render lại module.
+
+### Các bước
+
+1. Mở:
+
+```text
+Content
+→ Site Modules
+→ JB Cookies
+```
+
+2. Mở Advanced tab.
+3. Tìm:
+
+```text
+Caching
+```
+
+4. Ban đầu nên chọn:
+
+```text
+No caching
+```
+
+5. Hoàn tất toàn bộ functional test.
+6. Sau đó có thể test:
+
+```text
+Use Global
+```
+
+7. Clear Joomla cache.
+8. Test với nhiều browser sessions.
+9. Xác nhận consent state không bị dùng chung giữa users.
+
+### Khuyến nghị
+
+Trong giai đoạn development và migration:
+
+```text
+Caching: No caching
+```
+
+Sau khi production testing thành công mới cân nhắc bật cache.
+
+### Kết quả mong đợi
+
+Consent banner không bị:
+
+* Ẩn sai.
+* Hiện lại sai.
+* Dùng chung state giữa sessions.
+* Cache nội dung sai ngôn ngữ.
+
+---
+
+## 5.15 Cấu hình cookie discovery
+
+### Mục đích
+
+Tìm các cookie đang tồn tại trên homepage.
+
+### Các bước
+
+1. Hoàn tất cấu hình cơ bản của module.
+2. Mở chức năng cookie scan hoặc cookie preferences.
+3. Chạy scan trên homepage.
+4. Xem danh sách cookie được phát hiện.
+5. Phân loại từng cookie:
+
+```text
+Essential
+Functional
+Analytics
+Marketing
+Unknown
+```
+
+6. Xóa các record duplicate.
+7. Thêm description cho từng cookie.
+8. Lưu cấu hình.
+9. Kiểm tra thêm các page đặc biệt:
+
+* Login.
+* Contact form.
+* Search.
+* Product.
+* Cart.
+* Checkout.
+* Video page.
+
+10. Bổ sung các cookie không được homepage scan phát hiện.
+
+Joomla Extensions Directory cho biết module tìm kiếm các cookie hiện có từ homepage.
+
+### Kết quả mong đợi
+
+Danh sách cookie ban đầu được tạo, sau đó được administrator kiểm tra và hoàn thiện thủ công.
+
+---
+
+# 6. Quy trình setup đề xuất hoàn chỉnh
+
+Thứ tự triển khai nên là:
+
+```text
+1. Install JB Cookies
+2. Publish module on all pages
+3. Disable module cache during development
+4. Configure default language
+5. Configure all additional languages
+6. Create Cookie Policy article
+7. Configure Accept, Reject and Settings
+8. Create Essential cookie group
+9. Create Analytics cookie group
+10. Create Marketing cookie group
+11. Run homepage cookie discovery
+12. Manually test special pages
+13. Integrate analytics and marketing script blocking
+14. Test Bootstrap modal
+15. Test desktop and mobile
+16. Test Chrome, Firefox, Safari, Edge and Brave
+17. Test Accept
+18. Test Reject
+19. Test custom preferences
+20. Enable cache only after all tests pass
+```
+
+---
+
+# 7. Final acceptance checklist
+
+## Extension
+
+* [ ] JB Cookies is installed.
+* [ ] `mod_jbcookies` is enabled.
+* [ ] Module is published.
+* [ ] Module is assigned to all pages.
+* [ ] Template position is valid.
+
+## Content
+
+* [ ] Cookie notice content is complete.
+* [ ] Cookie Policy article is published.
+* [ ] Accept label is configured.
+* [ ] Reject label is configured.
+* [ ] Settings label is configured.
+* [ ] Every active language is configured.
+
+## Cookie groups
+
+* [ ] Essential group exists.
+* [ ] Analytics group exists.
+* [ ] Marketing group exists where applicable.
+* [ ] Cookie descriptions are accurate.
+* [ ] Cookie groups are displayed in the intended order.
+
+## Functional behavior
+
+* [ ] Notice appears on first visit.
+* [ ] Accept works.
+* [ ] Reject works.
+* [ ] Settings modal works.
+* [ ] Preferences persist after reload.
+* [ ] Users can reopen settings.
+* [ ] Policy article opens correctly.
+* [ ] No page reload is required after confirmation.
+
+## Technical behavior
+
+* [ ] No JavaScript errors.
+* [ ] No PHP warnings.
+* [ ] No missing assets.
+* [ ] Bootstrap modal works.
+* [ ] Brave modal works.
+* [ ] Mobile layout works.
+* [ ] Multilingual content works.
+
+## Consent validation
+
+* [ ] Essential cookies work without optional consent.
+* [ ] Analytics does not run before consent.
+* [ ] Marketing scripts do not run before consent.
+* [ ] Reject prevents optional tracking.
+* [ ] Changing preferences updates script behavior.
+
+---
+
+# 8. Final assessment
+
+```text
+Primary purpose:
+Display cookie information and provide a multilingual cookie-consent
+interface for Joomla websites.
+
+Strongest capabilities:
+Multilingual configuration, Bootstrap-based responsive UI, cookie
+preference groups, accept/reject actions, article popup, and simple
+Joomla module integration.
+
+Best use case:
+Small or medium Joomla websites requiring a lightweight and free cookie
+consent module.
+
+Main limitation:
+The administrator must verify that third-party analytics and marketing
+scripts are actually blocked before consent. A visible cookie banner
+alone does not guarantee legal or technical compliance.
+
+Joomla 6 recommendation:
+Suitable for Joomla 6 after template compatibility, multilingual,
+consent persistence, and real cookie-blocking tests have passed.
+```
