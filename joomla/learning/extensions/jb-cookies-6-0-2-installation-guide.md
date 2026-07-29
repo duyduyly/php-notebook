@@ -1,5 +1,55 @@
 # JB Cookies 6.0.2 — Joomla 6 Installation and Verification Guide
 
+
+## Document overview
+
+### Installation and verification
+
+- [Extension information](#extension-information)
+- [Official download links](#official-download-links)
+- [Prerequisites](#prerequisites)
+- [Method 1 — Upload Package File](#method-upload-package)
+- [Method 2 — Joomla Discover](#method-discover)
+- [Updates and editions](#updates-and-editions)
+- [Post-installation verification](#post-installation-verification)
+- [Troubleshooting](#troubleshooting)
+- [Production acceptance checklist](#production-acceptance)
+- [Final migration decision](#migration-decision)
+
+### Features and configuration
+
+- [Features and configuration guide](#features-configuration-guide)
+- [Purpose](#feature-purpose)
+- [Supported features](#supported-features)
+- [Strengths](#strengths)
+- [Limitations](#limitations)
+- [Feature-by-feature setup](#feature-setup)
+- [Recommended setup flow](#recommended-setup-flow)
+- [Final acceptance checklist](#final-acceptance-checklist)
+- [Final assessment](#final-assessment)
+
+### End-to-end flow
+
+```mermaid
+flowchart TD
+    A["Review requirements and back up"] --> B{"Choose installation method"}
+    B -->|Recommended| C["Upload installable ZIP"]
+    B -->|Files already deployed| D["Run Joomla Discover"]
+    C --> E["Publish and configure module"]
+    D --> E
+    E --> F["Configure languages and cookie groups"]
+    F --> G["Integrate optional-script blocking"]
+    G --> H["Test consent, browsers, and devices"]
+    H --> I{"All acceptance checks pass?"}
+    I -->|No| J["Troubleshoot and retest"]
+    J --> H
+    I -->|Yes| K["Release to production"]
+```
+
+---
+
+<a id="extension-information"></a>
+
 ## 1. Extension information
 
 | Field                | Value                                |
@@ -17,6 +67,8 @@
 JB Cookies 6.0.2 is distributed as a Joomla module. The Joomla Extensions Directory identifies it as a free extension and confirms compatibility with Joomla 6. The extension also uses the Joomla Update System.
 
 ---
+
+<a id="official-download-links"></a>
 
 ## 2. Official download links
 
@@ -54,6 +106,8 @@ Version 6.0.2 is marked as the current release, while version 6.0.0 introduced J
 
 ---
 
+<a id="prerequisites"></a>
+
 ## 3. Prerequisites
 
 Before installing JB Cookies, confirm the following:
@@ -81,6 +135,8 @@ Confirm there are no database schema errors.
 Create a complete backup using the project’s normal backup process or a Joomla backup extension.
 
 ---
+
+<a id="method-upload-package"></a>
 
 # 4. Method 1 — Install using Joomla Upload Package File
 
@@ -372,6 +428,8 @@ Also clear browser cookies before testing.
 
 ---
 
+<a id="method-discover"></a>
+
 # 5. Method 2 — Install using Joomla Discover
 
 ## Important limitation
@@ -382,12 +440,16 @@ Discover only detects extension files that have already been manually copied int
 
 Therefore, the process is:
 
-```text
-Download ZIP
-→ Extract ZIP
-→ Copy files to Joomla
-→ Run Discover
-→ Install discovered extension
+```mermaid
+flowchart TD
+    A["Download installable ZIP"] --> B["Extract package"]
+    B --> C["Copy module files to Joomla"]
+    C --> D["Run Discover"]
+    D --> E{"Module detected?"}
+    E -->|Yes| F["Install discovered extension"]
+    E -->|No| G["Check path, manifest, and permissions"]
+    G --> D
+    F --> H["Verify registration and configure module"]
 ```
 
 Use this method only when:
@@ -618,6 +680,8 @@ Configure:
 
 ---
 
+<a id="updates-and-editions"></a>
+
 # 6. Free and Pro upgrade process
 
 ## Current product model
@@ -698,6 +762,8 @@ System
 8. Retest all cookie functions.
 
 ---
+
+<a id="post-installation-verification"></a>
 
 # 7. Post-installation verification
 
@@ -993,6 +1059,8 @@ Disable Debug System after testing.
 
 ---
 
+<a id="troubleshooting"></a>
+
 # 8. Troubleshooting
 
 ## Module does not appear
@@ -1102,6 +1170,8 @@ If the update site is missing or broken, perform a manual package update.
 
 ---
 
+<a id="production-acceptance"></a>
+
 # 9. Production acceptance checklist
 
 ## Installation
@@ -1148,6 +1218,8 @@ If the update site is missing or broken, perform a manual package update.
 
 ---
 
+<a id="migration-decision"></a>
+
 # 10. Final migration decision
 
 ```text
@@ -1177,7 +1249,11 @@ testing.
 
 # Additional Guide: Features and Configuration
 
+<a id="features-configuration-guide"></a>
+
 # JB Cookies — Features and Configuration Guide for Joomla 6
+
+<a id="feature-purpose"></a>
 
 ## 1. Extension này dùng để làm gì?
 
@@ -1207,6 +1283,8 @@ Site Module
 JB Cookies phù hợp với website cần một giao diện cookie consent đơn giản, nhẹ và tích hợp trực tiếp vào Joomla. Extension được công bố hỗ trợ Joomla 3, 4, 5 và 6.
 
 ---
+
+<a id="supported-features"></a>
 
 ## 2. Extension hỗ trợ những gì?
 
@@ -1330,6 +1408,8 @@ Module có thể được publish tại position `debug` hoặc một module pos
 
 ---
 
+<a id="strengths"></a>
+
 ## 3. JB Cookies mạnh nhất ở điểm nào?
 
 ### 3.1 Dễ cài đặt và cấu hình
@@ -1382,6 +1462,8 @@ JB Cookies được phân phối miễn phí, có repository GitHub công khai v
 
 ---
 
+<a id="limitations"></a>
+
 ## 4. Giới hạn của extension
 
 JB Cookies không nên được hiểu là một giải pháp pháp lý hoàn chỉnh chỉ vì nó hiển thị cookie banner.
@@ -1419,6 +1501,8 @@ Do đó, extension mạnh ở:
 Nhưng không nên mặc định rằng nó là một Consent Management Platform đầy đủ giống các nền tảng chuyên dụng.
 
 ---
+
+<a id="feature-setup"></a>
 
 # 5. Setup từng chức năng
 
@@ -2234,34 +2318,31 @@ Danh sách cookie ban đầu được tạo, sau đó được administrator ki�
 
 ---
 
+<a id="recommended-setup-flow"></a>
+
 # 6. Quy trình setup đề xuất hoàn chỉnh
 
 Thứ tự triển khai nên là:
 
-```text
-1. Install JB Cookies
-2. Publish module on all pages
-3. Disable module cache during development
-4. Configure default language
-5. Configure all additional languages
-6. Create Cookie Policy article
-7. Configure Accept, Reject and Settings
-8. Create Essential cookie group
-9. Create Analytics cookie group
-10. Create Marketing cookie group
-11. Run homepage cookie discovery
-12. Manually test special pages
-13. Integrate analytics and marketing script blocking
-14. Test Bootstrap modal
-15. Test desktop and mobile
-16. Test Chrome, Firefox, Safari, Edge and Brave
-17. Test Accept
-18. Test Reject
-19. Test custom preferences
-20. Enable cache only after all tests pass
+```mermaid
+flowchart TD
+    A["Install JB Cookies"] --> B["Publish on all pages and disable cache"]
+    B --> C["Configure default and additional languages"]
+    C --> D["Create Cookie Policy and consent actions"]
+    D --> E["Define Essential, Analytics, and Marketing groups"]
+    E --> F["Discover cookies and inspect special pages"]
+    F --> G["Integrate analytics and marketing blocking"]
+    G --> H["Test modal, devices, and supported browsers"]
+    H --> I["Test Accept, Reject, and custom preferences"]
+    I --> J{"All tests pass?"}
+    J -->|No| K["Fix configuration or integration"]
+    K --> H
+    J -->|Yes| L["Enable cache and perform final acceptance"]
 ```
 
 ---
+
+<a id="final-acceptance-checklist"></a>
 
 # 7. Final acceptance checklist
 
@@ -2320,6 +2401,8 @@ Thứ tự triển khai nên là:
 * [ ] Changing preferences updates script behavior.
 
 ---
+
+<a id="final-assessment"></a>
 
 # 8. Final assessment
 
