@@ -1,0 +1,40 @@
+site_name: PHP & CMS Documentation
+site_description: A Markdown-based documentation website for PHP and CMS learning notes
+site_author: Alan
+repo_name: duyduyly/php-notebook
+repo_url: https://github.com/duyduyly/php-notebook
+
+# The nav section is intentionally omitted.
+# MkDocs will automatically build navigation from the docs folder tree.
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
