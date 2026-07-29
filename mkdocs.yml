@@ -6,8 +6,12 @@ repo_name: duyduyly/php-notebook
 repo_url: https://github.com/duyduyly/php-notebook
 edit_uri: edit/structure/docs/
 
-# Navigation is controlled manually so Documentation Home and Home stay hidden.
-# The pages still exist and can be opened by direct links.
+# These pages remain available by direct URL but are intentionally excluded
+# from all navigation menus and section navigation.
+not_in_nav: |
+  index.md
+  home/*
+
 nav:
   - CMS: cms/overview.md
   - PHP:
