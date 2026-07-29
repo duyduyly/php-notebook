@@ -6,9 +6,17 @@ repo_name: duyduyly/php-notebook
 repo_url: https://github.com/duyduyly/php-notebook
 edit_uri: edit/structure/docs/
 
-# The nav section is intentionally omitted.
-# MkDocs automatically builds navigation from the docs folder tree.
-# New folders and Markdown files appear after the next successful build.
+# Navigation is controlled manually so Documentation Home and Home stay hidden.
+# The pages still exist and can be opened by direct links.
+nav:
+  - CMS: cms/overview.md
+  - PHP:
+      - Overview: php/overview.md
+      - Demo:
+          - Demo: php/demo/demo.md
+  - Drupal: drupal/overview.md
+  - WordPress: wordpress/overview.md
+  - Joomla: joomla/overview.md
 
 theme:
   name: material
