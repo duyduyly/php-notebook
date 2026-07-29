@@ -1,4 +1,4 @@
-name: Deploy structure documentation
+name: Deploy documentation
 
 on:
   workflow_dispatch:
@@ -6,6 +6,9 @@ on:
     branches:
       - main
     paths:
+      - docs/**
+      - mkdocs.yml
+      - requirements.txt
       - .github/workflows/deploy-structure-docs.yml
 
 permissions:
@@ -21,10 +24,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout structure branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
-        with:
-          ref: structure
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -55,5 +56,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-# Deployment refresh: remove Home and Documentation Home everywhere.
