@@ -4,7 +4,7 @@ site_author: Alan
 site_url: https://duyduyly.github.io/php-notebook/
 repo_name: duyduyly/php-notebook
 repo_url: https://github.com/duyduyly/php-notebook
-edit_uri: edit/structure/docs/
+edit_uri: edit/main/docs/
 
 # The root landing page exists but is intentionally excluded from navigation.
 not_in_nav: |
@@ -16,8 +16,94 @@ nav:
   - Joomla: joomla/overview.md
   - PHP:
       - Overview: php/overview.md
-      - Demo:
-          - Demo: php/demo/demo.md
+      - 1. Environment and Basic Syntax:
+          - Intro: php/01-environment-and-basic-syntax/intro.md
+          - Install: php/01-environment-and-basic-syntax/install.md
+          - Syntax: php/01-environment-and-basic-syntax/syntax.md
+          - Comments: php/01-environment-and-basic-syntax/comments.md
+          - Echo / Print: php/01-environment-and-basic-syntax/echo-print.md
+      - 2. Variables and Data:
+          - Variables: php/02-variables-and-data/variables.md
+          - Scope: php/02-variables-and-data/scope.md
+          - Data Types: php/02-variables-and-data/data-types.md
+          - Numbers: php/02-variables-and-data/numbers.md
+          - Casting: php/02-variables-and-data/casting.md
+          - Math: php/02-variables-and-data/math.md
+          - Constants: php/02-variables-and-data/constants.md
+          - Magic Constants: php/02-variables-and-data/magic-constants.md
+      - 3. String Processing:
+          - Strings: php/03-string-processing/strings.md
+          - String Functions: php/03-string-processing/string-functions.md
+          - Modify: php/03-string-processing/modify.md
+          - Concatenate: php/03-string-processing/concatenate.md
+          - Slice: php/03-string-processing/slice.md
+          - Escape Characters: php/03-string-processing/escape-characters.md
+          - RegEx: php/03-string-processing/regex.md
+      - 4. Control Flow:
+          - Operators: php/04-control-flow/operators.md
+          - If / Elseif / Else: php/04-control-flow/if-elseif-else.md
+          - Shorthand If: php/04-control-flow/shorthand-if.md
+          - Nested If: php/04-control-flow/nested-if.md
+          - Switch: php/04-control-flow/switch.md
+          - Match: php/04-control-flow/match.md
+      - 5. Loops and Collections:
+          - While: php/05-loops-and-collections/while.md
+          - Do While: php/05-loops-and-collections/do-while.md
+          - For: php/05-loops-and-collections/for.md
+          - Foreach: php/05-loops-and-collections/foreach.md
+          - Break: php/05-loops-and-collections/break.md
+          - Continue: php/05-loops-and-collections/continue.md
+      - 6. Functions and Arrays:
+          - Functions: php/06-functions-and-arrays/functions.md
+          - Callback Functions: php/06-functions-and-arrays/callback-functions.md
+          - Indexed Arrays: php/06-functions-and-arrays/indexed-arrays.md
+          - Associative Arrays: php/06-functions-and-arrays/associative-arrays.md
+          - Multidimensional Arrays: php/06-functions-and-arrays/multidimensional-arrays.md
+          - Sorting: php/06-functions-and-arrays/sorting.md
+          - Array Functions: php/06-functions-and-arrays/array-functions.md
+          - Iterables: php/06-functions-and-arrays/iterables.md
+      - 7. HTTP Request and Forms:
+          - Superglobals: php/07-http-request-and-forms/superglobals.md
+          - GET / POST: php/07-http-request-and-forms/get-post.md
+          - Form Handling: php/07-http-request-and-forms/form-handling.md
+          - Validation: php/07-http-request-and-forms/validation.md
+          - Required Fields: php/07-http-request-and-forms/required-fields.md
+          - Email / URL Validation: php/07-http-request-and-forms/email-url-validation.md
+          - Filters: php/07-http-request-and-forms/filters.md
+      - 8. Files and Application Structure:
+          - Include / Require: php/08-files-and-application-structure/include-require.md
+          - File Read: php/08-files-and-application-structure/file-read.md
+          - File Write: php/08-files-and-application-structure/file-write.md
+          - File Upload: php/08-files-and-application-structure/file-upload.md
+          - Date and Time: php/08-files-and-application-structure/date-and-time.md
+      - 9. User State:
+          - Cookies: php/09-user-state/cookies.md
+          - Sessions: php/09-user-state/sessions.md
+      - 10. Data Exchange:
+          - JSON: php/10-data-exchange/json.md
+          - AJAX: php/10-data-exchange/ajax.md
+          - XML: php/10-data-exchange/xml.md
+      - 11. Error Handling:
+          - Exceptions: php/11-error-handling/exceptions.md
+      - 12. Object-Oriented PHP:
+          - Classes and Objects: php/12-object-oriented-php/classes-and-objects.md
+          - Constructor / Destructor: php/12-object-oriented-php/constructor-destructor.md
+          - Access Modifiers: php/12-object-oriented-php/access-modifiers.md
+          - Inheritance: php/12-object-oriented-php/inheritance.md
+          - Abstract Classes: php/12-object-oriented-php/abstract-classes.md
+          - Interfaces: php/12-object-oriented-php/interfaces.md
+          - Traits: php/12-object-oriented-php/traits.md
+          - Static: php/12-object-oriented-php/static.md
+          - Namespaces: php/12-object-oriented-php/namespaces.md
+      - 13. Database:
+          - Connect: php/13-database/connect.md
+          - Create Database / Table: php/13-database/create-database-table.md
+          - Insert: php/13-database/insert.md
+          - Select: php/13-database/select.md
+          - Update: php/13-database/update.md
+          - Delete: php/13-database/delete.md
+          - Filtering / Sorting / Pagination: php/13-database/filtering-sorting-pagination.md
+          - Prepared Statements: php/13-database/prepared-statements.md
   - WordPress: wordpress/overview.md
 
 theme:
