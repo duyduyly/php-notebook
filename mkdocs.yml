@@ -6,21 +6,19 @@ repo_name: duyduyly/php-notebook
 repo_url: https://github.com/duyduyly/php-notebook
 edit_uri: edit/structure/docs/
 
-# These pages remain available by direct URL but are intentionally excluded
-# from all navigation menus and section navigation.
+# The root landing page exists but is intentionally excluded from navigation.
 not_in_nav: |
   index.md
-  home/*
 
 nav:
   - CMS: cms/overview.md
+  - Drupal: drupal/overview.md
+  - Joomla: joomla/overview.md
   - PHP:
       - Overview: php/overview.md
       - Demo:
           - Demo: php/demo/demo.md
-  - Drupal: drupal/overview.md
   - WordPress: wordpress/overview.md
-  - Joomla: joomla/overview.md
 
 theme:
   name: material
