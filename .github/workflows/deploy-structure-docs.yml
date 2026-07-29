@@ -56,4 +56,4 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-# Deployment refresh: hide Home and Documentation Home from all navigation.
+# Deployment refresh: remove Home and Documentation Home everywhere.
