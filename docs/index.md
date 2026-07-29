@@ -4,18 +4,18 @@ Welcome to the PHP and CMS documentation website.
 
 Use the navigation menu to browse the available documentation areas.
 
-## Web tutorial
+## Home
 
-The documentation website demo and its structure guide are now grouped under:
+The documentation website demo and its structure guide are grouped under:
 
 ```text
-docs/web-tutorial/
+docs/home/
 ├── overview.md
 └── explain.md
 ```
 
-- [Open the documentation website demo](web-tutorial/overview.md)
-- [Read the structure and deployment guide](web-tutorial/explain.md)
+- [Open the documentation website demo](home/overview.md)
+- [Read the structure and deployment guide](home/explain.md)
 
 ## Main documentation areas
 
