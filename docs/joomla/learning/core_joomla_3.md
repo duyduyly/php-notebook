@@ -257,7 +257,7 @@ Audit the package and every child extension. Do not record only the parent packa
 
 A file extension installs or updates shared files, fonts, assets, or framework resources that do not fit the normal component, module, or plugin structure.
 
-For more detail, see [extension-in-joomla.md](./extension-in-joomla.md).
+For more detail, see [extension-in-joomla.md](extensions/extension-in-joomla.md).
 
 [Back to Table of Contents](#table-of-contents)
 
