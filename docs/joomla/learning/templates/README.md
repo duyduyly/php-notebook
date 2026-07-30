@@ -1,6 +1,6 @@
 # Joomla Templates
 
-A structured learning guide for understanding, building, overriding, testing, and migrating Joomla templates.
+A structured learning guide for understanding, building, overriding, configuring, testing, and migrating Joomla templates.
 
 ## Table of Contents
 
@@ -10,6 +10,7 @@ A structured learning guide for understanding, building, overriding, testing, an
 - [4. Assets, Languages, and Module Chrome](04-assets-languages-and-module-chrome.md)
 - [5. Joomla 3 to Joomla 4+ Migration](05-joomla-3-to-4-migration.md)
 - [6. Build, Test, Package, and Install a Custom Template](06-build-test-package-and-install.md)
+- [7. Template Features, Overrides, and Backend Setup](07-template-features-overrides-and-backend-setup.md)
 
 ---
 
@@ -25,6 +26,9 @@ After completing this section, you should be able to:
 - Create custom module chrome.
 - Migrate a Joomla 3 template toward Joomla 4, 5, or 6.
 - Build, test, package, and install a custom template.
+- Classify template features, component views, layouts, and overrides correctly.
+- Configure template styles, menu assignments, module positions, and common content views from Joomla Administrator.
+- Plan and test a safe Joomla 3 to Joomla 6 template migration.
 
 ---
 
@@ -37,6 +41,7 @@ flowchart LR
     C --> D[Assets and Languages]
     D --> E[Migration]
     E --> F[Build and Test]
+    F --> G[Features and Backend Setup]
 ```
 
 ---
