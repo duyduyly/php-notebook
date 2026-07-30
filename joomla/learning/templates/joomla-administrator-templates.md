@@ -3,19 +3,21 @@
 ## Table of Contents
 
 - [1. Overview](#1-overview)
-- [2. Administrator Templates in Joomla 3](#2-administrator-templates-in-joomla-3)
-  - [2.1 Isis](#21-isis)
-  - [2.2 Hathor](#22-hathor)
-- [3. Hathor vs. Isis](#3-hathor-vs-isis)
-- [4. Administrator Template in Joomla 6](#4-administrator-template-in-joomla-6)
-  - [4.1 Atum](#41-atum)
-- [5. Joomla 3 to Joomla 6 Mapping](#5-joomla-3-to-joomla-6-mapping)
-- [6. Migration Rules](#6-migration-rules)
-- [7. Customization Assessment](#7-customization-assessment)
-- [8. Recommended Migration Actions](#8-recommended-migration-actions)
-- [9. Inventory Records](#9-inventory-records)
-- [10. Validation Checklist](#10-validation-checklist)
-- [11. Summary](#11-summary)
+- [2. Official Joomla Evidence](#2-official-joomla-evidence)
+- [3. Administrator Templates in Joomla 3](#3-administrator-templates-in-joomla-3)
+  - [3.1 Isis](#31-isis)
+  - [3.2 Hathor](#32-hathor)
+- [4. Hathor vs. Isis](#4-hathor-vs-isis)
+- [5. Administrator Template in Joomla 6](#5-administrator-template-in-joomla-6)
+  - [5.1 Atum](#51-atum)
+- [6. Joomla 3 to Joomla 6 Mapping](#6-joomla-3-to-joomla-6-mapping)
+- [7. Migration Rules](#7-migration-rules)
+- [8. Customization Assessment](#8-customization-assessment)
+- [9. Recommended Migration Actions](#9-recommended-migration-actions)
+- [10. Inventory Records](#10-inventory-records)
+- [11. Validation Checklist](#11-validation-checklist)
+- [12. Official References](#12-official-references)
+- [13. Summary](#13-summary)
 
 ---
 
@@ -28,15 +30,46 @@ Joomla templates are separated by application area:
 | Site | Renders public website pages | `templates/<template-name>/` |
 | Administrator | Renders the backend administration interface | `administrator/templates/<template-name>/` |
 
-**Hathor and Isis are Joomla 3 administrator templates.** They are not frontend website themes and should not be classified as custom or third-party extensions unless the project contains direct modifications to their source files.
+**Hathor and Isis are Joomla 3 Core administrator templates.** They are not frontend website themes and should not be classified as custom or third-party extensions unless the project contains direct modifications to their source files.
 
-In Joomla 6, Hathor and Isis are no longer available. The standard administrator template is **Atum**.
+The official Joomla 3 documentation lists **ISIS as the default administrator template** and **Hathor as the alternative administrator template**.
+
+From Joomla 4 onward, the Joomla 3 administrator templates are no longer supported. Joomla introduced **Atum** as the new administrator template. Therefore, a Joomla 3 to Joomla 6 migration should use Atum instead of attempting to migrate Isis or Hathor.
 
 ---
 
-## 2. Administrator Templates in Joomla 3
+## 2. Official Joomla Evidence
 
-A standard Joomla 3 installation normally includes the following backend templates:
+The administrator-template change is documented by Joomla in the following official sources:
+
+| Evidence | Official statement | Source |
+|---|---|---|
+| Joomla 3 template list | Joomla 3 includes `ISIS` as the default administrator template and `Hathor` as another administrator template. | [J3.x: Templates supplied with Joomla!](https://docs.joomla.org/J3.x%3ATemplates_supplied_with_Joomla%21/en) |
+| Hathor removal announcement | Joomla states that Hathor was not updated for newer Joomla 3 functionality and would be removed from the Joomla 4 distribution. | [J3.x: Hathor admin template has not been updated](https://docs.joomla.org/J3.x%3AHathor_admin_template_has_not_been_updated_to_work_with_the_new_features/en) |
+| Joomla 4 compatibility change | Joomla states that the Joomla 3 backend templates, Isis and Hathor, are no longer supported and that the new backend template is Atum. | [Potential backward compatibility issues in Joomla 4](https://docs.joomla.org/Potential_backward_compatibility_issues_in_Joomla_4/en) |
+| Atum introduction | Joomla documentation identifies Atum as the administrator template used for site management in Joomla 4. | [J4.x: Template Basics](https://docs.joomla.org/Special%3AMyLanguage/J4.x%3ATemplate_Basics) |
+| Joomla 4 installed templates | Joomla documentation states that Joomla 4 comes with one administrator template: Atum. | [J4.x: Switching Templates](https://docs.joomla.org/J4.x%3ASwitching_Templates) |
+
+### Verified transition
+
+```text
+Joomla 3
+├── Isis — default administrator template
+└── Hathor — alternative administrator template
+
+        ↓ Removed / no longer supported from Joomla 4
+
+Joomla 4, Joomla 5, and Joomla 6
+└── Atum — Core administrator template
+```
+
+> The official removal announcement is tied to Joomla 4 because that is the release in which the template architecture changed. Joomla 6 continues on the newer Joomla architecture and does not restore Isis or Hathor.
+
+---
+
+## 3. Administrator Templates in Joomla 3
+
+A standard Joomla 3 installation normally includes:
 
 ```text
 administrator/
@@ -45,20 +78,16 @@ administrator/
     └── isis/
 ```
 
-### 2.1 Isis
+### 3.1 Isis
 
 Isis is the default administrator template in Joomla 3.
 
-It controls the appearance of backend areas such as:
+It controls backend areas such as:
 
 - Control Panel
-- Article Manager
-- Category Manager
-- Menu Manager
-- Module Manager
-- Plugin Manager
-- Template Manager
-- Extension Manager
+- Article and Category Managers
+- Menu and Module Managers
+- Plugin and Extension Managers
 - Component forms and views
 - Administrator toolbars and system messages
 
@@ -68,18 +97,17 @@ It controls the appearance of backend areas such as:
 | Type | Administrator template |
 | Source | Joomla Core |
 | Default in Joomla 3 | Yes |
-| Responsive | Yes |
 | Recommended for Joomla 3 | Yes |
 | Joomla 6 compatible | No |
 | Joomla 6 replacement | Atum |
 
-Isis is the preferred administrator template for Joomla 3 because it supports the Joomla 3 backend interface and third-party administrator views more consistently than Hathor.
+Official proof: [J3.x: Templates supplied with Joomla!](https://docs.joomla.org/J3.x%3ATemplates_supplied_with_Joomla%21/en)
 
-### 2.2 Hathor
+### 3.2 Hathor
 
 Hathor is an alternative Joomla 3 administrator template originally designed with accessibility as its main goal.
 
-Its design focused on use cases such as:
+Its design focused on:
 
 - Keyboard navigation
 - Screen-reader usage
@@ -93,27 +121,26 @@ Its design focused on use cases such as:
 | Source | Joomla Core |
 | Default in Joomla 3 | No |
 | Primary purpose | Accessibility-focused backend UI |
-| Full support for later Joomla 3 features | Limited |
-| Recommended for a modern Joomla 3 backend | No |
+| Support for later Joomla 3 features | Limited |
 | Joomla 6 compatible | No |
 | Joomla 6 replacement | Atum |
 
-Hathor was not maintained to the same level as Isis for later Joomla 3 functionality. A project still using Hathor should be reviewed carefully for outdated layouts and administrator extension compatibility issues.
+Joomla officially recommended using Isis because Hathor had not been updated for newer Joomla 3 features. Joomla also announced that Hathor would be removed from Joomla 4.
+
+Official proof: [J3.x: Hathor admin template has not been updated](https://docs.joomla.org/J3.x%3AHathor_admin_template_has_not_been_updated_to_work_with_the_new_features/en)
 
 ---
 
-## 3. Hathor vs. Isis
+## 4. Hathor vs. Isis
 
 | Criterion | Isis | Hathor |
 |---|---|---|
 | Included in Joomla 3 Core | Yes | Yes |
 | Administrator template | Yes | Yes |
-| Frontend template | No | No |
 | Joomla 3 default | Yes | No |
-| Responsive backend | Better support | More limited |
 | Main design goal | General administrator experience | Accessibility |
 | Later Joomla 3 feature support | Better | Limited |
-| Recommended on Joomla 3 | Yes | No |
+| Recommended on later Joomla 3 releases | Yes | No |
 | Available in Joomla 6 | No | No |
 | Migration target | Atum | Atum |
 
@@ -121,17 +148,17 @@ Hathor was not maintained to the same level as Isis for later Joomla 3 functiona
 
 ---
 
-## 4. Administrator Template in Joomla 6
+## 5. Administrator Template in Joomla 6
 
-### 4.1 Atum
+### 5.1 Atum
 
-Atum is the Joomla administrator template introduced with Joomla 4 and used by later Joomla versions, including Joomla 6.
+Atum was introduced as the Joomla 4 administrator template and remains the Core administrator-template foundation used by later Joomla generations, including Joomla 6.
 
 ```text
 administrator/templates/atum/
 ```
 
-Its static assets are normally stored under:
+Static assets are normally stored under:
 
 ```text
 media/templates/administrator/atum/
@@ -146,15 +173,18 @@ media/templates/administrator/atum/
 | Element | `atum` |
 | Type | Administrator template |
 | Source | Joomla Core |
-| Default in Joomla 6 | Yes |
 | Separate installation required | No |
-| Replaces Isis and Hathor | Yes |
+| Migration replacement for Isis/Hathor | Yes |
 
-Atum is installed with Joomla 6. It should normally remain the default backend template unless the project has a documented requirement for a supported custom administrator template.
+Official proof:
+
+- [J4.x: Template Basics](https://docs.joomla.org/Special%3AMyLanguage/J4.x%3ATemplate_Basics)
+- [J4.x: Switching Templates](https://docs.joomla.org/J4.x%3ASwitching_Templates)
+- [J4.x: Administrator Modules](https://docs.joomla.org/J4.x%3AAdministrator_Modules)
 
 ---
 
-## 5. Joomla 3 to Joomla 6 Mapping
+## 6. Joomla 3 to Joomla 6 Mapping
 
 ```text
 Joomla 3 Administrator
@@ -175,9 +205,13 @@ Joomla 6 Administrator
 | Isis or Hathor overrides | Review and rewrite for Joomla 6 |
 | Hard-coded template paths | Replace with Joomla APIs or extension-owned assets |
 
+The official compatibility documentation explicitly states that Isis and Hathor are no longer supported and identifies Atum as the replacement backend template:
+
+- [Potential backward compatibility issues in Joomla 4](https://docs.joomla.org/Potential_backward_compatibility_issues_in_Joomla_4/en#Templates)
+
 ---
 
-## 6. Migration Rules
+## 7. Migration Rules
 
 ### Rule 1: Do not copy Joomla 3 administrator templates
 
@@ -188,20 +222,20 @@ administrator/templates/isis/
 administrator/templates/hathor/
 ```
 
-The backend markup, layouts, assets, Bootstrap usage, JavaScript behavior, APIs, and extension integration points differ significantly between Joomla 3 and Joomla 6.
+The backend markup, layouts, assets, Bootstrap usage, JavaScript behavior, APIs, and extension integration points differ between Joomla 3 and newer Joomla versions.
 
 ### Rule 2: Use Atum as the Joomla 6 baseline
 
 For a clean Joomla 6 installation:
 
-1. Keep Atum as the default administrator template.
+1. Keep Atum as the administrator-template baseline.
 2. Install Joomla 6-compatible extensions.
 3. Test every administrator component and configuration screen.
 4. Reimplement only verified project-specific customizations.
 
 ### Rule 3: Do not edit Atum Core directly
 
-Direct changes under the following paths can be overwritten by Joomla updates:
+Direct changes under these paths can be overwritten by Joomla updates:
 
 ```text
 administrator/templates/atum/
@@ -216,9 +250,9 @@ CSS or JavaScript required by a custom administrator component should normally b
 
 ---
 
-## 7. Customization Assessment
+## 8. Customization Assessment
 
-The migration effort is minimal when Isis and Hathor are unchanged Joomla Core files. Additional work is required when the project modified them directly.
+Migration effort is minimal when Isis and Hathor remain unchanged Joomla Core files. Additional work is required when the project modified them directly.
 
 Review these Joomla 3 paths:
 
@@ -250,7 +284,7 @@ Common customizations include:
 - Custom administrator dashboard output
 - Hard-coded references to Isis or Hathor assets
 
-Useful searches:
+Useful search:
 
 ```bash
 grep -RniE "templates/(isis|hathor)|administrator/templates" \
@@ -260,7 +294,7 @@ grep -RniE "templates/(isis|hathor)|administrator/templates" \
   templates
 ```
 
-Compare the project with a clean Joomla 3 package:
+Compare the project against a clean Joomla 3 package:
 
 ```bash
 diff -ru \
@@ -272,17 +306,17 @@ Run the same comparison for Hathor when it exists or is used.
 
 ---
 
-## 8. Recommended Migration Actions
+## 9. Recommended Migration Actions
 
 | Joomla 3 customization | Joomla 6 action |
 |---|---|
 | No customization | Use Atum without template migration |
 | Login logo or simple branding | Reconfigure or reimplement for Atum |
-| Backend color changes | Use supported Atum configuration or extension-owned CSS |
+| Backend color changes | Use supported configuration or extension-owned CSS |
 | Component-specific CSS | Move it into the corresponding component assets |
 | Custom JavaScript | Register it through Joomla's Web Asset Manager |
 | Isis/Hathor layout override | Rewrite against Joomla 6 layouts |
-| Custom dashboard | Rebuild using Joomla 6 administrator modules and dashboards |
+| Custom dashboard | Rebuild using Joomla administrator modules and dashboards |
 | Hard-coded Isis/Hathor path | Replace it with dynamic APIs or extension-owned paths |
 
 ### Estimated effort
@@ -294,33 +328,31 @@ Run the same comparison for Hathor when it exists or is used.
 | Custom backend CSS or JavaScript | 4–12 hours |
 | Multiple overrides or template dependencies | 1–3+ days |
 
-These figures are planning estimates. Actual effort depends on the number of modified files, extension compatibility, and regression-test scope.
+These figures are planning estimates. Actual effort depends on modified files, extension compatibility, and regression-test scope.
 
 ---
 
-## 9. Inventory Records
-
-Recommended migration inventory entries:
+## 10. Inventory Records
 
 | Name | Element | Type | Source | Location | Joomla 3 status | Joomla 6 action |
 |---|---|---|---|---|---|---|
 | Isis | `isis` | Template | Joomla Core | Administrator | Default or installed | Do not migrate; replace with Atum |
 | Hathor | `hathor` | Template | Joomla Core | Administrator | Installed, possibly unused | Remove from scope; use Atum |
-| Atum | `atum` | Template | Joomla Core | Administrator | Not available | Use Joomla 6 default |
+| Atum | `atum` | Template | Joomla Core | Administrator | Not available | Use Joomla 6 Core template |
 
 Recommended classification:
 
 ```text
 Category: Joomla Core
 Extension type: Administrator Template
-Migration strategy: Replace by Joomla 6 Core equivalent
+Migration strategy: Replace with the Joomla 6 Core equivalent
 ```
 
 Do not classify Isis or Hathor as third-party extensions merely because they appear in the Joomla Extension Manager.
 
 ---
 
-## 10. Validation Checklist
+## 11. Validation Checklist
 
 ### Joomla 3 discovery
 
@@ -333,10 +365,10 @@ Do not classify Isis or Hathor as third-party extensions merely because they app
 
 ### Joomla 6 implementation
 
-- [ ] Keep Atum as the default administrator template.
+- [ ] Use Atum as the administrator-template baseline.
 - [ ] Reimplement only confirmed business-required customizations.
 - [ ] Move component-specific assets into their owning extensions.
-- [ ] Register JavaScript and CSS through supported Joomla 6 mechanisms.
+- [ ] Register JavaScript and CSS through supported Joomla mechanisms.
 - [ ] Test all custom and third-party administrator components.
 - [ ] Test administrator login, dashboard, menus, forms, modals, and messages.
 - [ ] Confirm keyboard navigation and accessibility behavior.
@@ -344,12 +376,36 @@ Do not classify Isis or Hathor as third-party extensions merely because they app
 
 ---
 
-## 11. Summary
+## 12. Official References
+
+All sources below are hosted on official Joomla domains.
+
+1. [J3.x: Templates supplied with Joomla!](https://docs.joomla.org/J3.x%3ATemplates_supplied_with_Joomla%21/en)  
+   Confirms that Joomla 3 includes Isis as the default administrator template and Hathor as another administrator template.
+
+2. [J3.x: Hathor admin template has not been updated to work with the new features](https://docs.joomla.org/J3.x%3AHathor_admin_template_has_not_been_updated_to_work_with_the_new_features/en)  
+   Confirms Joomla's recommendation to use Isis and announces that Hathor would be removed in Joomla 4.
+
+3. [Potential backward compatibility issues in Joomla 4](https://docs.joomla.org/Potential_backward_compatibility_issues_in_Joomla_4/en#Templates)  
+   Confirms that the Joomla 3 backend templates Isis and Hathor are no longer supported and that Atum is the new backend template.
+
+4. [J4.x: Template Basics](https://docs.joomla.org/Special%3AMyLanguage/J4.x%3ATemplate_Basics)  
+   Identifies Atum as the administrator template used for site management.
+
+5. [J4.x: Switching Templates](https://docs.joomla.org/J4.x%3ASwitching_Templates)  
+   States that Joomla 4 comes with one administrator template, Atum.
+
+6. [J4.x: Administrator Modules](https://docs.joomla.org/J4.x%3AAdministrator_Modules)  
+   Documents the Atum administrator interface and its administrator module positions.
+
+---
+
+## 13. Summary
 
 - Hathor and Isis are Joomla 3 Core administrator templates.
-- Isis is the Joomla 3 default and is generally more suitable than Hathor.
-- Hathor was accessibility-focused but has limited support for later Joomla 3 functionality.
-- Neither template is available or compatible with Joomla 6.
-- Atum is the Joomla 6 Core administrator template and requires no separate installation.
-- Do not copy Isis or Hathor into Joomla 6.
-- Migration work is required only when the Joomla 3 project contains custom branding, overrides, assets, or hard-coded dependencies.
+- Official Joomla documentation identifies Isis as the Joomla 3 default.
+- Joomla officially announced that Hathor would be removed in Joomla 4.
+- Joomla's compatibility documentation states that Isis and Hathor are no longer supported.
+- Atum replaced them as the new Joomla administrator template.
+- Joomla 6 should use Atum rather than copying or upgrading Isis or Hathor.
+- Migration work is required only when the Joomla 3 project contains custom branding, overrides, assets, or hard-coded template dependencies.
