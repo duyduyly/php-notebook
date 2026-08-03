@@ -9,13 +9,34 @@ description: Inspect a custom Joomla extension and generate a Markdown clone pla
 
 Inspect one custom Joomla extension in a source project and generate a complete Markdown plan report describing everything that must be cloned into a target Joomla project.
 
-The plan must preserve the original behavior, avoid missing logic, reconstruct the required database schema, and make the extension ready for Joomla Discover.
+The plan must preserve the original behavior, avoid missing logic, reconstruct the complete required database schema, and make the extension ready for Joomla Discover.
+
+## Required references
+
+Before inspecting the extension or generating the report, read these references in order:
+
+1. [Joomla 6 Extension Structure](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/extensions/joomla-6-extension-structure.md)
+2. [`references/README.md`](./references/README.md)
+3. [`references/extension-type-paths.md`](./references/extension-type-paths.md)
+4. [`references/discover-requirements.md`](./references/discover-requirements.md)
+5. [`references/database-schema-checklist.md`](./references/database-schema-checklist.md)
+6. [`references/coverage-rules.md`](./references/coverage-rules.md)
+7. [`templates/clone-plan-report-template.md`](./templates/clone-plan-report-template.md)
+
+### Reference rules
+
+- Treat the GitHub Joomla 6 structure document as the primary architecture reference.
+- Classify the extension type before selecting required paths or structure checks.
+- Apply only the requirements relevant to the detected type.
+- Do not require Component-only files for Modules, Plugins, Templates, Libraries, Languages, Packages, or File extensions.
+- When the source differs from the reference, record the difference and evidence. Do not silently rewrite business logic.
+- If repository evidence conflicts with a generic reference, report the conflict and mark it for verification.
 
 ## Use this skill when
 
 - Moving a custom Joomla extension between projects.
 - Reconstructing an installable or discoverable extension from installed files.
-- Creating a file, structure, manifest, and database inventory before migration.
+- Creating file, structure, manifest, and database inventories before migration.
 - Verifying that a cloned extension contains all original logic.
 - Producing a repeatable migration plan without implementing new features.
 
@@ -48,15 +69,17 @@ When a required fact cannot be verified, write `Unknown — verification require
 ## Non-negotiable rules
 
 1. Preserve business logic exactly unless an approved compatibility change is documented separately.
-2. Inspect both standard and non-standard paths.
+2. Inspect standard and non-standard paths.
 3. Treat the manifest as an installation map, not the only source of truth.
 4. Search source code for database tables, shared files, dependencies, and hard-coded paths.
 5. Preserve path and filename case exactly.
 6. Use checksums to detect unexpected logic changes.
-7. Keep source-file, structure, manifest, Discover, and database coverage separate.
+7. Keep source-file, structure, manifest, Discover, database, and logic-preservation coverage separate.
 8. Do not claim 100% coverage when evidence is incomplete.
 9. Do not copy Joomla-generated IDs blindly when Installer or Discover should recreate them.
 10. Never write secrets or production credentials into the report.
+11. Report missing or conflicting evidence instead of guessing.
+12. A successful Discover operation alone is never sufficient for `PASS`.
 
 ## Extension classification
 
@@ -74,7 +97,7 @@ Joomla Extension
 └── File — Arbitrary file collection installed by a manifest
 ```
 
-Use `../../joomla-6-extension-structure.md` as the structure reference. Do not apply the Component structure blindly to another extension type.
+Use the primary architecture reference and `references/extension-type-paths.md` to select expected source and target locations.
 
 ## Workflow
 
@@ -88,12 +111,11 @@ Record:
 - Plugin group when applicable.
 - Client: Site, Administrator, API, or multiple clients.
 - Manifest path and filename.
-- Version.
-- Namespace.
+- Version and namespace.
 - Installed paths.
 - Source and target Joomla/PHP versions.
 
-Read the manifest and capture:
+Capture applicable manifest values:
 
 ```text
 type
@@ -116,9 +138,7 @@ updateservers
 
 ### 2. Build the complete source inventory
 
-Inspect standard locations for the detected type and search outside them.
-
-Typical non-standard locations:
+Inspect every standard location listed for the detected extension type and search non-standard locations such as:
 
 ```text
 layouts/
@@ -137,8 +157,8 @@ For every related file, collect:
 
 | Field | Description |
 |---|---|
-| Source path | Exact path in source project |
-| Target path | Expected path in target project |
+| Source path | Exact source-project path |
+| Target path | Expected target-project path |
 | File type | PHP, XML, SQL, JS, CSS, image, language, JSON, other |
 | Size | File size when available |
 | SHA-256 | Checksum for logic-preservation verification |
@@ -147,17 +167,13 @@ For every related file, collect:
 | Clone status | Planned, Copied, Missing, Modified, Excluded |
 | Notes | Purpose, dependency, or risk |
 
-Calculate:
+Report original, required, cloned, missing, unexpected, and unexpectedly modified file counts.
 
-```text
-File coverage = matched required files / total required files × 100%
-```
+### 3. Validate the structure
 
-### 3. Validate the extension structure
+Generate a detected structure tree with inline comments.
 
-Generate a detected tree with inline comments explaining each directory and file.
-
-For every expected item, assign one status:
+Assign each expected item one status:
 
 ```text
 Present
@@ -167,38 +183,32 @@ Not applicable
 Unexpected
 ```
 
-Calculate:
-
-```text
-Structure coverage = complete required items / total required items × 100%
-```
-
-Optional items proven unnecessary must not lower the score.
+Optional items proven unnecessary must not reduce coverage.
 
 ### 4. Validate the manifest
 
-Check that:
+Check:
 
 - XML is well-formed.
-- Extension type is correct.
-- Client and plugin group are correct.
+- Type, client, element, and plugin group are correct.
 - Technical name matches installed paths.
-- Every declared file and folder exists.
+- Every declared file and directory exists.
 - Required files are not omitted.
-- Namespace path matches `src`.
-- Media and language destinations are correct.
-- Installer script exists when declared.
-- Install, uninstall, and update SQL paths exist when declared.
-- Manifest is placed where Joomla Discover expects it.
+- Namespace paths match the actual `src` directories.
+- Media and language destinations are valid.
+- Installer scripts and SQL paths exist when declared.
+- The manifest is located where Joomla Discover expects it.
 
-Produce a table:
+Produce:
 
 | Check | Expected | Actual | Status | Required action |
 |---|---|---|---|---|
 
 ### 5. Analyze database requirements
 
-Search source files for:
+Follow `references/database-schema-checklist.md`.
+
+Search all source files, manifests, installer scripts, and SQL files for database usage, including:
 
 ```text
 #__
@@ -214,60 +224,20 @@ getTable
 Table::getInstance
 ```
 
-Inventory every required database object:
-
-- Tables and columns.
-- Data types and nullability.
-- Defaults and auto-increment.
-- Primary, unique, and normal indexes.
-- Foreign keys.
-- Charset and collation.
-- Views, triggers, and procedures when present.
-- Business data that must be migrated.
-- Relations to Joomla Core IDs.
-
-Validate applicable SQL files:
-
-```text
-sql/install.mysql.utf8mb4.sql
-sql/uninstall.mysql.utf8mb4.sql
-sql/updates/mysql/<version>.sql
-```
-
-Calculate:
-
-```text
-Database schema coverage = recreated required schema objects / total required schema objects × 100%
-```
+Inventory tables, columns, types, nullability, defaults, auto-increment, keys, indexes, constraints, charset, collation, views, triggers, procedures, business data, and Joomla Core ID relationships.
 
 Separate:
 
-- Schema required for installation.
-- Business data migration.
-- Joomla Core relation mapping.
-- Records Joomla should recreate through Installer or Discover.
+- Extension schema.
+- Business data.
+- Joomla registration data.
+- Joomla Core relationship mapping.
 
 ### 6. Validate Discover readiness
 
-Determine the exact installed manifest path. Examples:
+Follow `references/discover-requirements.md`.
 
-```text
-Component: administrator/components/com_example/example.xml
-Site module: modules/mod_example/mod_example.xml
-Administrator module: administrator/modules/mod_example/mod_example.xml
-Plugin: plugins/system/example/example.xml
-Template: templates/example/templateDetails.xml
-Library: libraries/example/example.xml
-```
-
-Check:
-
-- Correct installed path.
-- Correct manifest filename and location.
-- Correct type, client, element, and plugin group.
-- No broken or conflicting `#__extensions` record.
-- All declared files exist before Discover.
-- SQL installation behavior is documented.
+Verify the exact installed manifest path, type, client, element, plugin group, declared files, namespace paths, SQL behavior, and possible `#__extensions` conflicts.
 
 Report exactly one status:
 
@@ -277,45 +247,26 @@ Conditional
 Not ready
 ```
 
-Discover readiness does not prove runtime correctness.
-
 ### 7. Find dependencies and external resources
 
 Search for:
 
-- Components, modules, plugins, libraries, and packages.
+- Related components, modules, plugins, libraries, and packages.
 - Composer packages and autoloaders.
 - Template overrides and shared layouts.
 - Shared media assets.
 - CLI scripts, cron jobs, Scheduler tasks, and web-service plugins.
-- Environment variables and PHP extensions.
+- Environment variables and required PHP extensions.
 - External APIs, storage paths, and writable directories.
 
-Useful search patterns:
-
-```text
-require
-require_once
-include
-include_once
-class_exists
-interface_exists
-trait_exists
-bootComponent
-PluginHelper::importPlugin
-JLoader
-Composer\\Autoload
-JPATH_
-```
-
-Record secret names and sources only, never secret values.
+Record secret names and configuration sources only, never secret values.
 
 ### 8. Verify logic preservation
 
-For all files not approved for compatibility modification:
+For files not approved for compatibility modification:
 
 - Compare source and target file counts.
-- Compare relative paths.
+- Compare relative paths and filename case.
 - Compare SHA-256 checksums.
 - Run PHP syntax checks.
 - Record every changed file and its approved reason.
@@ -329,9 +280,9 @@ Unexpected modified logic files = 0
 
 ### 9. Calculate coverage
 
-Report each category independently:
+Follow `references/coverage-rules.md` and report each category independently:
 
-| Coverage area | Pass target |
+| Coverage area | PASS target |
 |---|---:|
 | Source files | 100% |
 | Structure | 100% |
@@ -339,16 +290,13 @@ Report each category independently:
 | Database schema | 100% |
 | Logic preservation | 100% |
 | Discover readiness | Ready |
+| Blocking dependencies | 0 |
 
-Do not hide weak areas in a combined percentage.
-
-Use `PASS` only when all targets are reached and blocking dependencies equal zero. Otherwise use `INCOMPLETE` or `BLOCKED`.
+Do not use one combined percentage to hide incomplete critical areas.
 
 ## Required output
 
-Create one Markdown report from `templates/clone-plan-report-template.md`.
-
-The report must include:
+Create one Markdown report from `templates/clone-plan-report-template.md` containing:
 
 1. Executive Summary.
 2. Scope and Constraints.
@@ -384,11 +332,11 @@ grep -R "require\|include\|bootComponent\|PluginHelper::importPlugin" <extension
 mysqldump --no-data <database> <table-list> > schema.sql
 ```
 
-Exclude generated runtime directories such as cache, tmp, logs, and Git metadata unless the extension intentionally stores required assets there.
+Exclude generated runtime directories such as cache, tmp, logs, and Git metadata unless evidence shows that the extension intentionally stores required assets there.
 
 ## Completion criteria
 
-Mark the report `PASS` only when:
+Use `PASS` only when:
 
 ```text
 Source files = 100%
@@ -402,17 +350,18 @@ Unexpected logic changes = 0
 Blocking dependencies = 0
 ```
 
-A successful Discover operation alone is insufficient.
+Use `INCOMPLETE` when evidence is missing. Use `BLOCKED` when a known missing requirement prevents a safe clone.
 
 ## Final self-check
 
 Before returning the report, verify:
 
+- Every reference required by this skill was consulted.
 - Every file count is evidence-based.
 - Every required path has source and target mapping.
 - Every manifest reference was checked.
-- Every detected table has a schema source and clone action.
-- Discover readiness is justified.
+- Every detected database object has evidence and a clone action.
+- Discover readiness is justified separately from runtime correctness.
 - Missing information is marked unknown rather than guessed.
 - No secret value appears in the report.
 - No business logic change is proposed as part of the clone plan.
