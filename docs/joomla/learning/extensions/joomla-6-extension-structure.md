@@ -1,259 +1,229 @@
 # Joomla 6 Extension Structure
 
-A practical reference for understanding, creating, reviewing, and migrating Joomla 6 extensions.
+A practical, type-based reference for understanding, creating, reviewing, and migrating Joomla 6 extensions.
 
-This guide explains:
+> **Target environment:** Joomla 6 with modern PHP. The examples follow namespaces, dependency injection, MVC conventions, event subscribers, and the Web Asset Manager.
 
-- The eight Joomla extension types.
-- The difference between an installation package and installed files.
-- A complete Joomla 6 component structure.
-- Modern namespaces, dependency injection, MVC, forms, ACL, database migrations, language files, and web assets.
-- Recommended structures for modules, plugins, templates, libraries, languages, packages, and file extensions.
-- Which files are required, recommended, or optional.
-- Common Joomla 3-to-Joomla 6 migration issues.
+---
 
-> **Target environment:** Joomla 6 and modern PHP versions. The examples use Joomla's namespaced APIs, service providers, dependency injection, MVC conventions, and Web Asset Manager.
+<a id="overview-tree"></a>
+## Extension Structure Overview Tree
+
+The following tree shows all eight Joomla extension types. Comments describe the responsibility of each type and its most important internal folders.
+
+```text
+Joomla 6 Extensions
+├── 1. Component — Main application or business feature
+│   ├── administrator/ — Backend management application
+│   │   ├── services/ — Dependency Injection registration
+│   │   ├── src/ — Namespaced PHP classes
+│   │   │   ├── Controller/ — Receives tasks and coordinates actions
+│   │   │   ├── Extension/ — Main component class
+│   │   │   ├── Model/ — Data access and business logic
+│   │   │   ├── Table/ — Database table mapping
+│   │   │   ├── View/ — Prepares data for rendering
+│   │   │   ├── Field/ — Custom form fields
+│   │   │   ├── Rule/ — Custom validation rules
+│   │   │   ├── Helper/ — Reusable supporting logic
+│   │   │   └── Service/ — Router, HTML, category, or other services
+│   │   ├── forms/ — Edit forms and list filters
+│   │   ├── tmpl/ — Administrator layouts
+│   │   ├── sql/ — Install, uninstall, and update SQL
+│   │   ├── access.xml — ACL action definitions
+│   │   └── config.xml — Global component options
+│   ├── site/ — Frontend application
+│   │   ├── src/ — Site controllers, models, views, and routing
+│   │   ├── forms/ — Frontend forms
+│   │   └── tmpl/ — Frontend layouts
+│   ├── api/ — Optional JSON:API application
+│   ├── media/ — CSS, JavaScript, images, and joomla.asset.json
+│   ├── language/ — Site and administrator translations
+│   ├── script.php — Optional installation lifecycle script
+│   └── manifest.xml — Installation and update definition
+│
+├── 2. Module — Small content block rendered in a template position
+│   ├── services/provider.php — Registers dispatcher and helper factory
+│   ├── src/Dispatcher/ — Prepares data before rendering
+│   ├── src/Helper/ — Retrieves and transforms module data
+│   ├── tmpl/ — Module layouts
+│   ├── media/ — Module CSS and JavaScript
+│   ├── language/ — Module translations
+│   └── manifest.xml — Module installation definition
+│
+├── 3. Plugin — Executes logic when Joomla dispatches an event
+│   ├── services/provider.php — Registers the plugin instance
+│   ├── src/Extension/ — Event subscriber/plugin class
+│   ├── media/ — Optional CSS and JavaScript
+│   ├── language/ — Plugin translations
+│   └── manifest.xml — Plugin group and installation definition
+│
+├── 4. Template — Controls site or administrator presentation
+│   ├── index.php — Main page layout
+│   ├── component.php — Component-only layout
+│   ├── error.php — Error page layout
+│   ├── offline.php — Offline page layout
+│   ├── html/ — Component and module layout overrides
+│   ├── media/ — CSS, JavaScript, images, and SCSS
+│   ├── language/ — Template translations
+│   └── templateDetails.xml — Template manifest, positions, and options
+│
+├── 5. Library — Shared reusable PHP code
+│   ├── src/ — Namespaced library classes
+│   ├── vendor/ — Optional Composer dependencies
+│   ├── language/ — Optional translations
+│   └── manifest.xml — Library installation definition
+│
+├── 6. Language — Installs translated interface strings
+│   ├── site/ — Frontend language files
+│   ├── administrator/ — Backend language files
+│   └── install.xml — Language package manifest
+│
+├── 7. Package — Installs multiple related extensions together
+│   ├── packages/ — Child extension ZIP files
+│   ├── script.php — Optional package lifecycle logic
+│   └── pkg_example.xml — Package manifest and child list
+│
+└── 8. File — Installs an arbitrary collection of files
+    ├── files/ — Files copied to the declared destination
+    ├── script.php — Optional lifecycle logic
+    └── files_example.xml — File extension manifest
+```
+
+### Key conclusion
+
+The eight extension types **do not share the same complete structure**. They share installation concepts such as a manifest, optional language files, optional media, and sometimes namespaced PHP classes. Their runtime structures differ because each type has a different responsibility.
+
+[Back to Table of Contents](#table-of-contents)
 
 ---
 
 <a id="table-of-contents"></a>
 ## Table of Contents
 
-1. [Extension Architecture Overview](#extension-architecture-overview)
-2. [The Eight Joomla Extension Types](#extension-types)
-3. [Installation Package vs Installed Structure](#package-vs-installed)
-4. [Naming Conventions](#naming-conventions)
-5. [Complete Joomla 6 Component Structure](#component-structure)
-6. [Component Manifest File](#component-manifest)
-7. [Administrator Application](#administrator-application)
-8. [Site Application](#site-application)
-9. [API Application and Web Services](#api-application)
-10. [Dependency Injection and Service Providers](#dependency-injection)
-11. [Namespaces and PSR-4 Autoloading](#namespaces)
-12. [MVC Request Flow](#mvc-flow)
-13. [Controllers](#controllers)
-14. [Models](#models)
-15. [Views and Layouts](#views-layouts)
-16. [Table Classes](#table-classes)
-17. [Forms and Custom Fields](#forms-fields)
-18. [ACL and Component Configuration](#acl-configuration)
-19. [Database Installation and Migrations](#database)
-20. [Media and Web Asset Manager](#media-assets)
-21. [Language Files](#language-files)
-22. [Installer Script](#installer-script)
-23. [Update Server](#update-server)
-24. [Module Structure](#module-structure)
-25. [Plugin Structure](#plugin-structure)
-26. [Template Structure](#template-structure)
-27. [Library Structure](#library-structure)
-28. [Language Extension Structure](#language-extension-structure)
-29. [Package Structure](#package-structure)
-30. [File Extension Structure](#file-extension-structure)
-31. [Installed Paths Reference](#installed-paths)
-32. [Required, Recommended, and Optional Files](#required-files)
-33. [Joomla 3 to Joomla 6 Migration Notes](#migration-notes)
-34. [Validation Checklist](#validation-checklist)
-35. [Official References](#official-references)
+- [Extension Structure Overview Tree](#overview-tree)
+- [Level 1 — Shared Extension Architecture](#level-1-shared-architecture)
+  - [1.1 The Eight Extension Types](#extension-types)
+  - [1.2 Shared and Different Structures](#shared-vs-different)
+  - [1.3 Installation Package vs Installed Structure](#package-vs-installed)
+  - [1.4 Naming Conventions](#naming-conventions)
+  - [1.5 Common Manifest Concepts](#common-manifest)
+- [Level 2 — Application and Presentation Extensions](#level-2-application-presentation)
+  - [2.1 Component](#component)
+    - [2.1.1 Complete Component Tree](#component-tree)
+    - [2.1.2 Component Manifest](#component-manifest)
+    - [2.1.3 Administrator Application](#component-administrator)
+    - [2.1.4 Site Application](#component-site)
+    - [2.1.5 API Application](#component-api)
+    - [2.1.6 Dependency Injection](#component-di)
+    - [2.1.7 Namespace Mapping](#component-namespaces)
+    - [2.1.8 MVC Request Flow](#component-mvc)
+    - [2.1.9 Forms, ACL, and Configuration](#component-forms-acl)
+    - [2.1.10 Database and Migrations](#component-database)
+    - [2.1.11 Media and Web Assets](#component-assets)
+    - [2.1.12 Language and Installer Script](#component-language-installer)
+  - [2.2 Module](#module)
+    - [2.2.1 Module Tree](#module-tree)
+    - [2.2.2 Module Runtime Flow](#module-flow)
+  - [2.3 Plugin](#plugin)
+    - [2.3.1 Plugin Tree](#plugin-tree)
+    - [2.3.2 Plugin Groups and Events](#plugin-events)
+  - [2.4 Template](#template)
+    - [2.4.1 Template Tree](#template-tree)
+    - [2.4.2 Layout Overrides and Positions](#template-overrides)
+- [Level 3 — Supporting Extensions](#level-3-supporting-extensions)
+  - [3.1 Library](#library)
+  - [3.2 Language](#language)
+  - [3.3 Package](#package)
+  - [3.4 File](#file-extension)
+- [Level 4 — Installation, Migration, and Validation](#level-4-installation-migration)
+  - [4.1 Installed Paths](#installed-paths)
+  - [4.2 Required, Recommended, and Optional Files](#required-files)
+  - [4.3 Joomla 3 to Joomla 6 Migration Notes](#migration-notes)
+  - [4.4 Validation Checklist](#validation-checklist)
+  - [4.5 Official References](#official-references)
 
 ---
 
-<a id="extension-architecture-overview"></a>
-## 1. Extension Architecture Overview
-
-A Joomla extension is an installable software unit that adds functionality, presentation, integration, language support, or shared code to Joomla.
-
-Joomla creates a page by coordinating several extension types:
-
-```mermaid
-flowchart TD
-    A[HTTP Request] --> B[Joomla Application]
-    B --> C[Router]
-    C --> D[Component]
-    D --> E[Main Page Content]
-    B --> F[Modules]
-    F --> G[Template Positions]
-    B --> H[Plugins]
-    H --> I[Event Processing]
-    E --> J[Template]
-    G --> J
-    I --> J
-    J --> K[HTML Response]
-```
-
-The most important distinction is:
-
-| Concept | Meaning | Example |
-|---|---|---|
-| Extension type | How the extension works | Component, module, plugin |
-| Extension origin | Who created it | Joomla Core, third-party, custom |
-| Client | Where it runs | Site, Administrator, API |
-| Package structure | Files before installation | ZIP source structure |
-| Installed structure | Files after installation | Files distributed into Joomla folders |
-
-[Back to Table of Contents](#table-of-contents)
-
----
+<a id="level-1-shared-architecture"></a>
+# Level 1 — Shared Extension Architecture
 
 <a id="extension-types"></a>
-## 2. The Eight Joomla Extension Types
+## 1.1 The Eight Extension Types
 
-Joomla supports eight extension types.
-
-| Type | Common technical name | Main responsibility |
+| Type | Technical name | Primary responsibility |
 |---|---|---|
-| Component | `com_example` | Main application or business feature |
-| Module | `mod_example` | Small content block in a template position |
+| Component | `com_example` | Main application, business logic, data management, and page output |
+| Module | `mod_example` | Small content block rendered in a template position |
 | Plugin | `plg_group_example` | Event-based processing and integration |
 | Template | Template name | Site or administrator presentation |
-| Language | `en-GB`, `vi-VN` | Translated interface strings |
 | Library | `lib_example` | Shared reusable PHP code |
-| Package | `pkg_example` | Bundle of multiple extensions |
-| File | `files_example` | Install or update an arbitrary file collection |
+| Language | `en-GB`, `vi-VN` | Translated interface strings |
+| Package | `pkg_example` | Bundle of related extensions |
+| File | `files_example` | Arbitrary file installation or update |
 
-### 2.1. Component
+<a id="shared-vs-different"></a>
+## 1.2 Shared and Different Structures
 
-A component is the main application rendered in the central page area. It may include:
+### Common concepts
 
-- Administrator management screens.
-- Frontend pages.
-- Database tables.
-- Forms and filters.
-- ACL rules.
-- API endpoints.
-- Routing.
+Most extension types use some of these elements:
 
-Examples: `com_content`, `com_users`, `com_contact`, and custom business components.
+```text
+extension/
+├── manifest.xml        # Describes installation, version, files, and metadata
+├── services/           # Optional DI registration
+├── src/                # Optional namespaced PHP classes
+├── language/           # Optional translated strings
+├── media/              # Optional static assets
+└── script.php          # Optional install/update/uninstall lifecycle logic
+```
 
-### 2.2. Module
+### Important differences
 
-A module renders a smaller block in a template position such as `sidebar-right`, `topbar`, or `footer`.
-
-Examples: menus, login forms, latest articles, banners, search forms, and custom dashboards.
-
-### 2.3. Plugin
-
-A plugin subscribes to Joomla events and runs when those events are dispatched.
-
-Common plugin groups include:
-
-- `system`
-- `content`
-- `user`
-- `authentication`
-- `extension`
-- `webservices`
-- `task`
-- `console`
-- `editors`
-- `editors-xtd`
-- `finder`
-
-### 2.4. Template
-
-A template controls the final layout and visual presentation. Joomla has separate site and administrator templates.
-
-### 2.5. Language
-
-A language extension installs translated Joomla interface strings.
-
-### 2.6. Library
-
-A library contains shared code used by several extensions. It usually has no direct page output.
-
-### 2.7. Package
-
-A package installs several related extensions in one operation.
-
-### 2.8. File
-
-A file extension installs a defined collection of files when none of the other extension types is appropriate.
-
-[Back to Table of Contents](#table-of-contents)
-
----
+| Type | Main internal pattern |
+|---|---|
+| Component | Full MVC, backend, frontend, optional API, database, ACL |
+| Module | Dispatcher, helper, and layout |
+| Plugin | Event subscriber and plugin group |
+| Template | Page layouts, positions, assets, and overrides |
+| Library | Reusable namespaced classes |
+| Language | Translation files only |
+| Package | Child extension ZIP files |
+| File | Arbitrary files copied by the installer |
 
 <a id="package-vs-installed"></a>
-## 3. Installation Package vs Installed Structure
+## 1.3 Installation Package vs Installed Structure
 
-A common source of confusion is that a component ZIP structure does not always match its final Joomla filesystem structure.
-
-### Installation package
-
-This is the source directory compressed into a ZIP file and uploaded through Joomla's installer.
+The structure inside an installation ZIP does not have to match the final Joomla filesystem exactly. The manifest maps package folders to installed destinations.
 
 ```text
-com_example.zip
-└── com_example/
-    ├── example.xml
-    ├── administrator/
-    ├── site/
-    ├── api/
-    ├── media/
-    ├── language/
-    └── script.php
+Installation package                 Installed Joomla paths
+com_example/                         joomla-root/
+├── administrator/       ────────▶   ├── administrator/components/com_example/
+├── site/                ────────▶   ├── components/com_example/
+├── api/                 ────────▶   ├── api/components/com_example/
+├── media/               ────────▶   ├── media/com_example/
+└── language/            ────────▶   ├── language/en-GB/
+                                      └── administrator/language/en-GB/
 ```
 
-### Installed structure
-
-The installer reads the manifest and distributes files into Joomla:
-
-```text
-joomla-root/
-├── administrator/components/com_example/
-├── components/com_example/
-├── api/components/com_example/
-├── media/com_example/
-├── administrator/language/en-GB/
-└── language/en-GB/
-```
-
-> The manifest controls where files are copied. Folder names inside the ZIP are packaging decisions; installed paths are Joomla runtime locations.
-
-### Two valid packaging styles
-
-A component package may use either:
-
-1. Joomla destination-like folders:
-
-```text
-administrator/components/com_example/
-components/com_example/
-```
-
-2. Simplified source folders:
-
-```text
-administrator/
-site/
-api/
-```
-
-Both can work when the manifest's `folder` attributes correctly map source folders to Joomla destinations. Consistency is more important than the chosen packaging style.
-
-[Back to Table of Contents](#table-of-contents)
-
----
+> Always inspect the manifest before assuming where a package folder will be installed.
 
 <a id="naming-conventions"></a>
-## 4. Naming Conventions
-
-Use consistent technical names.
+## 1.4 Naming Conventions
 
 | Item | Recommended format | Example |
 |---|---|---|
-| Component element | `com_<name>` | `com_example` |
-| Module element | `mod_<name>` | `mod_example` |
-| Plugin package name | `plg_<group>_<name>` | `plg_system_example` |
-| Plugin installed folder | `plugins/<group>/<name>` | `plugins/system/example` |
-| Package | `pkg_<name>` | `pkg_example` |
+| Component | `com_<name>` | `com_example` |
+| Module | `mod_<name>` | `mod_example` |
+| Plugin package | `plg_<group>_<name>` | `plg_system_example` |
+| Plugin installed path | `plugins/<group>/<name>` | `plugins/system/example` |
 | Library | `lib_<name>` | `lib_example` |
-| Component manifest | `<name>.xml` or `com_<name>.xml` | `example.xml` |
-| Module manifest | `mod_<name>.xml` | `mod_example.xml` |
-| Plugin manifest | `<name>.xml` | `example.xml` |
+| Package | `pkg_<name>` | `pkg_example` |
+| File extension | `files_<name>` | `files_example` |
 | Template manifest | `templateDetails.xml` | Fixed filename |
-| Language manifest | `install.xml` | Fixed convention |
 
-### Recommended namespaces
+Recommended namespace patterns:
 
 ```text
 Vendor\Component\Example
@@ -262,1016 +232,309 @@ Vendor\Plugin\System\Example
 Vendor\Library\Example
 ```
 
-Namespace segments and directory names are case-sensitive on Linux.
+Namespace and directory case must match on case-sensitive systems such as Linux.
+
+<a id="common-manifest"></a>
+## 1.5 Common Manifest Concepts
+
+A manifest normally defines:
+
+- Extension type and installation method.
+- Name, element, version, author, license, and description.
+- Namespace and source path when applicable.
+- Files and folders to install.
+- Administrator and site destinations.
+- Media and language files.
+- SQL installation and schema update paths.
+- Installer script.
+- Update server.
+
+Minimal example:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="module" client="site" method="upgrade">
+    <name>MOD_EXAMPLE</name>
+    <version>1.0.0</version>
+    <namespace path="src">Acme\Module\Example</namespace>
+
+    <files>
+        <folder plugin="example">services</folder>
+        <folder>src</folder>
+        <folder>tmpl</folder>
+    </files>
+</extension>
+```
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="component-structure"></a>
-## 5. Complete Joomla 6 Component Structure
+<a id="level-2-application-presentation"></a>
+# Level 2 — Application and Presentation Extensions
 
-The following is a comprehensive structure. A small component does not need every optional directory.
+<a id="component"></a>
+## 2.1 Component
+
+A component is the most complete Joomla extension type. It can provide administrator screens, frontend pages, database tables, forms, ACL, routing, and API endpoints.
+
+<a id="component-tree"></a>
+### 2.1.1 Complete Component Tree
 
 ```text
 com_example/
-├── example.xml                         # Installation manifest
+├── example.xml                         # Component manifest
 ├── script.php                          # Optional installer lifecycle script
-│
 ├── administrator/
-│   ├── access.xml                      # ACL action definitions
-│   ├── config.xml                      # Global component options
+│   ├── access.xml                      # ACL actions
+│   ├── config.xml                      # Global component configuration
 │   ├── forms/
 │   │   ├── item.xml                    # Edit form
 │   │   └── filter_items.xml            # List filters and pagination
 │   ├── services/
-│   │   └── provider.php                # DI service provider / boot entry point
+│   │   └── provider.php                # DI registration and component bootstrapping
 │   ├── sql/
-│   │   ├── install.mysql.utf8mb4.sql
-│   │   ├── uninstall.mysql.utf8mb4.sql
-│   │   └── updates/
-│   │       └── mysql/
-│   │           ├── 1.0.1.sql
-│   │           └── 1.1.0.sql
+│   │   ├── install.mysql.utf8mb4.sql   # Initial database schema
+│   │   ├── uninstall.mysql.utf8mb4.sql # Optional cleanup
+│   │   └── updates/mysql/              # Versioned schema migrations
 │   ├── src/
-│   │   ├── Controller/
-│   │   │   ├── DisplayController.php
-│   │   │   ├── ItemController.php
-│   │   │   └── ItemsController.php
-│   │   ├── Extension/
-│   │   │   └── ExampleComponent.php
-│   │   ├── Field/
-│   │   │   └── ExampleField.php
-│   │   ├── Helper/
-│   │   │   └── ExampleHelper.php
-│   │   ├── Model/
-│   │   │   ├── ItemModel.php
-│   │   │   └── ItemsModel.php
-│   │   ├── Rule/
-│   │   │   └── ExampleRule.php
-│   │   ├── Service/
-│   │   │   ├── HTML/
-│   │   │   │   └── AdministratorService.php
-│   │   │   └── Router.php
-│   │   ├── Table/
-│   │   │   └── ItemTable.php
-│   │   └── View/
-│   │       ├── Item/
-│   │       │   └── HtmlView.php
-│   │       └── Items/
-│   │           └── HtmlView.php
-│   └── tmpl/
-│       ├── item/
-│       │   └── edit.php
-│       └── items/
-│           └── default.php
-│
+│   │   ├── Controller/                 # Display, item, and list tasks
+│   │   ├── Extension/                  # Main component class
+│   │   ├── Field/                      # Custom form fields
+│   │   ├── Helper/                     # Supporting reusable logic
+│   │   ├── Model/                      # Data access and business logic
+│   │   ├── Rule/                       # Custom validation rules
+│   │   ├── Service/                    # Router and other services
+│   │   ├── Table/                      # Database table mappings
+│   │   └── View/                       # Data preparation for layouts
+│   └── tmpl/                           # Administrator layouts
 ├── site/
-│   ├── forms/
-│   │   └── item.xml
-│   ├── services/
-│   │   └── provider.php                # Needed only for a separate site provider design
+│   ├── forms/                          # Frontend forms
 │   ├── src/
 │   │   ├── Controller/
-│   │   │   └── DisplayController.php
-│   │   ├── Extension/
-│   │   │   └── ExampleComponent.php
 │   │   ├── Helper/
-│   │   │   └── RouteHelper.php
 │   │   ├── Model/
-│   │   │   ├── ItemModel.php
-│   │   │   └── ItemsModel.php
 │   │   ├── Service/
-│   │   │   └── Router.php
 │   │   └── View/
-│   │       ├── Item/
-│   │       │   └── HtmlView.php
-│   │       └── Items/
-│   │           └── HtmlView.php
-│   └── tmpl/
-│       ├── item/
-│       │   └── default.php
-│       └── items/
-│           └── default.php
-│
+│   └── tmpl/                           # Frontend layouts
 ├── api/
 │   └── src/
-│       ├── Controller/
-│       │   └── ItemsController.php
-│       └── View/
-│           └── Items/
-│               └── JsonapiView.php
-│
+│       ├── Controller/                 # API request handling
+│       └── View/                       # JSON:API output
 ├── media/
 │   ├── css/
-│   │   ├── admin.css
-│   │   └── site.css
 │   ├── images/
-│   │   └── icon.svg
 │   ├── js/
-│   │   ├── admin.js
-│   │   └── site.js
-│   └── joomla.asset.json
-│
+│   └── joomla.asset.json               # Web Asset Manager definitions
 └── language/
-    ├── administrator/
-    │   └── en-GB/
-    │       ├── com_example.ini
-    │       └── com_example.sys.ini
-    └── site/
-        └── en-GB/
-            └── com_example.ini
+    ├── administrator/en-GB/
+    └── site/en-GB/
 ```
 
-### Important design note
-
-A component normally uses one primary `services/provider.php`, conventionally installed on the administrator side, to register the component extension and factories used by the Site and Administrator applications. Do not duplicate providers unless the architecture genuinely requires separate registrations.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
 <a id="component-manifest"></a>
-## 6. Component Manifest File
+### 2.1.2 Component Manifest
 
-The manifest is the most important installation file. Joomla uses it to identify the extension and decide which files, SQL scripts, media, languages, and update servers must be installed.
+The component manifest maps package folders to Site, Administrator, API, media, language, and SQL destinations.
+
+Important sections include:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
 <extension type="component" method="upgrade">
     <name>COM_EXAMPLE</name>
     <element>com_example</element>
-    <author>Example Company</author>
-    <creationDate>2026-08</creationDate>
-    <copyright>(C) 2026 Example Company</copyright>
-    <license>GNU General Public License version 2 or later</license>
-    <authorEmail>dev@example.com</authorEmail>
-    <authorUrl>https://example.com</authorUrl>
     <version>1.0.0</version>
-    <description>COM_EXAMPLE_XML_DESCRIPTION</description>
-
     <namespace path="src">Acme\Component\Example</namespace>
 
     <files folder="site">
-        <folder>forms</folder>
         <folder>src</folder>
+        <folder>forms</folder>
         <folder>tmpl</folder>
     </files>
 
     <administration>
-        <menu img="class:component">COM_EXAMPLE</menu>
-
+        <menu>COM_EXAMPLE</menu>
         <files folder="administrator">
             <filename>access.xml</filename>
             <filename>config.xml</filename>
-            <folder>forms</folder>
             <folder>services</folder>
-            <folder>sql</folder>
             <folder>src</folder>
+            <folder>forms</folder>
             <folder>tmpl</folder>
+            <folder>sql</folder>
         </files>
     </administration>
 
-    <media destination="com_example" folder="media">
+    <media folder="media" destination="com_example">
         <folder>css</folder>
-        <folder>images</folder>
         <folder>js</folder>
         <filename>joomla.asset.json</filename>
     </media>
-
-    <languages folder="language/site">
-        <language tag="en-GB">en-GB/com_example.ini</language>
-    </languages>
-
-    <administration>
-        <!-- Merge this content into the single administration element in a real manifest. -->
-    </administration>
-
-    <install>
-        <sql>
-            <file driver="mysql" charset="utf8mb4">
-                administrator/sql/install.mysql.utf8mb4.sql
-            </file>
-        </sql>
-    </install>
-
-    <uninstall>
-        <sql>
-            <file driver="mysql" charset="utf8mb4">
-                administrator/sql/uninstall.mysql.utf8mb4.sql
-            </file>
-        </sql>
-    </uninstall>
-
-    <update>
-        <schemas>
-            <schemapath type="mysql" charset="utf8mb4">
-                administrator/sql/updates/mysql
-            </schemapath>
-        </schemas>
-    </update>
-
-    <scriptfile>script.php</scriptfile>
-
-    <updateservers>
-        <server type="extension" priority="1" name="Example Updates">
-            https://example.com/updates/com_example.xml
-        </server>
-    </updateservers>
 </extension>
 ```
 
-> The example above shows all major sections for learning purposes. In a production manifest, use only one `<administration>` element and place administrator files and administrator languages inside it according to the selected packaging layout.
+<a id="component-administrator"></a>
+### 2.1.3 Administrator Application
 
-### Critical manifest rules
-
-- Use `method="upgrade"` to permit installation over an existing version.
-- The component element should be `com_example`.
-- Every source file or directory that must be installed must be listed.
-- Files not declared in the manifest are ignored by the installer.
-- The namespace path must match the installed `src` directory.
-- Manifest XML must be well formed.
-- The version must be updated for every release and database migration.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="administrator-application"></a>
-## 7. Administrator Application
-
-Installed path:
+Installed location:
 
 ```text
 administrator/components/com_example/
 ```
 
-Typical responsibilities:
+It normally provides:
 
-- List records.
-- Create, edit, delete, publish, and unpublish records.
-- Apply filters, ordering, and pagination.
-- Validate data.
-- Check permissions.
-- Manage component configuration.
-- Run database operations.
+- List and edit screens.
+- Toolbar actions.
+- Publishing and batch operations.
+- Filtering, sorting, and pagination.
+- Permissions and global options.
+- Database schema management.
 
-Typical backend URL:
+<a id="component-site"></a>
+### 2.1.4 Site Application
 
-```text
-/administrator/index.php?option=com_example&view=items
-```
-
-Recommended backend structure:
-
-```text
-administrator/components/com_example/
-├── access.xml
-├── config.xml
-├── forms/
-├── services/provider.php
-├── sql/
-├── src/
-└── tmpl/
-```
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="site-application"></a>
-## 8. Site Application
-
-Installed path:
+Installed location:
 
 ```text
 components/com_example/
 ```
 
-Typical responsibilities:
+It normally provides:
 
-- Render public lists and details.
-- Process frontend forms.
-- Build SEF routes.
-- Apply access and language filters.
-- Load frontend assets.
+- Public list and detail views.
+- Frontend forms.
+- Menu-item views.
+- Routing and SEF URLs.
+- User-facing layouts.
 
-Typical frontend URL:
+<a id="component-api"></a>
+### 2.1.5 API Application
 
-```text
-index.php?option=com_example&view=items
-```
-
-Recommended site structure:
-
-```text
-components/com_example/
-├── forms/
-├── src/
-└── tmpl/
-```
-
-Frontend layouts can be overridden by a site template:
-
-```text
-templates/<template-name>/html/com_example/items/default.php
-```
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="api-application"></a>
-## 9. API Application and Web Services
-
-Joomla's API application uses paths under:
+Installed location:
 
 ```text
 api/components/com_example/
 ```
 
-A component API layer may contain API controllers and JSON:API views:
+The API layer is optional. It may include controllers and JSON:API views. A web-services plugin is commonly used to register component routes.
 
-```text
-api/components/com_example/
-└── src/
-    ├── Controller/
-    │   └── ItemsController.php
-    └── View/
-        └── Items/
-            └── JsonapiView.php
-```
+<a id="component-di"></a>
+### 2.1.6 Dependency Injection
 
-However, API route registration is commonly implemented by a separate `webservices` plugin:
+`services/provider.php` registers the component and its factories in Joomla's dependency injection container.
 
-```text
-plugins/webservices/example/
-```
+Typical registrations include:
 
-A complete web service feature may therefore require both:
+- Component dispatcher factory.
+- MVC factory.
+- Router factory.
+- Category factory.
+- Component extension class.
 
-```text
-com_example
-└── API controllers and JSON:API views
+A component normally uses one primary provider installed on the administrator side. Do not duplicate providers without a real architectural need.
 
-plg_webservices_example
-└── Registers routes for com_example
-```
+<a id="component-namespaces"></a>
+### 2.1.7 Namespace Mapping
 
-Do not assume that adding an `api/` directory automatically exposes endpoints. Route registration, permissions, authentication, and serializers must also be configured.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="dependency-injection"></a>
-## 10. Dependency Injection and Service Providers
-
-Modern Joomla extensions use `services/provider.php` as a bootstrapping entry point.
-
-Typical responsibilities:
-
-- Register the component dispatcher factory.
-- Register the MVC factory.
-- Register the component extension class.
-- Register router, category, HTML, or custom services.
-
-Simplified example:
-
-```php
-<?php
-
-defined('_JEXEC') or die;
-
-use Joomla\CMS\Dispatcher\ComponentDispatcherFactoryInterface;
-use Joomla\CMS\Extension\ComponentInterface;
-use Joomla\CMS\Extension\MVCComponent;
-use Joomla\CMS\Extension\Service\Provider\ComponentDispatcherFactory;
-use Joomla\CMS\Extension\Service\Provider\MVCFactory;
-use Joomla\DI\Container;
-use Joomla\DI\ServiceProviderInterface;
-
-return new class implements ServiceProviderInterface {
-    public function register(Container $container): void
-    {
-        $container->registerServiceProvider(
-            new ComponentDispatcherFactory('\\Acme\\Component\\Example')
-        );
-
-        $container->registerServiceProvider(
-            new MVCFactory('\\Acme\\Component\\Example')
-        );
-
-        $container->set(
-            ComponentInterface::class,
-            static function (Container $container): ComponentInterface {
-                return new MVCComponent(
-                    $container->get(ComponentDispatcherFactoryInterface::class)
-                );
-            }
-        );
-    }
-};
-```
-
-### Why this matters
-
-Joomla 3 extensions often used procedural entry files and manually loaded classes. Joomla 6 expects modern autoloading and services. Copying an old entry file without redesigning its bootstrap process is usually insufficient.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="namespaces"></a>
-## 11. Namespaces and PSR-4 Autoloading
-
-Manifest declaration:
+With this manifest declaration:
 
 ```xml
 <namespace path="src">Acme\Component\Example</namespace>
 ```
 
-For components, Joomla creates two principal namespace prefixes:
+Joomla maps application-specific namespaces conceptually as follows:
 
 ```text
-Acme\Component\Example\Administrator
-    -> administrator/components/com_example/src
-
-Acme\Component\Example\Site
-    -> components/com_example/src
+Acme\Component\Example\Administrator  → administrator/components/com_example/src
+Acme\Component\Example\Site           → components/com_example/src
+Acme\Component\Example\Api            → api/components/com_example/src
 ```
 
-Examples:
-
-```php
-namespace Acme\Component\Example\Administrator\Model;
-```
-
-```php
-namespace Acme\Component\Example\Site\View\Items;
-```
-
-### Namespace validation checklist
-
-- The namespace in the manifest matches the PHP namespace.
-- `path="src"` points to the class root.
-- Directory and class names follow PSR-4 casing.
-- The provider uses the same namespace prefix.
-- Old class aliases are not treated as permanent replacements.
-- After manual namespace changes, verify Joomla's generated namespace cache.
-
-Joomla may generate namespace mappings in:
-
-```text
-administrator/cache/autoload_psr4.php
-```
-
-Normally, reinstalling the extension regenerates the mapping. Avoid manually editing the generated cache file.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="mvc-flow"></a>
-## 12. MVC Request Flow
+<a id="component-mvc"></a>
+### 2.1.8 MVC Request Flow
 
 ```mermaid
-flowchart TD
-    A[HTTP Request] --> B[Joomla Router]
-    B --> C[Component Dispatcher]
+flowchart LR
+    A[Request] --> B[Router]
+    B --> C[Dispatcher]
     C --> D[Controller]
     D --> E[Model]
-    E --> F[(Database or External Service)]
-    F --> E
+    E --> F[(Database)]
     E --> G[View]
-    G --> H[tmpl Layout]
-    H --> I[HTML or JSON Response]
+    G --> H[tmpl layout]
+    H --> I[Response]
 ```
 
-Example request:
+| Layer | Responsibility |
+|---|---|
+| Controller | Receives the task, checks permission, and coordinates execution |
+| Model | Loads, validates, transforms, and stores data |
+| Table | Maps one record to a database table |
+| View | Retrieves prepared model data and exposes it to the layout |
+| Layout | Renders HTML or another output format |
+
+<a id="component-forms-acl"></a>
+### 2.1.9 Forms, ACL, and Configuration
 
 ```text
-index.php?option=com_example&view=items
+administrator/
+├── forms/item.xml          # Edit fields
+├── forms/filter_items.xml  # Search, filters, ordering, pagination
+├── access.xml              # Available permissions
+└── config.xml              # Global options and permission UI
 ```
 
-Resolution:
+Common ACL actions:
 
 ```text
-option=com_example
-    -> boot component
-
-view=items
-    -> Items view
-
-Controller
-    -> selects and executes the task
-
-Model
-    -> loads or changes data
-
-View
-    -> prepares display data
-
-tmpl/items/default.php
-    -> renders output
+core.admin
+core.manage
+core.create
+core.delete
+core.edit
+core.edit.state
+core.edit.own
 ```
 
-Keep responsibilities separated:
-
-- Controller: request and task coordination.
-- Model: data access and business logic.
-- View: presentation preparation.
-- Layout: HTML rendering.
-- Table: persistence for one database row.
-- Service: reusable application logic or integrations.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="controllers"></a>
-## 13. Controllers
-
-Typical controller classes:
+<a id="component-database"></a>
+### 2.1.10 Database and Migrations
 
 ```text
-src/Controller/
-├── DisplayController.php
-├── ItemController.php
-└── ItemsController.php
-```
-
-| Controller | Typical base class | Responsibility |
-|---|---|---|
-| `DisplayController` | `BaseController` | Select and render a view |
-| `ItemController` | `FormController` | Save, edit, apply, cancel one record |
-| `ItemsController` | `AdminController` | Publish, unpublish, delete, batch-process records |
-
-Task example:
-
-```text
-index.php?option=com_example&task=item.save
-```
-
-This normally maps to:
-
-```text
-ItemController::save()
-```
-
-Controllers should:
-
-- Validate CSRF tokens for state-changing requests.
-- Check authorization.
-- Read input through Joomla's Input API.
-- Delegate business logic to models or services.
-- Redirect with clear success or error messages.
-
-Controllers should not contain large SQL queries or HTML templates.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="models"></a>
-## 14. Models
-
-Typical models:
-
-```text
-src/Model/
-├── ItemModel.php
-└── ItemsModel.php
-```
-
-### Form model
-
-Usually handles one record:
-
-- Load a form.
-- Load one item.
-- Validate submitted data.
-- Save or delete a record.
-- Run pre-save and post-save logic.
-
-Typical base class:
-
-```php
-Joomla\CMS\MVC\Model\AdminModel
-```
-
-### List model
-
-Usually handles record collections:
-
-- Search.
-- Filters.
-- Ordering.
-- Pagination.
-- Query construction.
-
-Typical base class:
-
-```php
-Joomla\CMS\MVC\Model\ListModel
-```
-
-Simplified query example:
-
-```php
-protected function getListQuery()
-{
-    $db = $this->getDatabase();
-    $query = $db->getQuery(true);
-
-    return $query
-        ->select($db->quoteName(['id', 'title', 'published']))
-        ->from($db->quoteName('#__example_items'));
-}
-```
-
-Use Joomla's database query API and quote identifiers and values correctly. Avoid concatenating untrusted request data into SQL.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="views-layouts"></a>
-## 15. Views and Layouts
-
-View class:
-
-```text
-src/View/Items/HtmlView.php
-```
-
-Layout:
-
-```text
-tmpl/items/default.php
-```
-
-Simplified view:
-
-```php
-final class HtmlView extends BaseHtmlView
-{
-    public $items;
-    public $pagination;
-    public $state;
-
-    public function display($tpl = null): void
-    {
-        $this->items      = $this->get('Items');
-        $this->pagination = $this->get('Pagination');
-        $this->state      = $this->get('State');
-
-        parent::display($tpl);
-    }
-}
-```
-
-Simplified layout:
-
-```php
-<?php defined('_JEXEC') or die; ?>
-
-<h1><?= $this->escape($this->document->getTitle()); ?></h1>
-
-<?php foreach ($this->items as $item) : ?>
-    <article>
-        <h2><?= $this->escape($item->title); ?></h2>
-    </article>
-<?php endforeach; ?>
-```
-
-### Layout naming
-
-```text
-tmpl/<view>/<layout>.php
-```
-
-Examples:
-
-```text
-tmpl/items/default.php
-tmpl/item/edit.php
-tmpl/item/default.php
-```
-
-### Template overrides
-
-```text
-templates/cassiopeia/html/com_example/items/default.php
-```
-
-Overrides are not part of the component installation unless intentionally packaged elsewhere. They must be audited separately during migration.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="table-classes"></a>
-## 16. Table Classes
-
-A Table class represents one database table row and provides persistence methods.
-
-```text
-src/Table/ItemTable.php
-```
-
-Example:
-
-```php
-final class ItemTable extends Table
-{
-    public function __construct(DatabaseDriver $db)
-    {
-        parent::__construct('#__example_items', 'id', $db);
-    }
-}
-```
-
-Common responsibilities:
-
-- Bind input data.
-- Validate table-level rules.
-- Store a row.
-- Delete a row.
-- Check in and check out records.
-- Generate aliases before storage.
-
-The `#__` prefix is replaced by the site's actual database prefix.
-
-```text
-#__example_items
-    -> abc_example_items
-```
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="forms-fields"></a>
-## 17. Forms and Custom Fields
-
-Form XML files commonly live under:
-
-```text
-administrator/components/com_example/forms/
-```
-
-Edit form:
-
-```xml
-<form>
-    <fieldset name="details">
-        <field
-            name="title"
-            type="text"
-            label="JGLOBAL_TITLE"
-            required="true"
-        />
-
-        <field
-            name="published"
-            type="list"
-            label="JSTATUS"
-            default="1"
-        >
-            <option value="1">JPUBLISHED</option>
-            <option value="0">JUNPUBLISHED</option>
-        </field>
-    </fieldset>
-</form>
-```
-
-List filter form:
-
-```xml
-<form>
-    <fields name="filter">
-        <field
-            name="search"
-            type="text"
-            label="JSEARCH_FILTER"
-            hint="JSEARCH_FILTER"
-        />
-    </fields>
-
-    <fields name="list">
-        <field name="fullordering" type="list" default="a.id DESC" />
-        <field name="limit" type="limitbox" default="20" />
-    </fields>
-</form>
-```
-
-Custom form field:
-
-```text
-src/Field/ExampleField.php
-```
-
-Custom validation rule:
-
-```text
-src/Rule/ExampleRule.php
-```
-
-Use custom fields only when Joomla's standard form field types cannot meet the requirement.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="acl-configuration"></a>
-## 18. ACL and Component Configuration
-
-### `access.xml`
-
-Defines actions that administrators can allow or deny.
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<access component="com_example">
-    <section name="component">
-        <action name="core.admin" title="JACTION_ADMIN" />
-        <action name="core.manage" title="JACTION_MANAGE" />
-        <action name="core.create" title="JACTION_CREATE" />
-        <action name="core.delete" title="JACTION_DELETE" />
-        <action name="core.edit" title="JACTION_EDIT" />
-        <action name="core.edit.state" title="JACTION_EDITSTATE" />
-    </section>
-</access>
-```
-
-Permission check:
-
-```php
-$user->authorise('core.create', 'com_example');
-```
-
-### `config.xml`
-
-Defines component-wide options.
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<config>
-    <fieldset name="general" label="COM_EXAMPLE_CONFIG_GENERAL_LABEL">
-        <field
-            name="items_per_page"
-            type="number"
-            label="COM_EXAMPLE_ITEMS_PER_PAGE"
-            default="20"
-        />
-    </fieldset>
-
-    <fieldset name="permissions" label="JCONFIG_PERMISSIONS_LABEL">
-        <field
-            name="rules"
-            type="rules"
-            component="com_example"
-        />
-    </fieldset>
-</config>
-```
-
-Do not rely only on hiding toolbar buttons. Permissions must also be enforced in controllers and models.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="database"></a>
-## 19. Database Installation and Migrations
-
-Recommended structure:
-
-```text
-sql/
+administrator/sql/
 ├── install.mysql.utf8mb4.sql
 ├── uninstall.mysql.utf8mb4.sql
-└── updates/
-    └── mysql/
-        ├── 1.0.1.sql
-        └── 1.1.0.sql
+└── updates/mysql/
+    ├── 1.0.1.sql
+    └── 1.1.0.sql
 ```
 
-### Installation SQL
+Use `#__` instead of a hard-coded table prefix:
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__example_items` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `title` VARCHAR(255) NOT NULL,
-    `alias` VARCHAR(400) NOT NULL DEFAULT '',
-    `published` TINYINT NOT NULL DEFAULT 1,
-    `ordering` INT NOT NULL DEFAULT 0,
-    `checked_out` INT UNSIGNED NULL,
-    `checked_out_time` DATETIME NULL,
-    `created` DATETIME NULL,
-    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
-    `modified` DATETIME NULL,
-    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
-    `access` INT UNSIGNED NOT NULL DEFAULT 1,
-    `language` CHAR(7) NOT NULL DEFAULT '*',
-    PRIMARY KEY (`id`),
-    KEY `idx_state` (`published`),
-    KEY `idx_access` (`access`),
-    KEY `idx_language` (`language`)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  DEFAULT COLLATE=utf8mb4_unicode_ci;
+    `state` TINYINT NOT NULL DEFAULT 1,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Uninstall SQL
+Joomla records extension schema versions in `#__schemas`. Every released schema change should have a versioned SQL file.
 
-```sql
-DROP TABLE IF EXISTS `#__example_items`;
-```
+<a id="component-assets"></a>
+### 2.1.11 Media and Web Assets
 
-### Update SQL
-
-File:
-
-```text
-sql/updates/mysql/1.1.0.sql
-```
-
-```sql
-ALTER TABLE `#__example_items`
-    ADD COLUMN `description` TEXT NULL AFTER `alias`;
-```
-
-### Migration rules
-
-- Never edit an old migration already released to production.
-- Add a new versioned SQL file.
-- Keep the manifest version aligned with releases.
-- Test fresh installation and upgrade installation separately.
-- Back up the database before production updates.
-- Use `utf8mb4`.
-- Add indexes for fields used by filters, joins, and ordering.
-- Include `language`, `access`, audit, and publication fields when the feature requires Joomla-native behavior.
-
-Joomla tracks extension schema versions in `#__schemas`.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="media-assets"></a>
-## 20. Media and Web Asset Manager
-
-Installed path:
-
-```text
-media/com_example/
-```
-
-Recommended structure:
+Installed location:
 
 ```text
 media/com_example/
 ├── css/
-│   ├── admin.css
-│   └── site.css
-├── images/
 ├── js/
-│   ├── admin.js
-│   └── site.js
+├── images/
 └── joomla.asset.json
 ```
 
-Example `joomla.asset.json`:
-
-```json
-{
-  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
-  "name": "com_example",
-  "version": "1.0.0",
-  "description": "Assets for com_example",
-  "license": "GPL-2.0-or-later",
-  "assets": [
-    {
-      "name": "com_example.site",
-      "type": "style",
-      "uri": "com_example/site.css"
-    },
-    {
-      "name": "com_example.site",
-      "type": "script",
-      "uri": "com_example/site.js",
-      "dependencies": ["core"],
-      "attributes": {
-        "defer": true
-      }
-    }
-  ]
-}
-```
-
-Use assets:
+Load assets through the Web Asset Manager:
 
 ```php
 $wa = $this->getDocument()->getWebAssetManager();
@@ -1279,67 +542,23 @@ $wa->useStyle('com_example.site');
 $wa->useScript('com_example.site');
 ```
 
-### Joomla 6 rule
+Avoid hard-coded `<script>` and `<link>` tags when an asset definition is appropriate.
 
-Use Web Asset Manager rather than legacy direct asset-loading methods such as old `addScript()` or `addStyleSheet()` patterns.
+<a id="component-language-installer"></a>
+### 2.1.12 Language and Installer Script
 
-Do not put generated cache files in the extension package or Git repository.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="language-files"></a>
-## 21. Language Files
-
-Common files:
+Runtime strings normally use `.ini` files, while `.sys.ini` files are commonly used for installer, menu, and extension-manager labels.
 
 ```text
-com_example.ini
-com_example.sys.ini
+language/
+├── administrator/en-GB/
+│   ├── com_example.ini
+│   └── com_example.sys.ini
+└── site/en-GB/
+    └── com_example.ini
 ```
 
-### Runtime language file
-
-```ini
-COM_EXAMPLE="Example"
-COM_EXAMPLE_ITEMS="Items"
-COM_EXAMPLE_ITEM_SAVED="Item saved successfully."
-```
-
-### System language file
-
-```ini
-COM_EXAMPLE="Example"
-COM_EXAMPLE_XML_DESCRIPTION="Example component"
-COM_EXAMPLE_MENU="Example"
-```
-
-General responsibilities:
-
-| File | Typical use |
-|---|---|
-| `.ini` | Runtime labels, messages, form labels |
-| `.sys.ini` | Extension Manager name, description, menu labels |
-
-Rules:
-
-- Save files as UTF-8.
-- Keep keys uppercase and prefixed with the extension element.
-- Do not hard-code visible user-facing text in PHP or layouts.
-- Include both Site and Administrator language files when necessary.
-- Validate syntax because malformed INI files can prevent strings from loading.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="installer-script"></a>
-## 22. Installer Script
-
-`script.php` is optional and handles installation lifecycle operations that cannot be expressed through the manifest and SQL files alone.
-
-Common methods:
+Optional `script.php` lifecycle methods include:
 
 ```text
 preflight()
@@ -1349,128 +568,92 @@ uninstall()
 postflight()
 ```
 
-Typical uses:
-
-- Check minimum Joomla and PHP versions.
-- Remove obsolete files after an upgrade.
-- Migrate data that cannot be handled by plain SQL.
-- Display post-installation messages.
-- Block installation on an unsupported environment.
-
-Keep installer scripts idempotent where possible. Running an update twice should not corrupt data.
+Use them for compatibility checks, data transformations, obsolete-file cleanup, and post-install operations.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="update-server"></a>
-## 23. Update Server
+<a id="module"></a>
+## 2.2 Module
 
-The manifest may register an update server:
+A module renders a small block at a template position. It is simpler than a component and normally does not use a complete MVC stack.
 
-```xml
-<updateservers>
-    <server type="extension" priority="1" name="Example Updates">
-        https://example.com/updates/com_example.xml
-    </server>
-</updateservers>
-```
-
-An update server allows Joomla to:
-
-1. Check whether a newer extension version exists.
-2. Display the update in the administrator interface.
-3. Download and install the matching package.
-
-For commercial extensions, download keys or extra query parameters may be required. Do not commit private license keys into a public repository.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="module-structure"></a>
-## 24. Module Structure
-
-Recommended modern site module structure:
+<a id="module-tree"></a>
+### 2.2.1 Module Tree
 
 ```text
 mod_example/
-├── mod_example.xml
+├── mod_example.xml                 # Manifest and module parameters
 ├── services/
-│   └── provider.php
+│   └── provider.php                # Registers dispatcher and helper factory
 ├── src/
 │   ├── Dispatcher/
-│   │   └── Dispatcher.php
+│   │   └── Dispatcher.php          # Prepares module display data
 │   └── Helper/
-│       └── ExampleHelper.php
+│       └── ExampleHelper.php       # Retrieves or transforms data
 ├── tmpl/
-│   └── default.php
-├── language/
-│   └── en-GB/
-│       ├── mod_example.ini
-│       └── mod_example.sys.ini
-└── media/
-    ├── css/
-    │   └── module.css
-    ├── js/
-    │   └── module.js
-    └── joomla.asset.json
+│   ├── default.php                 # Default layout
+│   └── alternative.php             # Optional alternative layout
+├── media/
+│   ├── css/
+│   └── js/
+└── language/en-GB/
+    ├── mod_example.ini
+    └── mod_example.sys.ini
 ```
 
-Responsibilities:
-
-| File or directory | Responsibility |
-|---|---|
-| `mod_example.xml` | Installation manifest and module parameters |
-| `services/provider.php` | Registers module, dispatcher, and helper factories |
-| `src/Dispatcher` | Prepares variables and dispatches rendering |
-| `src/Helper` | Retrieves data and contains reusable module logic |
-| `tmpl/default.php` | Renders module HTML |
-| `language` | Module labels and descriptions |
-| `media` | CSS, JavaScript, and images |
-
-A legacy module entry file such as `mod_example.php` may still be encountered, but a modern Joomla 6 module should prefer the service-provider and dispatcher pattern.
-
-Module override:
+<a id="module-flow"></a>
+### 2.2.2 Module Runtime Flow
 
 ```text
-templates/<template-name>/html/mod_example/default.php
+Joomla module renderer
+        ↓
+services/provider.php
+        ↓
+Dispatcher
+        ↓
+Helper or service
+        ↓
+tmpl/default.php
+        ↓
+HTML in a template position
 ```
+
+A module manifest normally declares the `site` or `administrator` client and contains configuration fields for module parameters.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="plugin-structure"></a>
-## 25. Plugin Structure
+<a id="plugin"></a>
+## 2.3 Plugin
 
-Example system plugin package:
+A plugin reacts to Joomla events. It belongs to a plugin group such as `system`, `content`, `user`, `authentication`, `webservices`, `task`, or `console`.
+
+<a id="plugin-tree"></a>
+### 2.3.1 Plugin Tree
 
 ```text
 plg_system_example/
-├── example.xml
+├── example.xml                     # Manifest; declares group="system"
 ├── services/
-│   └── provider.php
+│   └── provider.php                # Creates and registers the plugin
 ├── src/
 │   └── Extension/
-│       └── Example.php
-├── language/
-│   └── en-GB/
-│       ├── plg_system_example.ini
-│       └── plg_system_example.sys.ini
-└── media/
-    ├── css/
-    ├── js/
-    └── joomla.asset.json
+│       └── Example.php             # Event subscriber/plugin class
+├── media/
+│   ├── css/
+│   └── js/
+└── language/en-GB/
+    ├── plg_system_example.ini
+    └── plg_system_example.sys.ini
 ```
 
-Installed path:
+<a id="plugin-events"></a>
+### 2.3.2 Plugin Groups and Events
 
-```text
-plugins/system/example/
-```
-
-Modern subscriber example:
+Example event subscriber:
 
 ```php
 final class Example extends CMSPlugin implements SubscriberInterface
@@ -1478,167 +661,120 @@ final class Example extends CMSPlugin implements SubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            'onAfterRoute' => 'onAfterRoute',
+            'onAfterRoute' => 'afterRoute',
+            'onContentPrepare' => 'prepareContent',
         ];
-    }
-
-    public function onAfterRoute(): void
-    {
-        // Event logic.
     }
 }
 ```
 
-Plugin manifest root:
-
-```xml
-<extension type="plugin" group="system" method="upgrade">
-```
-
-Important rules:
-
-- The plugin group determines its installed parent folder.
-- `group="system"` means the plugin is installed under `plugins/system`; it does not prove that the plugin is Joomla Core.
-- Event signatures must match the Joomla version.
-- Use event objects and subscriber interfaces where supported.
-- Register the plugin through `services/provider.php`.
+The plugin group defines where Joomla loads the plugin, but it does not prove whether the plugin is Joomla Core, third-party, or custom.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="template-structure"></a>
-## 26. Template Structure
+<a id="template"></a>
+## 2.4 Template
 
-Recommended site template structure:
+A template controls page presentation. Joomla has separate Site and Administrator template clients.
+
+<a id="template-tree"></a>
+### 2.4.1 Template Tree
 
 ```text
 tpl_example/
-├── templateDetails.xml
-├── index.php
-├── component.php
-├── error.php
-├── offline.php
-├── joomla.asset.json
-├── html/
-│   ├── com_content/
-│   │   └── article/
-│   │       └── default.php
-│   └── mod_menu/
-│       └── default.php
+├── templateDetails.xml             # Manifest, positions, files, and options
+├── index.php                       # Main page layout
+├── component.php                   # Component-only output
+├── error.php                       # Error page
+├── offline.php                     # Offline page
+├── html/                           # Layout overrides
+│   ├── com_content/article/default.php
+│   └── mod_menu/default.php
 ├── media/
 │   ├── css/
 │   ├── js/
 │   ├── images/
-│   └── scss/
-├── language/
-│   └── en-GB/
-│       ├── tpl_example.ini
-│       └── tpl_example.sys.ini
-├── template_preview.png
-└── template_thumbnail.png
+│   ├── scss/
+│   └── joomla.asset.json
+├── language/en-GB/
+│   ├── tpl_example.ini
+│   └── tpl_example.sys.ini
+└── template_preview.png
 ```
 
-Responsibilities:
+<a id="template-overrides"></a>
+### 2.4.2 Layout Overrides and Positions
 
-| File or directory | Responsibility |
-|---|---|
-| `templateDetails.xml` | Manifest, positions, files, and style parameters |
-| `index.php` | Main page layout |
-| `component.php` | Component-only output layout |
-| `error.php` | Error page |
-| `offline.php` | Offline-mode page |
-| `html/` | Component, module, layout, and field overrides |
-| `media/` | Template source assets |
-| `joomla.asset.json` | Asset definitions |
-| Preview images | Template Manager previews |
+Module positions are declared in `templateDetails.xml`:
 
-`templateDetails.xml` must use that exact filename.
+```xml
+<positions>
+    <position>topbar</position>
+    <position>sidebar-right</position>
+    <position>footer</position>
+</positions>
+```
 
-Administrator templates are installed under:
+Overrides are stored under:
 
 ```text
-administrator/templates/<template-name>/
+templates/example/html/<extension>/<view-or-layout>/
 ```
+
+An override is not a separate extension, but it must be reviewed during migration because old Joomla markup and APIs may no longer be compatible.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="library-structure"></a>
-## 27. Library Structure
+<a id="level-3-supporting-extensions"></a>
+# Level 3 — Supporting Extensions
 
-Example library package:
+<a id="library"></a>
+## 3.1 Library
+
+A library installs reusable PHP code shared by components, modules, or plugins.
 
 ```text
 lib_example/
-├── lib_example.xml
+├── example.xml                 # Library manifest
 ├── src/
-│   ├── Client.php
-│   ├── Exception/
-│   │   └── ExampleException.php
-│   └── Service/
-│       └── ExampleService.php
-└── language/
-    └── en-GB/
-        └── lib_example.sys.ini
+│   ├── Api/
+│   ├── Service/
+│   ├── ValueObject/
+│   └── Helper/
+├── vendor/                     # Optional Composer dependencies
+└── language/en-GB/             # Optional translations
 ```
 
-Typical installed path:
+A library usually has no menu, page output, MVC views, or template positions.
+
+<a id="language"></a>
+## 3.2 Language
+
+A language extension installs translated interface strings.
 
 ```text
-libraries/example/
-```
-
-Libraries should:
-
-- Contain reusable code rather than page-specific rendering.
-- Use namespaces and PSR-4 autoloading.
-- Avoid modifying Joomla Core files.
-- Document which components, modules, or plugins depend on them.
-- Be upgraded together with dependent extensions when API compatibility changes.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="language-extension-structure"></a>
-## 28. Language Extension Structure
-
-Example language package:
-
-```text
-language_vi-VN/
+language-package/
 ├── install.xml
-├── language/
+├── site/
 │   └── vi-VN/
 │       ├── vi-VN.ini
-│       ├── vi-VN.xml
-│       └── *.ini
+│       └── vi-VN.xml
 └── administrator/
-    └── language/
-        └── vi-VN/
-            └── *.ini
+    └── vi-VN/
+        ├── vi-VN.ini
+        └── vi-VN.xml
 ```
 
-A language extension may include:
+It contains no business logic or MVC application.
 
-- Site language metadata.
-- Administrator language metadata.
-- Core translations.
-- Installation translations.
-- Extension translations.
+<a id="package"></a>
+## 3.3 Package
 
-Language packs should match the Joomla major version they target.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="package-structure"></a>
-## 29. Package Structure
-
-A package installs several related extensions together.
+A package installs several related extension ZIP files in one operation.
 
 ```text
 pkg_example/
@@ -1651,297 +787,177 @@ pkg_example/
     └── lib_example.zip
 ```
 
-Manifest example:
+Example child declarations:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<extension type="package" method="upgrade">
-    <name>PKG_EXAMPLE</name>
-    <packagename>example</packagename>
-    <version>1.0.0</version>
-
-    <files folder="packages">
-        <file type="component" id="com_example">com_example.zip</file>
-        <file type="module" id="mod_example" client="site">mod_example.zip</file>
-        <file type="plugin" id="example" group="system">plg_system_example.zip</file>
-        <file type="library" id="example">lib_example.zip</file>
-    </files>
-</extension>
+<files folder="packages">
+    <file type="component" id="com_example">com_example.zip</file>
+    <file type="module" id="mod_example" client="site">mod_example.zip</file>
+    <file type="plugin" id="example" group="system">plg_system_example.zip</file>
+</files>
 ```
 
-Use a package when child extensions form one product and should be installed or uninstalled together.
+A package coordinates installation; the child extensions provide the runtime functionality.
 
-During migration, audit both the package record and each child extension.
+<a id="file-extension"></a>
+## 3.4 File
 
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="file-extension-structure"></a>
-## 30. File Extension Structure
-
-Example:
+A file extension installs an arbitrary collection of files when another extension type is not suitable.
 
 ```text
 files_example/
 ├── files_example.xml
+├── script.php
 └── files/
-    ├── media/
-    ├── libraries/
-    └── custom-destination-files/
+    ├── example.php
+    ├── css/
+    └── js/
 ```
 
-A file extension is useful for:
-
-- Shared static resources.
-- Framework support files.
-- Files that do not belong to one component, module, plugin, template, or library.
-
-Use this type carefully. Arbitrary file installation is harder to understand and audit than a purpose-specific extension type.
+Use file extensions carefully because arbitrary file placement can make ownership, update behavior, and cleanup harder to understand.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
+
+<a id="level-4-installation-migration"></a>
+# Level 4 — Installation, Migration, and Validation
 
 <a id="installed-paths"></a>
-## 31. Installed Paths Reference
+## 4.1 Installed Paths
 
-```text
-joomla-root/
-├── administrator/
-│   ├── components/com_example/
-│   ├── modules/mod_example/
-│   ├── templates/example/
-│   └── language/en-GB/
-│
-├── api/
-│   └── components/com_example/
-│
-├── components/com_example/
-├── modules/mod_example/
-├── plugins/<group>/<plugin-name>/
-├── templates/example/
-├── libraries/example/
-├── language/en-GB/
-└── media/
-    ├── com_example/
-    ├── mod_example/
-    ├── plg_system_example/
-    └── templates/site/example/
-```
-
-### Joomla path constants
-
-| Constant | Typical location |
+| Extension type | Common installed location |
 |---|---|
-| `JPATH_ROOT` | Joomla root |
-| `JPATH_SITE` | Site application root |
-| `JPATH_ADMINISTRATOR` | Administrator application root |
-| `JPATH_API` | API application root |
-| `JPATH_LIBRARIES` | Libraries directory |
-| `JPATH_PLUGINS` | Plugins directory |
-| `JPATH_THEMES` | Active application templates directory |
-| `JPATH_CACHE` | Application cache directory |
-
-Prefer Joomla path constants over hard-coded absolute paths.
-
-[Back to Table of Contents](#table-of-contents)
-
----
+| Site component | `components/com_example/` |
+| Administrator component | `administrator/components/com_example/` |
+| API component | `api/components/com_example/` |
+| Site module | `modules/mod_example/` |
+| Administrator module | `administrator/modules/mod_example/` |
+| Plugin | `plugins/<group>/<name>/` |
+| Site template | `templates/example/` |
+| Administrator template | `administrator/templates/example/` |
+| Library | `libraries/example/` |
+| Media | `media/<extension>/` |
+| Site language | `language/<tag>/` |
+| Administrator language | `administrator/language/<tag>/` |
 
 <a id="required-files"></a>
-## 32. Required, Recommended, and Optional Files
+## 4.2 Required, Recommended, and Optional Files
 
-### Component
-
-| Item | Level | Reason |
+| Item | Status | Notes |
 |---|---|---|
-| Manifest XML | Required | Installation metadata and file mapping |
-| Namespace declaration | Strongly recommended | Modern autoloading |
-| `services/provider.php` | Strongly recommended | Modern Joomla bootstrapping |
-| `src/Controller` | Required for normal MVC requests | Handles tasks |
-| `src/Model` | Required when data or business logic exists | Data operations |
-| `src/View` | Required for rendered views | Prepares output |
-| `tmpl` | Required for HTML output | Layout rendering |
-| Language files | Strongly recommended | Translatable UI |
-| `media/joomla.asset.json` | Recommended when assets exist | Modern asset loading |
-| `access.xml` | Required when custom ACL actions exist | Authorization definitions |
-| `config.xml` | Optional | Component options |
-| SQL files | Required when database objects exist | Install and migration |
-| `script.php` | Optional | Complex installation lifecycle |
-| API application | Optional | REST API support |
-| Update server | Recommended for distributed extensions | Update discovery |
-
-### Module
-
-| Item | Level |
-|---|---|
-| `mod_example.xml` | Required |
-| `services/provider.php` | Recommended |
-| `src/Dispatcher` | Recommended |
-| `src/Helper` | Recommended when data logic exists |
-| `tmpl/default.php` | Required for HTML output |
-| Language files | Recommended |
-| Media assets | Optional |
-
-### Plugin
-
-| Item | Level |
-|---|---|
-| `<plugin-name>.xml` | Required |
-| `services/provider.php` | Recommended |
-| `src/Extension/<Name>.php` | Required for modern plugin logic |
-| Language files | Recommended |
-| Media assets | Optional |
-
-[Back to Table of Contents](#table-of-contents)
-
----
+| Valid manifest | Required | Every installable extension requires one |
+| Declared extension files | Required | Every referenced path must exist |
+| Correct type/client/group | Required | Must match the extension responsibility |
+| Namespaced `src/` | Recommended for PHP extensions | Required by modern architecture when namespace loading is used |
+| `services/provider.php` | Recommended or required by architecture | Common for modern component, module, and plugin registration |
+| Language files | Recommended | Avoid hard-coded UI strings |
+| Media folder | Optional | Needed only for extension assets |
+| `joomla.asset.json` | Recommended when assets exist | Enables Web Asset Manager registration |
+| SQL files | Optional | Usually required only when the extension owns database tables |
+| `access.xml` and `config.xml` | Optional | Common for components with ACL or options |
+| `script.php` | Optional | Use only for lifecycle logic not handled declaratively |
+| Update server | Recommended for maintained releases | Enables managed updates |
 
 <a id="migration-notes"></a>
-## 33. Joomla 3 to Joomla 6 Migration Notes
-
-Do not copy Joomla 3 extension code into Joomla 6 and assume that Discover will make it compatible. Discover only registers files that already follow an installable extension structure; it does not rewrite obsolete code.
-
-### Common migration problems
+## 4.3 Joomla 3 to Joomla 6 Migration Notes
 
 | Joomla 3 pattern | Joomla 6 direction |
 |---|---|
-| Global classes such as `JFactory` | Namespaced Joomla classes and dependency injection |
-| `JObject` or `CMSObject` legacy usage | Plain objects, DTOs, Registry, or appropriate modern classes |
-| `JControllerLegacy` | Namespaced MVC controllers |
-| `JModelLegacy` | Namespaced MVC models |
-| `JViewLegacy` | Namespaced MVC views |
-| `JTable` | `Joomla\CMS\Table\Table` subclasses |
-| Manual class loading | Manifest namespaces and PSR-4 |
-| Procedural component entry files | Dispatcher, extension class, service provider |
-| Direct script and stylesheet loading | Web Asset Manager |
-| Old event signatures | Current event classes and subscriber methods |
-| Deprecated database APIs | Joomla Database query API |
-| Hard-coded paths | Joomla path constants |
-| Template overrides copied unchanged | Revalidate against Joomla 6 output and Bootstrap markup |
+| Global or legacy class names | Namespaced Joomla classes |
+| Direct component entry files containing all logic | Service provider, dispatcher, MVC classes |
+| `JModelLegacy`, `JControllerLegacy`, `JViewLegacy` | Namespaced MVC base classes |
+| `JFactory` static access | Application services and dependency injection where possible |
+| Direct CSS/JS insertion | Web Asset Manager |
+| Plugin methods without explicit event mapping | Event subscriber pattern where supported |
+| Mixed SQL and view logic | Separate models, tables, views, and services |
+| Legacy router code | Modern component router service |
+| Copied extension folders only | Proper manifest installation or verified Discover workflow |
 
-### Migration workflow
+Migration flow:
 
 ```mermaid
 flowchart TD
-    A[Inventory Extension Files] --> B[Identify Extension Type]
-    B --> C[Read Manifest and Entry Points]
-    C --> D[Map Joomla 3 APIs]
-    D --> E[Design Joomla 6 Structure]
-    E --> F[Add Namespace and Provider]
-    F --> G[Migrate MVC and Events]
-    G --> H[Migrate Assets and Forms]
-    H --> I[Migrate Database Schema]
-    I --> J[Install on Clean Joomla 6]
-    J --> K[Test Site Admin API ACL and Updates]
+    A[Identify extension type] --> B[Inspect manifest]
+    B --> C[Map package and installed paths]
+    C --> D[Replace deprecated Joomla APIs]
+    D --> E[Introduce namespaces and services]
+    E --> F[Review database and assets]
+    F --> G[Test install, update, and uninstall]
+    G --> H[Test runtime behavior]
 ```
 
-### Discover readiness is not runtime readiness
-
-An extension may appear in **System → Install → Discover** when its files are in recognizable locations. That only indicates potential registration. It does not prove:
-
-- Joomla 6 API compatibility.
-- PHP compatibility.
-- Correct namespaces.
-- Valid event signatures.
-- Working SQL migrations.
-- Working ACL.
-- Working frontend or backend layouts.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
 <a id="validation-checklist"></a>
-## 34. Validation Checklist
+## 4.4 Validation Checklist
 
 ### Package and manifest
 
-- [ ] The ZIP opens directly to the extension files, not an unnecessary extra parent directory.
-- [ ] The manifest filename follows the extension-type convention.
-- [ ] XML is well formed.
-- [ ] Extension `type`, `element`, `client`, and plugin `group` are correct.
-- [ ] `method="upgrade"` is set when updates must be supported.
-- [ ] Every required file and directory is declared.
-- [ ] The extension version is correct.
-- [ ] Namespace and source path match.
+- [ ] Extension type is correct.
+- [ ] Component element, module client, or plugin group is correct.
+- [ ] Every declared file and folder exists.
+- [ ] Manifest version matches the release.
+- [ ] Namespace paths match class locations and case.
+- [ ] Installation ZIP opens with the manifest at the expected level.
 
-### PHP and architecture
+### Runtime architecture
 
-- [ ] PHP classes follow PSR-4 naming and casing.
-- [ ] `services/provider.php` returns a valid service provider.
-- [ ] Controllers check tokens and permissions.
-- [ ] Models handle data and business rules.
-- [ ] Views and layouts do not execute unsafe SQL.
-- [ ] Removed Joomla 3 classes are not used.
-- [ ] Deprecated APIs have been replaced.
+- [ ] Service provider loads without errors.
+- [ ] Controllers, models, views, tables, dispatchers, or subscribers follow the correct extension type.
+- [ ] No Joomla 3 legacy classes remain without a deliberate compatibility layer.
+- [ ] Permissions are checked before write operations.
+- [ ] Input is filtered and output is escaped.
 
 ### Database
 
-- [ ] Fresh install creates all required tables.
-- [ ] Upgrade SQL works from every supported previous version.
-- [ ] Uninstall behavior is intentional.
-- [ ] Table names use `#__`.
-- [ ] Character set uses `utf8mb4`.
-- [ ] Queries quote identifiers and values.
-- [ ] Schema version is recorded correctly.
-
-### User interface
-
-- [ ] Administrator list view works.
-- [ ] Create, edit, save, apply, cancel, publish, and delete work as applicable.
-- [ ] Search, filter, ordering, and pagination work.
-- [ ] Frontend list and detail views work.
-- [ ] Template overrides are tested separately.
-- [ ] Empty states and error states are clear.
-
-### Security
-
-- [ ] CSRF tokens are checked for state-changing actions.
-- [ ] ACL is enforced in code, not only in the UI.
-- [ ] Output is escaped.
-- [ ] Input is filtered.
-- [ ] SQL injection is prevented.
-- [ ] File uploads validate type, size, filename, and destination.
-- [ ] API endpoints require correct authentication and permissions.
-- [ ] Secrets and license keys are not committed.
+- [ ] Install SQL works on an empty database.
+- [ ] Update SQL files are ordered by version.
+- [ ] `#__` is used for table prefixes.
+- [ ] Schema version is correctly recorded.
+- [ ] Uninstall behavior is intentional and documented.
 
 ### Assets and language
 
-- [ ] `joomla.asset.json` is valid when used.
-- [ ] Assets are loaded through Web Asset Manager.
-- [ ] Generated cache files are excluded from Git.
-- [ ] Language keys exist for visible text.
-- [ ] `.ini` and `.sys.ini` files are valid UTF-8.
+- [ ] CSS and JavaScript are stored under the extension media destination.
+- [ ] Asset names in `joomla.asset.json` match PHP usage.
+- [ ] Language keys exist for Site and Administrator contexts.
+- [ ] `.sys.ini` contains installer and menu labels when needed.
 
-### Installation and update testing
+### Installation lifecycle
 
-- [ ] Install on a clean Joomla 6 instance.
-- [ ] Upgrade over the previous supported release.
-- [ ] Reinstall or update does not duplicate data.
-- [ ] Disable and enable work.
-- [ ] Uninstall is tested on a disposable environment.
-- [ ] Update server metadata points to the correct package.
-- [ ] Joomla logs contain no warnings or deprecated API messages.
-- [ ] PHP error logs contain no warnings, notices, or type errors.
+- [ ] Fresh installation succeeds.
+- [ ] Upgrade from the previous supported version succeeds.
+- [ ] Reinstallation with `method="upgrade"` does not lose data.
+- [ ] Discover works only when all required installed files and a valid manifest are present.
+- [ ] Uninstall removes only files and data owned by the extension.
 
-[Back to Table of Contents](#table-of-contents)
+### Functional testing
 
----
+- [ ] Administrator list, edit, save, publish, and delete actions work.
+- [ ] Frontend list, detail, form, routing, and pagination work.
+- [ ] Modules render in assigned positions.
+- [ ] Plugins execute only for intended events.
+- [ ] Template positions and overrides render correctly.
+- [ ] API endpoints work when the extension provides them.
 
 <a id="official-references"></a>
-## 35. Official References
+## 4.5 Official References
 
-- [Joomla Programmers Documentation: Building Extensions](https://manual.joomla.org/docs/next/building-extensions/)
-- [Manifest Files](https://manual.joomla.org/docs/next/building-extensions/install-update/installation/manifest/)
-- [Defining Namespace Prefixes](https://manual.joomla.org/docs/next/general-concepts/namespaces/defining-your-namespace/)
-- [Component Development Tutorial](https://manual.joomla.org/docs/next/building-extensions/components/component-development-tutorial/)
-- [Module Development Tutorial](https://manual.joomla.org/docs/next/building-extensions/modules/module-development-tutorial/)
-- [Plugin Development](https://manual.joomla.org/docs/next/building-extensions/plugins/)
-- [Web Asset Manager](https://manual.joomla.org/docs/next/general-concepts/web-asset-manager/)
-- [Update Servers](https://manual.joomla.org/docs/next/building-extensions/install-update/update-server/)
+Use the current Joomla Programmers Documentation as the primary source for:
 
-> The Joomla manual may label the newest documentation as `next` or as an upcoming minor release. Always verify behavior against the exact Joomla 6 version used by the project and the source code of Joomla Core.
+- Building extensions.
+- Manifest files.
+- Component MVC.
+- Module development.
+- Plugin development and events.
+- Dependency injection.
+- Namespaces.
+- Web Asset Manager.
+- Packages and update servers.
+
+Documentation root:
+
+```text
+https://manual.joomla.org/
+```
 
 [Back to Table of Contents](#table-of-contents)
