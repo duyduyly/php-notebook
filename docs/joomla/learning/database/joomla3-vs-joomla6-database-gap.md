@@ -1,15 +1,13 @@
 # Joomla 3 vs Joomla 6 Database Gap Analysis
 
-A practical comparison of the Joomla 3 and Joomla 6 core database structures, focused on migration planning.
+A practical comparison of Joomla 3.10.x and Joomla 6.x database structures for migration planning.
 
-> **Baseline:** Joomla 3.10.x compared with Joomla 6.x.
->
-> **Important:** This is a logical and migration-oriented comparison. The exact physical schema must still be verified against the SQL files of the exact installed versions and extensions.
+> **Important:** The column details below describe the main logical and commonly encountered schema gaps. Always verify the exact physical schema from both installed projects because patch versions and extensions can add, remove, or alter columns.
 
 ## Table of Contents
 
 - [1. Comparison Status](#1-comparison-status)
-- [2. Executive Summary](#2-executive-summary)
+- [2. How to Read Column Changes](#2-how-to-read-column-changes)
 - [3. Complete Comparison Matrix](#3-complete-comparison-matrix)
   - [3.1 Content, Tags, and Fields](#31-content-tags-and-fields)
   - [3.2 Workflow](#32-workflow)
@@ -17,368 +15,244 @@ A practical comparison of the Joomla 3 and Joomla 6 core database structures, fo
   - [3.4 Users and ACL](#34-users-and-acl)
   - [3.5 Extensions and Updates](#35-extensions-and-updates)
   - [3.6 Search, Language, and Supporting Components](#36-search-language-and-supporting-components)
-  - [3.7 Scheduler, Logging, Privacy, Mail, and Guided Tours](#37-scheduler-logging-privacy-mail-and-guided-tours)
+  - [3.7 New Joomla 6 Subsystems](#37-new-joomla-6-subsystems)
   - [3.8 Runtime and Generated Data](#38-runtime-and-generated-data)
 - [4. Main ERD Gaps](#4-main-erd-gaps)
-- [5. Tables That Are Similar but Still Require Transformation](#5-tables-that-are-similar-but-still-require-transformation)
+- [5. Main Column-Level Migration Risks](#5-main-column-level-migration-risks)
 - [6. Tables That Must Not Be Copied Directly](#6-tables-that-must-not-be-copied-directly)
-- [7. Recommended Migration Decisions](#7-recommended-migration-decisions)
-- [8. Validation Checklist](#8-validation-checklist)
+- [7. Validation Checklist](#7-validation-checklist)
 
 ## 1. Comparison Status
 
 | Status | Meaning | Migration implication |
 |---|---|---|
-| **Same** | The table and its main responsibility exist in both versions | Data may be migratable, but columns and values must still be validated |
-| **Changed** | The table exists in both versions, but its schema, references, or behavior changed | Transform data and remap IDs; do not use a blind copy |
-| **New in Joomla 6** | Joomla 6 introduces a new core table or subsystem | Keep the Joomla 6 records or create valid target records |
-| **Rebuild** | The table stores generated, installation-owned, runtime, or index data | Do not migrate rows; regenerate from Joomla 6 |
-| **Conditional** | The table exists or is useful only when the related feature is used | Migrate only after confirming actual project usage |
-| **Legacy / Review** | The Joomla 3 data model is no longer the preferred Joomla 6 model | Review retention requirements and use the Joomla 6 replacement |
+| **Same** | The table and its main purpose exist in both versions | Validate columns, defaults, indexes, and data before copying |
+| **Changed** | The table exists in both versions, but schema or behavior differs | Transform records and remap references |
+| **New in Joomla 6** | Joomla 6 introduces a new table or subsystem | Keep target defaults or create valid Joomla 6 records |
+| **Rebuild** | The table contains generated, runtime, security, or installation-owned data | Do not migrate rows; regenerate them |
+| **Conditional** | Migration depends on actual project usage or retention rules | Migrate only after scope approval |
+| **Legacy / Review** | Joomla 3 storage is no longer the preferred target model | Review replacement and retention requirements |
 
-## 2. Executive Summary
+## 2. How to Read Column Changes
 
-The Joomla 3 and Joomla 6 databases share the same core concepts for:
+The **Detailed column changes** column uses these labels:
+
+| Label | Meaning |
+|---|---|
+| **Keep** | The business value normally remains useful |
+| **Remap** | The value references a target record whose ID may change |
+| **Transform** | The value or JSON structure may require conversion |
+| **Rebuild** | Joomla 6 should generate the value or record |
+| **Drop / Skip** | The value should normally not be migrated |
+| **Verify** | Compare the exact Joomla 3 and Joomla 6 physical schemas |
+
+Example:
 
 ```text
-Articles
-Categories
-Menus
-Modules
-Users
-User groups
-View levels
-ACL assets
-Extensions
-Tags
-Custom fields
-Languages
-Redirects
-Smart Search
+Keep: title, alias
+Remap: catid, access, asset_id
+Transform: params, images
+Rebuild: lft, rgt
+Skip: checked_out runtime state
 ```
-
-However, the following facts make a full database copy unsafe:
-
-1. Joomla 6 adds content workflow tables.
-2. Joomla 6 expands ACL assets for workflows, scheduler tasks, privacy, logs, and other components.
-3. Extension IDs, asset IDs, menu IDs, module IDs, and template style IDs are installation-specific.
-4. Joomla 6 adds scheduler, action log, privacy, mail template, MFA, and guided-tour subsystems.
-5. Several system tables contain generated or version-owned data and must be rebuilt.
-6. Matching table names do not guarantee matching columns, defaults, JSON structures, indexes, or business rules.
 
 ## 3. Complete Comparison Matrix
 
 ### 3.1 Content, Tags, and Fields
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| `#__content` | `#__content` | **Changed** | Core article concept remains, but column definitions, defaults, state handling, JSON expectations, and workflow integration may differ | Transform records, map category/user/access/asset IDs, validate JSON, then create workflow associations |
-| `#__categories` | `#__categories` | **Changed** | Same shared category model and nested-set tree; target component records, assets, defaults, and tree values may differ | Migrate parent-first and rebuild `lft`, `rgt`, `level`, and `path` |
-| `#__content_frontpage` | `#__content_frontpage` | **Changed** | Same featured-content purpose, but supported scheduling columns and consistency rules may differ | Remap article IDs and validate featured state and ordering |
-| `#__content_rating` | `#__content_rating` | **Conditional** | Same optional article-rating purpose | Migrate only when ratings must be retained; validate counts and privacy requirements |
-| `#__tags` | `#__tags` | **Changed** | Same hierarchical tag concept; assets, access, language, and nested-set values require remapping | Migrate parent-first and rebuild the tag tree |
-| `#__contentitem_tag_map` | `#__contentitem_tag_map` | **Changed** | Same polymorphic mapping concept; content IDs, tag IDs, type aliases, and content-type references may differ | Remap every referenced ID and validate `type_alias` |
-| `#__fields_groups` | `#__fields_groups` | **Changed** | Same custom-field grouping concept; context, access, language, and parameters may differ | Recreate or transform groups before fields |
-| `#__fields` | `#__fields` | **Changed** | Same field-definition concept; field plugins, contexts, parameters, categories, and defaults may differ | Confirm the Joomla 6 field plugin exists, then transform definitions |
-| `#__fields_values` | `#__fields_values` | **Changed** | Same field-value mapping; both `field_id` and context-specific `item_id` may change | Remap field IDs and target item IDs |
-| `#__fields_categories` | `#__fields_categories` | **Changed** | Same field-to-category restriction concept where used | Remap field and category IDs |
-| `#__associations` | `#__associations` | **Changed** | Same multilingual association purpose; item IDs and contexts must match the Joomla 6 target | Rebuild association groups after all related items exist |
-| `#__content_types` | `#__content_types` | **Rebuild** | Core content-type registry is installation- and extension-dependent | Keep Joomla 6 records; map by type alias instead of copying raw IDs |
-| `#__ucm_base` | `#__ucm_base` or current Joomla 6 content integration | **Legacy / Review** | UCM implementation and usage differ across Joomla generations | Do not copy blindly; let Joomla 6 and installed extensions rebuild required records |
-| `#__ucm_content` | `#__ucm_content` or current Joomla 6 content integration | **Legacy / Review** | Unified content records may be generated from target content and content types | Rebuild where supported; validate only if an extension depends on UCM data |
-| `#__ucm_history` | `#__contenthistory` or current history storage | **Legacy / Review** | Content-history storage changed across Joomla generations | Migrate only when history retention is required and a verified mapping exists |
-| `#__contact_details` | `#__contact_details` | **Changed** | Same contact component purpose; categories, users, fields, params, assets, and routing may differ | Migrate through a component-specific mapping |
-| `#__newsfeeds` | `#__newsfeeds` | **Changed** | Same component purpose, but schema and extension behavior may differ | Migrate only when the component is enabled and required |
-| `#__banners` | `#__banners` | **Changed** | Same banner purpose; supporting categories, clients, tracks, and parameters may differ | Use a component-specific migration and validate reporting data |
-| `#__banner_clients` | `#__banner_clients` | **Changed** | Same client ownership concept | Remap client references before banners |
-| `#__banner_tracks` | `#__banner_tracks` | **Conditional** | Historical tracking data may be large and not operationally required | Migrate only when reporting retention is required |
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| `#__content` | `#__content` | **Changed** | Article purpose remains, but defaults, workflow integration, dates, JSON, and references differ | **Keep:** `title`, `alias`, `introtext`, `fulltext`, `created`, `modified`, `metakey`, `metadesc`, `hits`, `language`. **Remap:** `catid`, `created_by`, `modified_by`, `access`, `asset_id`. **Transform/verify:** `state`, `featured`, `images`, `urls`, `attribs`, `metadata`, `publish_up`, `publish_down`, `version`, `note`. **Reset:** `checked_out`, `checked_out_time`. **Add relationship:** target workflow association | Transform articles, map all references, validate JSON and dates, then create workflow associations |
+| `#__categories` | `#__categories` | **Changed** | Same shared category and nested-set model, but assets, roots, defaults, and target extension records differ | **Keep:** `extension`, `title`, `alias`, `description`, `language`. **Remap:** `parent_id`, `asset_id`, `access`, `created_user_id`, `modified_user_id`. **Transform:** `params`, `metadata`, publication dates/state. **Rebuild:** `lft`, `rgt`, `level`, `path`. **Reset:** checkout fields | Import parent-first, map the owning component, and rebuild the category tree |
+| `#__content_frontpage` | `#__content_frontpage` | **Changed** | Featured mapping remains; target schema may include additional scheduling fields | **Remap:** `content_id`. **Keep/verify:** `ordering`. **Verify target-only columns:** featured start/end dates or target defaults when present | Insert after articles and keep `#__content.featured` consistent |
+| `#__content_rating` | `#__content_rating` | **Conditional** | Ratings remain optional; privacy and physical columns may differ | **Remap:** `content_id`. **Keep/verify:** rating totals and counts. **Review:** IP-related or audit fields | Migrate only when historical ratings are required |
+| `#__tags` | `#__tags` | **Changed** | Same hierarchical taxonomy, but ACL, assets, defaults, and tree values differ | **Keep:** `title`, `alias`, `description`, `language`. **Remap:** `parent_id`, `asset_id`, `access`, creator/modifier IDs. **Transform:** `params`, `metadata`, publication dates. **Rebuild:** `lft`, `rgt`, `level`, `path` | Import parent-first and rebuild the tag tree |
+| `#__contentitem_tag_map` | `#__contentitem_tag_map` | **Changed** | Same polymorphic mapping, but every referenced identifier may differ | **Remap:** `content_item_id`, `core_content_id`, `tag_id`, content type IDs. **Verify/transform:** `type_alias`. **Rebuild:** ordering/index-derived values if present | Recreate mappings only after content, tags, and content types exist |
+| `#__fields_groups` | `#__fields_groups` | **Changed** | Group purpose remains, but contexts, assets, access, and options may differ | **Keep:** `title`, `context`, `language`, `note`. **Remap:** `asset_id`, `access`, creator/modifier IDs. **Transform:** `params`. **Verify:** state, ordering, checkout columns | Recreate groups before fields |
+| `#__fields` | `#__fields` | **Changed** | Field definitions depend on Joomla 6 field plugins and accepted contexts | **Keep:** `title`, `name`, `label`, `description`, `type`, `context`, `language`. **Remap:** `group_id`, `asset_id`, `access`, creator/modifier IDs. **Transform:** `params`, `fieldparams`, default values. **Verify:** `required`, `only_use_in_subform`, state/order columns. **Dependency:** target field plugin must exist | Install field plugins, then transform field definitions |
+| `#__fields_values` | `#__fields_values` | **Changed** | Same value mapping, but both IDs are target-specific | **Remap:** `field_id`, `item_id`. **Keep/transform:** `value`, especially multi-value or serialized formats | Insert only after fields and target items exist |
+| `#__fields_categories` | `#__fields_categories` | **Changed** | Same field restriction mapping | **Remap:** `field_id`, `category_id` | Rebuild from field and category mapping tables |
+| `#__associations` | `#__associations` | **Changed** | Same multilingual grouping, but item IDs and contexts change | **Remap:** item IDs contained in `id`. **Keep/verify:** `key`, `context`. **Rebuild:** groups when source members fail migration | Recreate after all multilingual content and menus exist |
+| `#__content_types` | `#__content_types` | **Rebuild** | Registry rows are owned by Joomla 6 and installed extensions | **Do not preserve raw IDs.** **Map by:** `type_alias`, table identity, component identity. **Keep target:** `type_title`, `router`, `field_mappings`, `content_history_options` as created by installers | Keep Joomla 6 registry; map aliases instead of copying rows |
+| `#__ucm_base` | Joomla 6 UCM/content integration | **Legacy / Review** | Usage differs across Joomla generations | **Do not copy IDs.** **Verify:** `ucm_item_id`, `ucm_type_id`, `ucm_language_id`. **Rebuild:** target integration records where required | Rebuild only when a target extension still requires UCM records |
+| `#__ucm_content` | Joomla 6 UCM/content integration | **Legacy / Review** | Data is often derived from target content and content types | **Remap:** `core_content_item_id`, `core_type_id`, `core_catid`, `core_created_user_id`, `core_access`. **Transform:** JSON and metadata fields. Prefer rebuild | Let Joomla 6 generate records where supported |
+| `#__ucm_history` | `#__contenthistory` or current history storage | **Legacy / Review** | History storage and payload formats changed | **Remap:** item and type IDs. **Transform:** `version_data`, metadata JSON, editor IDs. **Verify:** save date, version note, keep-forever flags | Migrate only under an explicit history-retention requirement |
+| `#__contact_details` | `#__contact_details` | **Changed** | Contact purpose remains, but fields, routing, ACL, users, categories, and params differ | **Keep:** name, alias, address/contact text, metadata. **Remap:** `catid`, `user_id`, `access`, `asset_id`, creator/modifier IDs. **Transform:** `params`, `metadata`, image paths, publication dates. **Rebuild:** tree/order-related derived values where applicable | Use a component-specific migration |
+| `#__newsfeeds` | `#__newsfeeds` | **Changed** | Same business purpose; schema and component behavior may differ | **Keep:** name/title, alias, link, description, language. **Remap:** `catid`, `access`, creator/modifier IDs. **Transform:** `params`, metadata, publication fields | Migrate only when the component is enabled and used |
+| `#__banners` | `#__banners` | **Changed** | Same banner purpose, but supporting IDs, tracking rules, and params differ | **Keep:** name, alias, click URL, image/custom code, impressions/clicks when required. **Remap:** `catid`, `cid`, `created_by`, `modified_by`. **Transform:** `params`, metadata, date fields. **Verify:** tracking and purchase fields | Migrate with banner clients and categories |
+| `#__banner_clients` | `#__banner_clients` | **Changed** | Same client ownership concept | **Keep:** name, contact details, notes. **Remap:** creator/modifier IDs where present. **Transform:** `metakey`, extra tracking configuration | Import before banners |
+| `#__banner_tracks` | `#__banner_tracks` | **Conditional** | Historical statistics are optional and may be large | **Remap:** banner/client IDs. **Keep/verify:** track type, count, date. **Review:** retention and aggregation strategy | Migrate only when historical reporting is required |
 
 ### 3.2 Workflow
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| No core equivalent | `#__workflows` | **New in Joomla 6** | Defines content workflows by extension | Keep Joomla 6 defaults or create approved target workflows |
-| No core equivalent | `#__workflow_stages` | **New in Joomla 6** | Defines stages inside a workflow | Map Joomla 3 publication states to valid target stages |
-| No core equivalent | `#__workflow_transitions` | **New in Joomla 6** | Defines allowed state transitions and actions | Keep or configure Joomla 6 transitions; do not generate from Joomla 3 rows automatically |
-| No core equivalent | `#__workflow_associations` | **New in Joomla 6** | Associates each content item with its current workflow stage | Create a valid association for every migrated article when workflow is active |
-
-The most important new relationship is:
-
-```mermaid
-erDiagram
-    CONTENT {
-        int id PK
-        int state
-    }
-
-    WORKFLOW_ASSOCIATIONS {
-        int item_id PK
-        int stage_id
-        varchar extension
-    }
-
-    WORKFLOW_STAGES {
-        int id PK
-        int workflow_id
-        varchar title
-    }
-
-    WORKFLOWS {
-        int id PK
-        varchar extension
-        varchar title
-    }
-
-    CONTENT ||--o| WORKFLOW_ASSOCIATIONS : follows
-    WORKFLOW_STAGES ||--o{ WORKFLOW_ASSOCIATIONS : current_stage
-    WORKFLOWS ||--o{ WORKFLOW_STAGES : contains
-```
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| No core equivalent | `#__workflows` | **New in Joomla 6** | Defines workflow containers | **Target-owned:** `id`, `asset_id`. **Configure:** `title`, `description`, `extension`, `default`, `published`, `ordering`, `params`. **Do not derive raw IDs from Joomla 3** | Keep the Basic Workflow or create an approved target workflow |
+| No core equivalent | `#__workflow_stages` | **New in Joomla 6** | Defines stages inside workflows | **Target-owned/remap:** `id`, `asset_id`, `workflow_id`. **Configure:** `title`, `description`, `published`, `default`, `ordering` | Map Joomla 3 article states to target stage IDs |
+| No core equivalent | `#__workflow_transitions` | **New in Joomla 6** | Defines allowed transitions between stages | **Target-owned/remap:** `id`, `asset_id`, `workflow_id`, `from_stage_id`, `to_stage_id`. **Configure:** `title`, `description`, `published`, `ordering`, `options` | Keep/configure Joomla 6 transitions rather than fabricating them from source rows |
+| No core equivalent | `#__workflow_associations` | **New in Joomla 6** | Connects each article to its current stage | **Create:** `item_id` from target article ID, `stage_id` from state-to-stage mapping, `extension` such as `com_content.article` | Create one valid association for every migrated article when workflow is active |
 
 ### 3.3 Menus, Modules, and Templates
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| `#__menu_types` | `#__menu_types` | **Changed** | Same menu-container purpose; administrator menus and target defaults differ | Migrate approved frontend menu types only |
-| `#__menu` | `#__menu` | **Changed** | Same menu and routing role; component IDs, internal links, parameters, template styles, trees, and administrator items differ | Import frontend items parent-first, map component IDs, rewrite links, and rebuild the menu tree |
-| `#__modules` | `#__modules` | **Changed** | Same module-instance concept; module types, positions, parameters, administrator modules, and assets differ | Install compatible module code first; migrate approved frontend instances only |
-| `#__modules_menu` | `#__modules_menu` | **Changed** | Same assignment table, but both module IDs and menu IDs may change | Remap both sides while preserving include/exclude/all-pages behavior |
-| `#__template_styles` | `#__template_styles` | **Changed** | Same configured-style concept; Joomla 3 templates are normally incompatible with Joomla 6 | Install the target template and transform only approved compatible parameters |
-
-Important stable relationships:
-
-```text
-#__menu_types.menutype → #__menu.menutype
-#__extensions.extension_id → #__menu.component_id
-#__modules.id → #__modules_menu.moduleid
-#__menu.id → #__modules_menu.menuid
-#__template_styles.id → #__menu.template_style_id
-```
-
-The relationship concepts are similar, but the IDs must not be assumed to match.
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| `#__menu_types` | `#__menu_types` | **Changed** | Frontend menu concept remains; administrator menu records differ | **Keep:** `menutype`, `title`, `description`. **Verify:** `client_id` and target-only permission/asset references. **Skip:** Joomla 3 administrator menu types | Migrate approved frontend menu containers only |
+| `#__menu` | `#__menu` | **Changed** | Routing purpose remains, but component IDs, links, params, trees, home flags, and admin items differ | **Keep:** `title`, `alias`, `type`, `menutype`, `language`, `browserNav`. **Remap:** `parent_id`, `component_id`, `access`, `template_style_id`. **Rewrite:** `link` IDs and component/view/task values. **Transform:** `params`, image values. **Rebuild:** `lft`, `rgt`, `level`, `path`. **Reset:** checkout fields. **Validate:** `home`, `client_id`, `published` | Import frontend items parent-first, rewrite links, and rebuild the menu tree |
+| `#__modules` | `#__modules` | **Changed** | Module instances remain, but module code, positions, assets, params, and admin dashboards differ | **Keep:** `title`, `content`, `showtitle`, `language`, publication dates. **Remap:** `asset_id`, `access`, creator IDs. **Map:** `module` to an installed Joomla 6 module and `position` to the target template. **Transform:** `params`. **Reset:** checkout fields. **Skip:** incompatible administrator modules | Install compatible module code first, then migrate approved frontend instances |
+| `#__modules_menu` | `#__modules_menu` | **Changed** | Same bridge table; both sides may receive new IDs | **Remap:** `moduleid`, absolute value of `menuid`. **Preserve:** `0`, positive include, and negative exclude semantics | Recreate after modules and menu items exist |
+| `#__template_styles` | `#__template_styles` | **Changed** | Style concept remains, but Joomla 3 templates are usually incompatible | **Keep selectively:** style title/name. **Map:** `template` to compatible Joomla 6 template. **Transform:** `params`. **Verify:** `client_id`, `home`, inheritance/parent fields available in target. **Do not copy:** incompatible template-specific settings | Install target template and recreate styles from an approved parameter map |
 
 ### 3.4 Users and ACL
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| `#__users` | `#__users` | **Changed** | Same account purpose; authentication, reset, token, and MFA behavior changed | Migrate approved identity fields and password hashes only after compatibility testing |
-| `#__usergroups` | `#__usergroups` | **Changed** | Same hierarchical group model; target core groups and tree values must remain valid | Map core groups by meaning, create custom groups parent-first, and rebuild the tree |
-| `#__user_usergroup_map` | `#__user_usergroup_map` | **Changed** | Same many-to-many mapping; both IDs may change | Remap user and group IDs and remove duplicates |
-| `#__viewlevels` | `#__viewlevels` | **Changed** | Same view-access purpose; `rules` contains target user-group IDs | Remap group IDs inside JSON rules |
-| `#__assets` | `#__assets` | **Changed** | Same ACL tree, but Joomla 6 contains many additional component, workflow, task, and module assets | Keep Joomla 6 core assets and rebuild assets for migrated objects |
-| `#__user_profiles` | `#__user_profiles` | **Conditional** | Same extensible profile storage; profile namespaces and plugins may differ | Migrate approved profile namespaces only |
-| `#__user_notes` | `#__user_notes` | **Conditional** | Same administrator-note concept | Migrate only when business value and privacy rules require it |
-| `#__user_keys` | `#__user_keys` | **Rebuild** | Authentication and remember-me keys are temporary and security-sensitive | Do not migrate |
-| OTP-related columns in `#__users` | `#__user_mfa` and current MFA mechanisms | **New / Changed** | MFA storage moved to a dedicated modern subsystem | Require MFA re-enrollment; do not copy Joomla 3 OTP secrets blindly |
-| `#__session` | `#__session` | **Rebuild** | Same runtime-session purpose but all source sessions are invalid on the target | Do not migrate; allow Joomla 6 to create sessions |
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| `#__users` | `#__users` | **Changed** | Identity remains, while authentication, reset, token, and MFA behavior changed | **Keep:** `name`, `username`, `email`, `password` after compatibility test, `block`, `sendEmail`, registration/visit dates. **Transform/verify:** `params`, activation and reset state. **Reset/drop:** temporary reset tokens, OTP secrets, emergency codes, checkout/runtime data. **Verify target-only:** last reset, reset count, require-reset and security fields | Selectively migrate approved accounts and require resets where compatibility is uncertain |
+| `#__usergroups` | `#__usergroups` | **Changed** | Same hierarchy, but target core groups and nested-set values are installation-owned | **Keep:** custom group `title`. **Remap:** `parent_id`. **Rebuild:** `lft`, `rgt`, optionally level/path. **Do not overwrite:** Joomla 6 core groups by raw ID | Map core groups by meaning and create custom groups parent-first |
+| `#__user_usergroup_map` | `#__user_usergroup_map` | **Changed** | Same many-to-many mapping | **Remap:** `user_id`, `group_id`. **Deduplicate:** composite mappings | Insert after users and groups exist |
+| `#__viewlevels` | `#__viewlevels` | **Changed** | Same visibility mechanism, but JSON group IDs differ | **Keep:** `title`, `ordering`. **Transform:** `rules` JSON by replacing source group IDs with target group IDs | Map by meaning and transformed rules, not raw IDs |
+| `#__assets` | `#__assets` | **Changed / Rebuild** | Same ACL tree, but Joomla 6 has many additional core assets | **Do not copy raw:** `id`, `parent_id`, `lft`, `rgt`, `level`. **Recreate/map:** `name`, `title`, `rules`. **Assign new:** target `asset_id` values back to categories, articles, modules, workflows, and custom objects | Keep Joomla 6 core assets and rebuild assets for migrated objects |
+| `#__user_profiles` | `#__user_profiles` | **Conditional** | Key/value profile storage remains; namespaces depend on plugins | **Remap:** `user_id`. **Keep selectively:** `profile_key`, `profile_value`, `ordering`. **Drop:** obsolete plugin namespaces | Migrate approved namespaces only |
+| `#__user_notes` | `#__user_notes` | **Conditional** | Administrator notes remain optional | **Keep:** subject/body/state/review date where required. **Remap:** `user_id`, `catid`, creator/modifier IDs. **Transform:** metadata and dates | Migrate only when business and privacy requirements justify retention |
+| `#__user_keys` | `#__user_keys` | **Rebuild** | Temporary authentication keys are invalid on the target | **Skip all columns:** user handle, series, token, expiry, last used | Never migrate |
+| OTP columns in `#__users` | `#__user_mfa` | **New / Changed** | MFA data moved into a dedicated modern subsystem | **Do not map directly:** `otpKey`, emergency codes, encrypted secrets. **Target creates:** MFA method, title, records, secrets, timestamps | Require MFA re-enrollment |
+| `#__session` | `#__session` | **Rebuild** | Runtime sessions are target-specific | **Skip all:** session ID, user ID session link, time, client, guest, data payload | Start with an empty Joomla 6 session table |
 
 ### 3.5 Extensions and Updates
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| `#__extensions` | `#__extensions` | **Changed** | Same registry role; columns, protected/locked state, manifest data, IDs, plugins, modules, and core records differ | Install Joomla 6-compatible extensions and map by `type + element + folder + client_id` |
-| `#__schemas` | `#__schemas` | **Rebuild** | Records must match the schema installed by Joomla 6 packages | Let installers and update SQL create records |
-| `#__update_sites` | `#__update_sites` | **Rebuild** | Update URLs and target extension ownership may differ | Recreate during extension installation |
-| `#__update_sites_extensions` | `#__update_sites_extensions` | **Rebuild** | Depends on new extension and update-site IDs | Recreate from Joomla 6 installation data |
-| `#__updates` | `#__updates` | **Rebuild** | Generated update-discovery cache | Clear and rediscover in Joomla 6 |
-| `#__postinstall_messages` | `#__postinstall_messages` | **Rebuild** | Version-specific post-installation instructions | Keep Joomla 6 records |
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| `#__extensions` | `#__extensions` | **Changed / Rebuild** | Same registry purpose, but target core rows, IDs, columns, manifests, and installed code differ | **Map identity by:** `type`, `element`, `folder`, `client_id`. **Do not preserve:** `extension_id`, `package_id`. **Joomla 6 adds/uses:** `changelogurl`, `locked`, `custom_data`, `state`, `note` and target manifest structures. **Verify/transform:** `params`, `manifest_cache`, `enabled`, `access`, `protected`, `ordering`. **Reset:** checkout fields | Install compatible packages and use the target registry; create an extension ID map |
+| `#__schemas` | `#__schemas` | **Rebuild** | Schema versions must match installed packages | **Target-owned:** `extension_id`, `version_id`. IDs depend on the target registry | Let installers and update SQL create records |
+| `#__update_sites` | `#__update_sites` | **Rebuild** | Update URLs and ownership are target-specific | **Target-owned:** IDs and installer-created rows. **Verify:** name, type, location, enabled, extra query, last check | Recreate during extension installation |
+| `#__update_sites_extensions` | `#__update_sites_extensions` | **Rebuild** | Both referenced IDs change | **Rebuild:** `update_site_id`, `extension_id` from target records | Do not copy |
+| `#__updates` | `#__updates` | **Rebuild** | Generated update-discovery cache | **Skip all source rows.** Joomla 6 rediscovers update IDs, element/type/folder/client/version/details URLs | Clear and rediscover updates |
+| `#__postinstall_messages` | `#__postinstall_messages` | **Rebuild** | Messages are version- and extension-specific | **Keep target installer rows.** Do not map source message IDs or version ranges | Keep Joomla 6 records |
 
 ### 3.6 Search, Language, and Supporting Components
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| `#__finder_links` | `#__finder_links` | **Rebuild** | Search index rows depend on target content, plugins, and tokenization | Do not migrate; rebuild Smart Search |
-| `#__finder_terms` | `#__finder_terms` | **Rebuild** | Generated search terms | Re-index in Joomla 6 |
-| `#__finder_taxonomy` | `#__finder_taxonomy` | **Rebuild** | Generated taxonomy tree | Re-index in Joomla 6 |
-| `#__finder_tokens*` | `#__finder_tokens*` or current Finder storage | **Rebuild** | Generated temporary/index data and physical implementation may differ | Do not migrate |
-| `#__finder_filters` | `#__finder_filters` | **Conditional** | Saved filters may have business value, but context and taxonomy IDs may change | Recreate or transform only required filters |
-| `#__languages` | `#__languages` | **Changed** | Same content-language purpose; installed language packages and defaults must already exist | Install languages first, then transform content-language configuration |
-| `#__associations` | `#__associations` | **Changed** | Same multilingual relationship concept; all associated item IDs change | Rebuild after target content and menus exist |
-| `#__redirect_links` | `#__redirect_links` | **Changed** | Same redirect purpose, but URLs and target routing may change | Generate redirects from old-to-new URL comparison instead of copying blindly |
-| `#__messages` | `#__messages` | **Conditional** | Same private administrator messaging purpose | Usually skip unless retention is explicitly required |
-| `#__messages_cfg` | Current Joomla 6 message configuration | **Legacy / Review** | User messaging configuration may be stored or interpreted differently | Review exact target schema and migrate only required preferences |
-| `#__core_log_searches` | No direct operational requirement | **Legacy / Review** | Historical search logging is not required for site operation | Archive if required; otherwise skip |
-| `#__utf8_conversion` | No normal target migration requirement | **Legacy / Review** | Historical conversion support data | Do not migrate unless an exact target process requires it |
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| `#__finder_links` | `#__finder_links` | **Rebuild** | Index rows depend on target plugins, content, routes, and tokenization | **Skip generated:** link IDs, URLs, routes, title index data, taxonomy maps, state/access/language index copies | Clear and rebuild Smart Search |
+| `#__finder_terms` | `#__finder_terms` | **Rebuild** | Generated term dictionary differs | **Skip all term IDs, stems, frequencies, weights** | Re-index in Joomla 6 |
+| `#__finder_taxonomy` | `#__finder_taxonomy` | **Rebuild** | Generated taxonomy tree uses target IDs | **Skip/rebuild:** parent, nested-set values, state, access, language, node mappings | Re-index in Joomla 6 |
+| `#__finder_tokens*` | Current Joomla 6 Finder storage | **Rebuild** | Temporary/index implementation can differ | **Skip all token rows and temporary tables** | Do not migrate |
+| `#__finder_filters` | `#__finder_filters` | **Conditional** | User-defined filters may remain useful but taxonomy references change | **Keep selectively:** title, alias, state, language. **Remap/transform:** filter JSON, taxonomy node IDs, access, created_by | Recreate only approved filters after indexing |
+| `#__languages` | `#__languages` | **Changed** | Same content-language configuration, but installed packages and defaults must exist first | **Keep/verify:** `lang_code`, title, native title, `sef`, image, description, metadata. **Remap:** `access`. **Validate:** ordering, published, home/default relationships. **Do not replace installed language packages** | Install language packages first, then migrate configuration |
+| `#__associations` | `#__associations` | **Changed** | Same multilingual mapping, but all item IDs change | **Remap:** item IDs. **Keep/verify:** association key and context | Rebuild after target items exist |
+| `#__redirect_links` | `#__redirect_links` | **Changed** | Same redirect purpose, but target URLs and route behavior differ | **Keep selectively:** old URL, comment, state. **Generate/transform:** new URL, created/updated dates, header code, published state. **Deduplicate:** redirect chains and loops | Generate redirects from an old-to-new URL inventory |
+| `#__messages` | `#__messages` | **Conditional** | Private administrator messages are not required for site operation | **Remap:** sender/recipient user IDs. **Keep selectively:** subject, message, state, priority, dates. **Drop:** messages without valid users | Usually skip unless retention is required |
+| `#__messages_cfg` | Current Joomla 6 message configuration | **Legacy / Review** | Preference storage may differ | **Remap:** user IDs. **Verify/transform:** configuration namespace and serialized/JSON value | Review exact target schema before migration |
+| `#__core_log_searches` | No normal target requirement | **Legacy / Review** | Historical search logs are not operational data | **Archive only:** search term and hit count if reporting requires it | Do not import into core Joomla 6 tables |
+| `#__utf8_conversion` | No normal target requirement | **Legacy / Review** | Historical conversion bookkeeping is obsolete after clean utf8mb4 migration | **Skip all rows** | Do not migrate |
 
-### 3.7 Scheduler, Logging, Privacy, Mail, and Guided Tours
+### 3.7 New Joomla 6 Subsystems
 
-| Joomla 3 table | Joomla 6 table | Status | Main gap | Recommended action |
-|---|---|---|---|---|
-| No core equivalent | `#__scheduler_tasks` | **New in Joomla 6** | Stores configured scheduled task instances | Keep Joomla 6 core tasks; recreate extension tasks through their installers |
-| No core equivalent | `#__scheduler_log` | **New in Joomla 6** | Stores scheduler execution history | Start fresh; do not manufacture historical logs |
-| No equivalent core subsystem | `#__action_logs` | **New in Joomla 6** | Stores user action audit records | Start fresh unless legal retention requires a controlled import |
-| No equivalent core subsystem | `#__action_logs_extensions` | **New in Joomla 6** | Registers extensions that support action logging | Keep Joomla 6 records |
-| No equivalent core subsystem | `#__action_log_config` | **New in Joomla 6** | Configures action-log behavior | Configure on Joomla 6 |
-| No equivalent core subsystem | `#__privacy_requests` | **New in Joomla 6** | Tracks privacy export/removal requests | Keep target records; migrate historical requests only when legally required |
-| No equivalent core subsystem | `#__privacy_consents` | **New in Joomla 6** | Stores consent records | Define a legal and business migration decision before importing |
-| No core equivalent | `#__mail_templates` | **New in Joomla 6** | Stores configurable mail-template overrides | Keep defaults or create approved Joomla 6 templates |
-| No core equivalent | `#__guidedtours` | **New in Joomla 6** | Defines administrator guided tours | Keep Joomla 6 and extension-provided records |
-| No core equivalent | `#__guidedtour_steps` | **New in Joomla 6** | Stores ordered steps for guided tours | Keep Joomla 6 and extension-provided records |
+| Joomla 3 table | Joomla 6 table | Status | Main gap | Detailed column changes | Recommended action |
+|---|---|---|---|---|---|
+| No core equivalent | `#__scheduler_tasks` | **New in Joomla 6** | Stores scheduled task instances | **Target/installer creates:** `id`, `asset_id`, task `type`, execution rules, cron fields, state, priority, params, timestamps. **Do not fabricate IDs from Joomla 3** | Keep core tasks and recreate extension tasks through installers/configuration |
+| No core equivalent | `#__scheduler_log` | **New / Rebuild** | Stores scheduler execution history | **Start empty:** task ID, run ID, result, duration, output, timestamps | Do not migrate historical rows |
+| No core equivalent | `#__action_logs` | **New / Conditional** | Stores user action audit records | **Target generates:** IDs, message, message language key, context, user ID, record ID, extension, date, IP. Historical import requires legal review and user/record remapping | Start fresh unless retention is mandatory |
+| No core equivalent | `#__action_logs_extensions` | **New in Joomla 6** | Registers extensions that support action logs | **Target-owned:** extension identifiers and enabled state | Keep Joomla 6 records |
+| No core equivalent | `#__action_log_config` | **New in Joomla 6** | Stores action-log configuration | **Configure target:** type title, type alias, id holder, title holder, table name, text prefix | Configure in Joomla 6 |
+| No core equivalent | `#__privacy_requests` | **New / Conditional** | Tracks data export/removal requests | **Target/legal data:** request type, email, status, requested/confirmed/completed dates, token/hash. Historical tokens should not be copied blindly | Migrate only under an approved legal-retention plan |
+| No core equivalent | `#__privacy_consents` | **New / Conditional** | Stores user consent evidence | **Remap:** user ID. **Keep/verify:** subject, body, created/modified/invalidated dates, state, IP. **Review privacy rules** | Import only with legal approval |
+| No core equivalent | `#__mail_templates` | **New in Joomla 6** | Stores configurable mail templates | **Target-owned identity:** template ID and extension. **Configure:** language, subject, body, HTML body, attachments, params | Keep defaults or recreate approved overrides |
+| No core equivalent | `#__guidedtours` | **New in Joomla 6** | Defines administrator guided tours | **Installer-owned:** ID, title, description, URL, published, ordering, autostart, language, extension | Keep Joomla 6 and extension records |
+| No core equivalent | `#__guidedtour_steps` | **New in Joomla 6** | Stores tour steps | **Installer-owned/remap:** tour ID, title, description, position, target, type, interactive type, URL, published, ordering, language | Keep installer-created records |
 
 ### 3.8 Runtime and Generated Data
 
-| Joomla 3 table or data | Joomla 6 equivalent | Status | Recommended action |
-|---|---|---|---|
-| `#__session` | `#__session` | **Rebuild** | Never migrate active sessions |
-| Cache data | Joomla 6 cache storage | **Rebuild** | Clear and regenerate |
-| Smart Search index | `#__finder_*` | **Rebuild** | Re-index after migration |
-| Update discovery | `#__updates` | **Rebuild** | Rediscover from Joomla 6 |
-| Scheduler execution log | `#__scheduler_log` | **New / Rebuild** | Start fresh |
-| Action logs | `#__action_logs` | **New / Conditional** | Start fresh unless retention is required |
-| Temporary authentication keys | `#__user_keys` and current token mechanisms | **Rebuild** | Never migrate |
-| MFA secrets | `#__user_mfa` | **New / Security-sensitive** | Require re-enrollment |
+| Joomla 3 data | Joomla 6 equivalent | Status | Detailed column changes | Recommended action |
+|---|---|---|---|---|
+| Active sessions | `#__session` | **Rebuild** | Skip session IDs, user-session references, timestamps, client flags, guest flags, and payloads | Start empty |
+| Cache data | Joomla 6 cache storage | **Rebuild** | Skip cache IDs, blobs, expirations, and group metadata | Clear and regenerate |
+| Smart Search index | `#__finder_*` | **Rebuild** | Skip all index IDs, terms, tokens, taxonomy and mapping rows | Re-index after migration |
+| Update discovery | `#__updates` | **Rebuild** | Skip discovered version and update metadata | Rediscover in Joomla 6 |
+| Scheduler history | `#__scheduler_log` | **New / Rebuild** | No Joomla 3 mapping; start with no run history | Start fresh |
+| Action logs | `#__action_logs` | **New / Conditional** | No direct mapping; historical import requires user, record, extension, date, and privacy mapping | Start fresh by default |
+| Remember-me/auth keys | `#__user_keys` | **Rebuild** | Skip token, series, user handle, expiry, and last-used values | Never migrate |
+| MFA secrets | `#__user_mfa` | **New / Security-sensitive** | Never convert Joomla 3 OTP secrets into target MFA rows without a supported migration mechanism | Require re-enrollment |
 
 ## 4. Main ERD Gaps
 
 ```mermaid
-flowchart LR
-    subgraph J3["Joomla 3 core model"]
-        J3CAT["Categories"] --> J3ART["Articles"]
-        J3MENU["Menus"] --> J3MOD["Module assignments"]
-        J3USER["Users and groups"] --> J3ACL["View levels and assets"]
-        J3EXT["Extensions"]
-    end
+erDiagram
+    CONTENT ||--o{ CATEGORIES : belongs_to
+    CONTENT ||--o| WORKFLOW_ASSOCIATIONS : follows
+    WORKFLOW_STAGES ||--o{ WORKFLOW_ASSOCIATIONS : assigns
+    WORKFLOWS ||--o{ WORKFLOW_STAGES : contains
 
-    subgraph SHARED["Shared concepts, changed schemas"]
-        CONTENT["Content / Categories"]
-        NAV["Menus / Modules / Templates"]
-        ACCESS["Users / Groups / ACL"]
-        SYSTEM["Extensions / Updates / Search"]
-    end
+    MENU_TYPES ||--o{ MENU : contains
+    EXTENSIONS ||--o{ MENU : handles
+    MODULES ||--o{ MODULES_MENU : assigned_by
+    MENU ||--o{ MODULES_MENU : receives
 
-    subgraph J6["Joomla 6 additions"]
-        WF["Content workflows"]
-        SCHED["Scheduler"]
-        LOG["Action logs"]
-        PRIV["Privacy"]
-        MFA["Dedicated MFA"]
-        MAIL["Mail templates"]
-        TOUR["Guided tours"]
-    end
-
-    J3ART --> CONTENT
-    J3MENU --> NAV
-    J3ACL --> ACCESS
-    J3EXT --> SYSTEM
-
-    CONTENT --> WF
-    SYSTEM --> SCHED
-    ACCESS --> MFA
-    SYSTEM --> LOG
-    SYSTEM --> PRIV
-    SYSTEM --> MAIL
-    SYSTEM --> TOUR
+    USERS ||--o{ USER_USERGROUP_MAP : mapped
+    USERGROUPS ||--o{ USER_USERGROUP_MAP : contains
+    USERGROUPS ||--o{ VIEWLEVELS : referenced_in_rules
+    ASSETS ||--o{ CONTENT : controls
 ```
 
-The key structural gap is not that Joomla 6 replaces all Joomla 3 tables. Instead:
+The main architectural difference is:
 
 ```text
-Joomla 6 keeps many core entities
-+ changes their schemas and installation-owned IDs
-+ adds new subsystems and relationships
-+ requires generated/system data to be rebuilt
+Joomla 3 core entities
++ similar Joomla 6 tables with changed columns and target-owned IDs
++ new workflow relationships
++ new scheduler, logging, privacy, MFA, mail, and guided-tour subsystems
++ generated and security data that must be rebuilt
 ```
 
-## 5. Tables That Are Similar but Still Require Transformation
+## 5. Main Column-Level Migration Risks
 
-These tables exist in both versions and have similar responsibilities:
-
-```text
-#__content
-#__categories
-#__content_frontpage
-#__tags
-#__contentitem_tag_map
-#__fields_groups
-#__fields
-#__fields_values
-#__menu_types
-#__menu
-#__modules
-#__modules_menu
-#__template_styles
-#__users
-#__usergroups
-#__user_usergroup_map
-#__viewlevels
-#__assets
-#__extensions
-#__languages
-#__associations
-#__redirect_links
-```
-
-They must still be transformed because one or more of these values can differ:
-
-```text
-Primary IDs
-Parent IDs
-Asset IDs
-Extension IDs
-Access-level IDs
-User-group IDs inside JSON
-Template style IDs
-Menu links containing article/category IDs
-JSON configuration structures
-Default values and nullability
-Nested-set boundaries
-Workflow associations
-Installed extension ownership
-```
+| Risk type | Common columns | Required handling |
+|---|---|---|
+| Primary IDs | `id`, `extension_id`, `asset_id` | Preserve only when guaranteed safe; otherwise use mapping tables |
+| Logical foreign keys | `catid`, `parent_id`, `user_id`, `created_by`, `component_id`, `moduleid`, `menuid`, `access`, `group_id`, `field_id`, `item_id`, `tag_id` | Remap to target IDs |
+| Nested-set trees | `parent_id`, `lft`, `rgt`, `level`, `path` | Import parent-first and rebuild trees |
+| JSON configuration | `params`, `attribs`, `metadata`, `images`, `urls`, `rules`, `manifest_cache`, `custom_data`, `fieldparams` | Decode, validate, remap embedded IDs/paths, and re-encode |
+| State values | `state`, `published`, `enabled`, `featured`, `home`, `default` | Map values to target behavior and workflow stages |
+| Date values | `created`, `modified`, `publish_up`, `publish_down`, zero dates | Normalize invalid zero dates and target nullability |
+| Checkout/runtime | `checked_out`, `checked_out_time`, sessions, cache | Reset or skip |
+| Authentication/security | passwords, reset tokens, remember-me keys, OTP/MFA secrets | Migrate only supported password hashes; reset/drop temporary secrets |
+| Installation-owned values | extension IDs, assets, schemas, update sites, workflow IDs | Keep target records and build identity-based maps |
+| Routing values | `link`, `path`, `alias`, `template_style_id`, component/view/task IDs | Rewrite and validate generated URLs |
 
 ## 6. Tables That Must Not Be Copied Directly
 
 | Table or group | Why direct copying is unsafe |
 |---|---|
-| `#__assets` | Joomla 6 has a different ACL tree and additional core assets |
+| `#__assets` | Joomla 6 ACL tree and core assets differ |
 | `#__extensions` | Registry IDs and installed extension records are target-specific |
-| `#__schemas` | Must match the actual installed extension schema versions |
+| `#__schemas` | Must reflect the actual installed target schemas |
 | `#__update_sites` | Update sources belong to target extensions |
 | `#__update_sites_extensions` | Depends on target extension IDs |
 | `#__updates` | Generated discovery data |
 | `#__session` | Runtime and security-sensitive data |
 | `#__user_keys` | Temporary authentication data |
-| `#__user_mfa` | Security-sensitive target MFA data |
+| `#__user_mfa` | Security-sensitive target data |
 | `#__finder_*` | Generated search index |
-| `#__scheduler_tasks` | Core and extension task instances are installer-owned |
+| `#__scheduler_tasks` | Core and extension tasks are installer-owned |
 | `#__scheduler_log` | Generated execution history |
-| `#__action_logs*` | Generated target audit data |
+| `#__action_logs*` | Generated target audit records |
 | `#__privacy_*` | Requires legal and business review |
 | `#__postinstall_messages` | Version-specific records |
-| Joomla 3 administrator menu/module rows | Joomla 6 administrator UI structure is different |
+| Joomla 3 administrator menus/modules | Joomla 6 administrator UI structure is different |
 
-## 7. Recommended Migration Decisions
+## 7. Validation Checklist
 
-| Entity group | Default decision | Reason |
-|---|---|---|
-| Articles and categories | **Transform and migrate** | Core business content |
-| Tags and custom fields | **Transform and migrate when used** | Content relationships and metadata |
-| Frontend menus | **Transform and migrate** | Required for routes and page context |
-| Frontend modules | **Transform and migrate after code installation** | Instances depend on compatible module code and positions |
-| Users | **Selective controlled migration** | Identity and security-sensitive data |
-| User groups and view levels | **Map by meaning, not raw ID** | Target core IDs and JSON group references may differ |
-| ACL assets | **Rebuild** | Target ACL tree is structurally different |
-| Extensions | **Reinstall, then map** | Target installers own registry and schemas |
-| Template styles | **Recreate/transform** | Joomla 3 templates are generally incompatible |
-| Smart Search | **Rebuild** | Generated index data |
-| Workflow | **Create target associations** | New Joomla 6 relationship |
-| Scheduler, logging, guided tours | **Keep Joomla 6 defaults** | New target subsystems |
-| Sessions, keys, MFA secrets | **Do not migrate** | Security risk |
-| Custom and third-party tables | **Separate migration workstream** | Schema and business rules are extension-specific |
-
-## 8. Validation Checklist
-
-- [ ] Confirm the exact Joomla 3 and Joomla 6 versions.
-- [ ] Export the actual table and column inventories from both databases.
-- [ ] Classify every source table as core, third-party, custom, generated, temporary, or unknown.
-- [ ] Compare physical column types, defaults, nullability, indexes, and collations.
-- [ ] Install Joomla 6-compatible extensions before importing their data.
-- [ ] Build mappings for users, groups, access levels, categories, articles, extensions, menus, modules, tags, fields, and template styles.
-- [ ] Rebuild category, tag, menu, user-group, and asset trees.
-- [ ] Rewrite IDs embedded in menu links and JSON configuration.
-- [ ] Create valid Joomla 6 workflow associations.
-- [ ] Rebuild Smart Search and runtime caches.
-- [ ] Do not migrate sessions, authentication keys, or MFA secrets.
-- [ ] Validate row counts, hashes, logical relationships, URLs, permissions, modules, languages, and rendered output.
+- [ ] Export `SHOW CREATE TABLE` for every compared table in both databases.
+- [ ] Compare column names, types, unsigned flags, nullability, defaults, comments, indexes, and collations.
+- [ ] Mark each source column as Keep, Remap, Transform, Rebuild, Skip, or Verify.
+- [ ] Install compatible Joomla 6 extensions before mapping extension-owned data.
+- [ ] Build ID maps for users, groups, access levels, assets, categories, articles, tags, fields, extensions, menus, modules, and styles.
+- [ ] Rebuild nested-set trees instead of trusting Joomla 3 boundaries.
+- [ ] Normalize dates and reject invalid required values.
+- [ ] Validate and transform every JSON field.
+- [ ] Rewrite menu links and IDs embedded in configuration.
+- [ ] Create valid workflow associations for migrated articles.
+- [ ] Start sessions, caches, search indexes, scheduler logs, action logs, and MFA data fresh unless an approved exception exists.
+- [ ] Compare row counts, hashes, relationships, URLs, permissions, multilingual behavior, modules, and rendered pages.
 
 ## Related Documentation
 
