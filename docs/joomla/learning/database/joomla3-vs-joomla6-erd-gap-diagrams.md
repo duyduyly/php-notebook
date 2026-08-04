@@ -2,341 +2,332 @@
 
 > A visual migration specification for comparing Joomla 3.10.x and Joomla 6.x database structures.
 
-This document complements the detailed [Joomla 3 vs Joomla 6 Database Gap Analysis](./joomla3-vs-joomla6-database-gap.md). It focuses on table-to-table mapping, relationship changes, new Joomla 6 dependencies, and the decisions required before writing migration SQL or PHP scripts.
+This document shows Joomla 3 and Joomla 6 tables next to each other so that column names, data types, references, and migration actions can be compared directly.
 
 > [!IMPORTANT]
-> These diagrams describe logical relationships and common migration behavior. Always verify the exact physical schemas from both installed projects using `SHOW CREATE TABLE` or `information_schema`.
+> The diagrams describe common Joomla core structures. Before writing migration SQL, verify the exact schemas from both installed projects:
+>
+> ```sql
+> SHOW CREATE TABLE `your_j3_prefix_content`;
+> SHOW CREATE TABLE `your_j6_prefix_content`;
+> ```
 
 ---
 
 ## Quick Summary
 
-| Area | Joomla 3 → Joomla 6 result | Default decision |
+| Area | Result | Default action |
 |---|---|---|
-| Content and categories | Same business concepts, changed references and workflow requirements | Transform and migrate |
-| Tags and custom fields | Same relationship model, target IDs and contexts may differ | Remap and migrate when used |
-| Menus and modules | Same core model, links, component IDs, positions, and styles differ | Rewrite, remap, and rebuild trees |
-| Users and ACL | Same account/group model, expanded security and ACL assets | Selectively migrate; rebuild ACL |
-| Extensions and updates | Same registry purpose, target installation owns IDs and schema records | Reinstall and map by identity |
-| Workflow | No direct Joomla 3 equivalent | Create Joomla 6 workflow associations |
-| Scheduler, privacy, logging, MFA, mail templates | New or substantially expanded in Joomla 6 | Keep target defaults or configure explicitly |
-| Sessions, Finder, cache, update discovery | Runtime or generated data | Skip source rows and rebuild |
+| Content and categories | Same business entities, changed references and workflow dependency | Transform, remap, and migrate |
+| Menus and modules | Same core entities, changed links, extension IDs, template positions, and tree values | Rewrite and rebuild |
+| Users and ACL | Same account/group model, expanded ACL and security model | Selectively migrate and rebuild ACL |
+| Extensions and schemas | Same purpose, but target installation owns IDs and schema records | Reinstall and map by identity |
+| Workflow, scheduler, privacy, logs, MFA | New or expanded in Joomla 6 | Keep target records or configure explicitly |
+| Sessions, Finder, cache, updates | Runtime or generated data | Skip and rebuild |
 
 ---
 
 ## Table of Contents
 
-- [1. Diagram Legend](#1-diagram-legend)
-- [2. Confidence Legend](#2-confidence-legend)
-- [3. Table-to-Table Status Matrix](#3-table-to-table-status-matrix)
-- [4. Whole-System Gap Overview](#4-whole-system-gap-overview)
-- [5. Content and Category Gap](#5-content-and-category-gap)
+- [1. Diagram and Column Legend](#1-diagram-and-column-legend)
+- [2. Table-to-Table Status Matrix](#2-table-to-table-status-matrix)
+- [3. Side-by-Side Article Table Comparison](#3-side-by-side-article-table-comparison)
+- [4. Side-by-Side Menu Table Comparison](#4-side-by-side-menu-table-comparison)
+- [5. Content and Category Relationships](#5-content-and-category-relationships)
 - [6. Workflow Gap](#6-workflow-gap)
 - [7. Tags and Custom Fields Gap](#7-tags-and-custom-fields-gap)
-- [8. Menu, Module, and Template Gap](#8-menu-module-and-template-gap)
+- [8. Module and Template Gap](#8-module-and-template-gap)
 - [9. User and ACL Gap](#9-user-and-acl-gap)
 - [10. Extension and System Gap](#10-extension-and-system-gap)
-- [11. Search, Runtime, and Generated Data Gap](#11-search-runtime-and-generated-data-gap)
+- [11. Runtime and Generated Data](#11-runtime-and-generated-data)
 - [12. End-to-End Article Migration Example](#12-end-to-end-article-migration-example)
 - [13. Migration Decision Flow](#13-migration-decision-flow)
-- [14. Recommended Migration Dependency Order](#14-recommended-migration-dependency-order)
-- [15. Validation Checklist](#15-validation-checklist)
-- [16. Key Conclusions](#16-key-conclusions)
+- [14. Validation Checklist](#14-validation-checklist)
 
 ---
 
-## 1. Diagram Legend
+## 1. Diagram and Column Legend
 
-The statuses below are independent classifications. They are not sequential steps.
+### Table-level statuses
 
 ```mermaid
 flowchart TB
     ENTITY["Compared table or entity"]
-
     ENTITY --> SAME["Same concept"]
     ENTITY --> CHANGED["Changed schema or behavior"]
     ENTITY --> NEW["New in Joomla 6"]
     ENTITY --> REBUILD["Rebuild in Joomla 6"]
     ENTITY --> CONDITIONAL["Conditional migration"]
-    ENTITY --> LEGACY["Legacy / Review"]
+    ENTITY --> LEGACY["Legacy or review"]
 ```
 
 | Status | Meaning | Default handling |
 |---|---|---|
-| **Same concept** | The business purpose remains in Joomla 6 | Still verify physical columns and behavior |
-| **Changed** | The table exists, but columns, IDs, defaults, JSON, indexes, or rules differ | Transform and remap |
-| **New in Joomla 6** | Joomla 6 introduces a new table, relationship, or subsystem | Keep target defaults or create valid target records |
-| **Rebuild** | Data is generated, runtime, security-sensitive, or installation-owned | Do not copy source rows |
-| **Conditional** | Migration depends on project use, legal retention, or business value | Migrate only after approval |
-| **Legacy / Review** | Joomla 3 storage is obsolete or no longer the preferred target model | Review replacement and retention strategy |
+| **Same concept** | The business purpose remains | Still compare the physical columns |
+| **Changed** | Columns, types, IDs, defaults, JSON, indexes, or behavior differ | Transform and remap |
+| **New in Joomla 6** | New table, relationship, or subsystem | Keep or create valid target records |
+| **Rebuild** | Generated, runtime, security-sensitive, or installation-owned | Do not copy source rows |
+| **Conditional** | Depends on project usage or retention requirements | Migrate only after approval |
+| **Legacy / Review** | Joomla 3 storage is obsolete or replaced | Review the target model |
 
-### Column-action labels
+### Column annotations used inside table diagrams
 
-| Label | Meaning |
-|---|---|
-| **Keep** | Preserve the business value after schema validation |
-| **Remap** | Replace a Joomla 3 ID with its Joomla 6 target ID |
-| **Transform** | Convert a value, JSON structure, state, date, URL, path, or serialized format |
-| **Verify** | Compare the exact source and target schemas before deciding |
-| **Rebuild** | Generate the value or relationship in Joomla 6 |
-| **Reset** | Keep the record but clear temporary values |
-| **Skip** | Do not migrate the value or record |
-| **Target-owned** | Preserve the Joomla 6 installer-created value |
-| **Add relationship** | Create a relationship that did not exist in Joomla 3 |
-
----
-
-## 2. Confidence Legend
-
-| Confidence | Meaning |
-|---|---|
-| **Verified principle** | Stable Joomla migration rule, such as not migrating sessions or update cache |
-| **Expected schema gap** | Common Joomla 3-to-6 behavior that still requires physical-schema verification |
-| **Project-dependent** | Depends on the exact Joomla patch version, extension version, custom code, or business rule |
+| Annotation | Meaning | Typical handling |
+|---|---|---|
+| `KEEP` | Same business value | Copy after validating type and size |
+| `REMAP` | Foreign/logical reference changes | Replace using an ID mapping table |
+| `TRANSFORM` | Value or format changes | Convert JSON, state, date, URL, path, or enum |
+| `VERIFY` | Exact compatibility is uncertain | Compare both physical schemas |
+| `REBUILD` | Joomla 6 should generate the value | Rebuild trees, assets, indexes, or relationships |
+| `RESET` | Keep the row but clear temporary state | Use `NULL`, `0`, or target default |
+| `SKIP` | Do not migrate | Exclude runtime or sensitive data |
+| `NEW` | Column or relationship is target-only | Populate according to Joomla 6 rules |
+| `TARGET` | Installer or Joomla 6 owns the value | Preserve the target value |
 
 > [!NOTE]
-> A table may be **Same concept** and **Changed schema** at the same time. In this document, `Same concept` never means safe for blind `INSERT ... SELECT` copying.
+> A column can require more than one action. For example, `images` can be `KEEP + TRANSFORM + VERIFY`: retain the image meaning, normalize the JSON, and verify the path.
 
 ---
 
-## 3. Table-to-Table Status Matrix
+## 2. Table-to-Table Status Matrix
 
-This matrix provides the fastest view of which Joomla 3 tables remain, change, or require rebuilding.
-
-| Joomla 3 | Joomla 6 | Status | Main migration action | Confidence |
-|---|---|---|---|---|
-| `#__content` | `#__content` | **Changed** | Transform rows, remap references, add workflow association | Expected schema gap |
-| `#__categories` | `#__categories` | **Changed** | Remap parents/assets/access and rebuild nested set | Expected schema gap |
-| `#__content_frontpage` | `#__content_frontpage` | **Changed** | Remap article IDs and verify featured scheduling | Project-dependent |
-| `#__tags` | `#__tags` | **Changed** | Remap IDs and rebuild tree | Expected schema gap |
-| `#__contentitem_tag_map` | `#__contentitem_tag_map` | **Changed** | Remap content, tag, and type references | Expected schema gap |
-| `#__fields*` | `#__fields*` | **Changed** | Validate field plugins and remap field/item/category IDs | Project-dependent |
-| `#__menu_types` | `#__menu_types` | **Changed** | Migrate frontend menu types only | Expected schema gap |
-| `#__menu` | `#__menu` | **Changed** | Rewrite links, map components/styles/access, rebuild tree | Expected schema gap |
-| `#__modules` | `#__modules` | **Changed** | Install compatible code, map positions, transform params | Project-dependent |
-| `#__modules_menu` | `#__modules_menu` | **Changed** | Remap module and menu IDs | Verified principle |
-| `#__template_styles` | `#__template_styles` | **Changed** | Recreate styles on a Joomla 6-compatible template | Project-dependent |
-| `#__users` | `#__users` | **Changed** | Selectively migrate identity and supported password hashes | Project-dependent |
-| `#__usergroups` | `#__usergroups` | **Changed** | Map by meaning and rebuild hierarchy | Expected schema gap |
-| `#__user_usergroup_map` | `#__user_usergroup_map` | **Changed** | Remap user and group IDs | Verified principle |
-| `#__viewlevels` | `#__viewlevels` | **Changed** | Rewrite group IDs inside JSON rules | Verified principle |
-| `#__assets` | `#__assets` | **Rebuild** | Keep Joomla 6 core tree and recreate migrated-object assets | Verified principle |
-| `#__extensions` | `#__extensions` | **Rebuild** | Reinstall extensions; map by type, element, folder, client | Verified principle |
-| `#__schemas` | `#__schemas` | **Rebuild** | Let installers create schema versions | Verified principle |
-| `#__updates` | `#__updates` | **Rebuild** | Rediscover updates in Joomla 6 | Verified principle |
-| `#__finder_*` | `#__finder_*` | **Rebuild** | Re-index Smart Search | Verified principle |
-| `#__session` | `#__session` | **Rebuild** | Start empty | Verified principle |
-| No direct equivalent | `#__workflows*` | **New in Joomla 6** | Keep/configure workflows and add associations | Verified principle |
-| No direct equivalent | `#__scheduler_*` | **New in Joomla 6** | Keep installer-created tasks; start logs fresh | Verified principle |
-| No direct equivalent | `#__action_logs*` | **New in Joomla 6** | Start fresh unless retention is required | Project-dependent |
-| No direct equivalent | `#__privacy_*` | **New / Conditional** | Apply legal-retention decision | Project-dependent |
-| Joomla 3 OTP fields | `#__user_mfa` | **New / Changed** | Require MFA re-enrollment | Verified principle |
-
-```mermaid
-flowchart LR
-    J3CONTENT["J3 #__content"] -->|Changed| J6CONTENT["J6 #__content"]
-    J3MENU["J3 #__menu"] -->|Changed| J6MENU["J6 #__menu"]
-    J3USERS["J3 #__users"] -->|Changed| J6USERS["J6 #__users"]
-    J3ASSETS["J3 #__assets"] -.->|Rebuild| J6ASSETS["J6 #__assets"]
-    J3EXT["J3 #__extensions"] -.->|Reinstall + map| J6EXT["J6 #__extensions"]
-    J3SESSION["J3 #__session"] -.->|Do not copy| J6SESSION["J6 #__session"]
-    J6CONTENT -->|New dependency| J6WF["J6 workflow tables"]
-```
-
----
-
-## 4. Whole-System Gap Overview
-
-```mermaid
-flowchart LR
-    subgraph J3["Joomla 3 source"]
-        J3_CONTENT["Content / Categories"]
-        J3_NAV["Menus / Modules / Templates"]
-        J3_ACCESS["Users / Groups / ACL"]
-        J3_SYSTEM["Extensions / Updates"]
-        J3_RUNTIME["Finder / Sessions / Cache"]
-    end
-
-    subgraph TRANSFORM["Transform and remap"]
-        T_CONTENT["Content IDs, states, JSON"]
-        T_NAV["Links, components, positions, trees"]
-        T_ACCESS["Groups, view levels, ownership"]
-    end
-
-    subgraph TARGET["Joomla 6 target"]
-        J6_CONTENT["Content / Categories"]
-        J6_NAV["Menus / Modules / Templates"]
-        J6_ACCESS["Users / Groups / ACL"]
-        J6_SYSTEM["Installed Extensions"]
-        J6_NEW["Workflow / Scheduler / Privacy / Logs / MFA"]
-        J6_RUNTIME["Fresh Finder / Sessions / Cache"]
-    end
-
-    J3_CONTENT --> T_CONTENT --> J6_CONTENT
-    J3_NAV --> T_NAV --> J6_NAV
-    J3_ACCESS --> T_ACCESS --> J6_ACCESS
-    J3_SYSTEM -.->|reinstall and map| J6_SYSTEM
-    J3_RUNTIME -.->|skip and rebuild| J6_RUNTIME
-
-    J6_CONTENT --> J6_NEW
-    J6_SYSTEM --> J6_NEW
-    J6_ACCESS --> J6_NEW
-```
-
-### Main message
-
-```text
-Joomla 6 keeps many Joomla 3 business entities,
-but changes their physical schema, installation-owned IDs, and dependencies.
-The migration must transform business data and rebuild target-owned structures.
-```
-
----
-
-## 5. Content and Category Gap
-
-### 5.1 Logical relationship comparison
-
-```mermaid
-flowchart LR
-    subgraph J3["Joomla 3"]
-        J3CAT["#__categories"] -->|id → catid| J3ART["#__content"]
-        J3USER["#__users"] -->|id → created_by| J3ART
-        J3VIEW["#__viewlevels"] -->|id → access| J3ART
-        J3ASSET["#__assets"] -->|id → asset_id| J3ART
-        J3ART --> J3FEATURED["#__content_frontpage"]
-    end
-
-    subgraph J6["Joomla 6"]
-        J6CAT["#__categories"] -->|id → catid| J6ART["#__content"]
-        J6USER["#__users"] -->|id → created_by| J6ART
-        J6VIEW["#__viewlevels"] -->|id → access| J6ART
-        J6ASSET["#__assets"] -->|id → asset_id| J6ART
-        J6ART --> J6FEATURED["#__content_frontpage"]
-        J6ART -->|item_id| WFASSOC["#__workflow_associations"]
-        WFSTAGE["#__workflow_stages"] -->|id → stage_id| WFASSOC
-    end
-```
-
-### 5.2 Article transformation flow
-
-```mermaid
-flowchart TD
-    SOURCE["Joomla 3 #__content row"]
-
-    SOURCE --> KEEP["Keep business values"]
-    SOURCE --> REMAP["Remap category, users, access, asset"]
-    SOURCE --> TRANSFORM["Transform state, dates, JSON, paths"]
-    SOURCE --> RESET["Reset checkout values"]
-
-    KEEP --> TARGET["Joomla 6 #__content row"]
-    REMAP --> TARGET
-    TRANSFORM --> TARGET
-    RESET --> TARGET
-
-    TARGET --> ADDWF["Add #__workflow_associations row"]
-```
-
-### 5.3 Article column mapping
-
-| Joomla 3 column | Joomla 6 column/relation | Action | Notes |
+| Joomla 3 | Joomla 6 | Status | Main action |
 |---|---|---|---|
-| `id` | `id` | Keep or map | Preserve only when collision-free |
-| `catid` | `catid` | Remap | Use category mapping table |
-| `created_by`, `modified_by` | Same columns | Remap | Use user mapping table |
-| `access` | `access` | Remap | Map view level by meaning/rules |
-| `asset_id` | `asset_id` | Rebuild/remap | Assign the target-created asset ID |
-| `state` | `state` | Transform/Verify | Confirm Joomla 6 state behavior |
-| `state` | workflow stage association | Add relationship | Map source state to target stage |
-| `featured` | `featured` and frontpage row | Transform/Verify | Keep both structures consistent |
-| `images`, `urls`, `attribs`, `metadata` | Same logical fields | Transform/Verify | Validate JSON and embedded paths/IDs |
-| `publish_up`, `publish_down` | Same logical fields | Transform | Normalize zero dates and nullability |
-| `checked_out`, `checked_out_time` | Same logical fields | Reset | Do not retain stale edit locks |
+| `#__content` | `#__content` | **Changed** | Transform rows, remap IDs, add workflow association |
+| `#__categories` | `#__categories` | **Changed** | Remap parents/assets/access and rebuild tree |
+| `#__content_frontpage` | `#__content_frontpage` | **Changed** | Remap article IDs and verify scheduling columns |
+| `#__tags` | `#__tags` | **Changed** | Remap references and rebuild tree |
+| `#__contentitem_tag_map` | Same | **Changed** | Remap content, tag, and type IDs |
+| `#__fields*` | Same family | **Changed** | Verify field plugins and remap IDs/context |
+| `#__menu_types` | `#__menu_types` | **Changed** | Migrate frontend menus only |
+| `#__menu` | `#__menu` | **Changed** | Rewrite links and rebuild tree |
+| `#__modules` | `#__modules` | **Changed** | Install compatible code and map positions |
+| `#__modules_menu` | Same | **Changed** | Remap both IDs |
+| `#__template_styles` | Same | **Changed** | Recreate on compatible Joomla 6 template |
+| `#__users` | `#__users` | **Changed** | Selectively migrate identity/security fields |
+| `#__usergroups` | Same | **Changed** | Map by meaning and rebuild hierarchy |
+| `#__viewlevels` | Same | **Changed** | Rewrite group IDs in JSON rules |
+| `#__assets` | `#__assets` | **Rebuild** | Preserve target core tree; recreate object assets |
+| `#__extensions` | `#__extensions` | **Rebuild** | Reinstall and map by extension identity |
+| `#__schemas` | `#__schemas` | **Rebuild** | Let installers create rows |
+| `#__finder_*` | `#__finder_*` | **Rebuild** | Re-index |
+| `#__session` | `#__session` | **Rebuild** | Start empty |
+| No equivalent | `#__workflows*` | **New** | Configure workflows and create associations |
+| No equivalent | `#__scheduler_*` | **New** | Keep installer-created tasks and fresh logs |
+| Joomla 3 OTP fields | `#__user_mfa` | **New / Changed** | Require MFA re-enrollment |
 
-### 5.4 Category tree gap
+---
+
+## 3. Side-by-Side Article Table Comparison
+
+The two entities below are intentionally connected by a comparison relationship so Mermaid normally renders them close together.
+
+```mermaid
+erDiagram
+    J3_CONTENT ||--|| J6_CONTENT : "compare"
+
+    J3_CONTENT {
+        int id PK "KEEP or MAP"
+        int asset_id FK "REMAP or REBUILD"
+        varchar title "KEEP"
+        varchar alias "KEEP and VERIFY"
+        text introtext "KEEP"
+        text fulltext "KEEP"
+        int state "TRANSFORM"
+        int catid FK "REMAP"
+        datetime created "KEEP"
+        int created_by FK "REMAP"
+        datetime modified "KEEP"
+        int modified_by FK "REMAP"
+        datetime publish_up "TRANSFORM date"
+        datetime publish_down "TRANSFORM date"
+        text images "TRANSFORM JSON"
+        text urls "TRANSFORM JSON"
+        text attribs "TRANSFORM JSON"
+        int access FK "REMAP"
+        int featured "VERIFY"
+        varchar language "KEEP and VERIFY"
+        int checked_out "RESET"
+        datetime checked_out_time "RESET"
+    }
+
+    J6_CONTENT {
+        int id PK "TARGET ID"
+        int asset_id FK "TARGET asset"
+        varchar title "FROM J3"
+        varchar alias "FROM J3"
+        text introtext "FROM J3"
+        text fulltext "FROM J3"
+        int state "MAPPED state"
+        int catid FK "TARGET category"
+        datetime created "NORMALIZED"
+        int created_by FK "TARGET user"
+        datetime modified "NORMALIZED"
+        int modified_by FK "TARGET user"
+        datetime publish_up "NULL or valid date"
+        datetime publish_down "NULL or valid date"
+        text images "VALID Joomla 6 JSON"
+        text urls "VALID Joomla 6 JSON"
+        text attribs "VALID Joomla 6 JSON"
+        int access FK "TARGET viewlevel"
+        int featured "CONSISTENT with frontpage"
+        varchar language "INSTALLED language"
+        int checked_out "RESET value"
+        datetime checked_out_time "RESET value"
+    }
+```
+
+### Article differences requiring special attention
+
+| Joomla 3 column | Joomla 6 target | Action | Warning |
+|---|---|---|---|
+| `id` | `id` | Keep or map | Do not preserve when it collides with target rows |
+| `catid` | `catid` | Remap | Category IDs are installation-specific |
+| `created_by`, `modified_by` | Same names | Remap | User IDs may differ |
+| `access` | `access` | Remap | Map view levels by meaning, not only ID |
+| `asset_id` | `asset_id` | Rebuild/remap | Do not copy Joomla 3 core asset IDs blindly |
+| `state` | `state` | Transform/verify | Must agree with the selected Joomla 6 workflow stage |
+| `state` | `#__workflow_associations.stage_id` | New relationship | Create after target article insertion |
+| `images`, `urls`, `attribs`, `metadata` | Same logical fields | Transform | Validate JSON and embedded IDs/paths |
+| `publish_up`, `publish_down` | Same logical fields | Transform | Convert invalid zero dates to valid target values |
+| `checked_out*` | Same logical fields | Reset | Prevent stale edit locks |
+
+### New Joomla 6 article dependency
 
 ```mermaid
 flowchart LR
-    J3CAT["Joomla 3 category"]
-    J3CAT --> PARENT["Remap parent_id"]
-    J3CAT --> ACCESS["Remap access and asset_id"]
-    J3CAT --> PARAMS["Transform params and metadata"]
-    J3CAT --> TREE["Rebuild lft, rgt, level, path"]
-
-    PARENT --> J6CAT["Joomla 6 category"]
-    ACCESS --> J6CAT
-    PARAMS --> J6CAT
-    TREE --> J6CAT
+    ARTICLE["Joomla 6 #__content"] -->|item_id| ASSOCIATION["#__workflow_associations"]
+    STAGE["#__workflow_stages"] -->|stage_id| ASSOCIATION
+    WORKFLOW["#__workflows"] -->|workflow_id| STAGE
 ```
 
-| Joomla 3 column | Joomla 6 handling |
-|---|---|
-| `parent_id` | Remap parent-first |
-| `lft`, `rgt`, `level`, `path` | Rebuild or validate after insertion |
-| `asset_id` | Assign recreated target asset |
-| `access` | Remap target view level |
-| `extension` | Verify owning component is installed |
-| `params`, `metadata` | Transform and validate JSON |
+---
+
+## 4. Side-by-Side Menu Table Comparison
+
+```mermaid
+erDiagram
+    J3_MENU ||--|| J6_MENU : "compare"
+
+    J3_MENU {
+        int id PK "KEEP or MAP"
+        varchar menutype "KEEP"
+        varchar title "KEEP"
+        varchar alias "KEEP and VERIFY"
+        varchar path "REBUILD"
+        text link "TRANSFORM IDs and route"
+        varchar type "VERIFY"
+        int component_id FK "REMAP extension"
+        int parent_id FK "REMAP"
+        int lft "REBUILD"
+        int rgt "REBUILD"
+        int level "REBUILD"
+        int published "VERIFY"
+        int access FK "REMAP"
+        text params "TRANSFORM JSON"
+        int home "VERIFY"
+        varchar language "KEEP and VERIFY"
+        int template_style_id FK "REMAP"
+        int client_id "FILTER frontend"
+        int checked_out "RESET"
+        datetime checked_out_time "RESET"
+    }
+
+    J6_MENU {
+        int id PK "TARGET ID"
+        varchar menutype "TARGET menu type"
+        varchar title "FROM J3"
+        varchar alias "VALID target alias"
+        varchar path "REBUILT"
+        text link "REWRITTEN target route"
+        varchar type "SUPPORTED type"
+        int component_id FK "TARGET extension"
+        int parent_id FK "TARGET parent"
+        int lft "REBUILT"
+        int rgt "REBUILT"
+        int level "REBUILT"
+        int published "TARGET state"
+        int access FK "TARGET viewlevel"
+        text params "VALID Joomla 6 JSON"
+        int home "VALID default"
+        varchar language "INSTALLED language"
+        int template_style_id FK "TARGET style"
+        int client_id "SITE records only"
+        int checked_out "RESET value"
+        datetime checked_out_time "RESET value"
+    }
+```
+
+### Menu differences requiring special attention
+
+| Column | Required handling | Example |
+|---|---|---|
+| `component_id` | Map using `type + element + folder + client_id` | Joomla 3 extension ID `100` may become Joomla 6 ID `250` |
+| `link` | Rewrite embedded content/category/custom IDs | `view=article&id=25` → mapped article ID |
+| `parent_id` | Remap parent first | Import menu tree parent-first |
+| `lft`, `rgt`, `level`, `path` | Rebuild | Do not trust source nested-set boundaries |
+| `template_style_id` | Map to compatible Joomla 6 style | Protostar style cannot be copied as Cassiopeia style |
+| `params` | Transform and validate JSON | Remove obsolete template/component options |
+| `client_id` | Filter | Do not migrate Joomla 3 administrator menu rows |
+| `home` | Validate | Ensure one valid default menu per required language |
+
+---
+
+## 5. Content and Category Relationships
+
+```mermaid
+flowchart LR
+    J3CAT["J3 #__categories"] -->|id to catid| J3ART["J3 #__content"]
+    J3USER["J3 #__users"] -->|id to created_by| J3ART
+    J3VIEW["J3 #__viewlevels"] -->|id to access| J3ART
+
+    J3CAT -->|category map| J6CAT["J6 #__categories"]
+    J3USER -->|user map| J6USER["J6 #__users"]
+    J3VIEW -->|viewlevel map| J6VIEW["J6 #__viewlevels"]
+    J3ART -->|content transform| J6ART["J6 #__content"]
+
+    J6CAT -->|id to catid| J6ART
+    J6USER -->|id to created_by| J6ART
+    J6VIEW -->|id to access| J6ART
+```
+
+### Category tree handling
+
+```mermaid
+flowchart LR
+    SOURCE["J3 category"] --> PARENT["Remap parent_id"]
+    SOURCE --> ACL["Rebuild asset_id and remap access"]
+    SOURCE --> JSON["Transform params and metadata"]
+    SOURCE --> TREE["Rebuild lft rgt level path"]
+
+    PARENT --> TARGET["J6 category"]
+    ACL --> TARGET
+    JSON --> TARGET
+    TREE --> TARGET
+```
 
 ---
 
 ## 6. Workflow Gap
 
-Joomla 3 mainly stores article publication state in `#__content.state`. Joomla 6 can additionally require formal workflow records and an association between each article and its current stage.
-
 ```mermaid
 flowchart LR
-    subgraph J3["Joomla 3"]
-        J3ART["#__content"] --> J3STATE["state"]
-    end
-
-    subgraph MAP["State mapping"]
-        M1["1 → Published stage"]
-        M0["0 → Unpublished stage"]
-        M2["2 → Archived stage"]
-        MN2["-2 → Trashed stage"]
-    end
-
-    subgraph J6["Joomla 6"]
-        J6ART["#__content"] --> ASSOC["#__workflow_associations"]
-        ASSOC --> STAGE["#__workflow_stages"]
-        STAGE --> WORKFLOW["#__workflows"]
-        WORKFLOW --> TRANSITION["#__workflow_transitions"]
-    end
-
-    J3STATE --> M1
-    J3STATE --> M0
-    J3STATE --> M2
-    J3STATE --> MN2
-    M1 --> STAGE
-    M0 --> STAGE
-    M2 --> STAGE
-    MN2 --> STAGE
+    J3STATE["J3 #__content.state"] --> MAP["State-to-stage mapping"]
+    MAP --> J6STATE["J6 #__content.state"]
+    MAP --> STAGE["J6 #__workflow_stages.id"]
+    J6ARTICLE["J6 #__content.id"] --> ASSOCIATION["#__workflow_associations.item_id"]
+    STAGE --> ASSOCIATION
 ```
 
-### Workflow mapping requirements
+| Joomla 3 state | Typical Joomla 6 handling |
+|---:|---|
+| `1` | Published target state and published workflow stage |
+| `0` | Unpublished target state and unpublished stage |
+| `2` | Archived target state and archived stage |
+| `-2` | Trashed target state and trashed stage |
 
-| Source value | Target value/relation | Action |
-|---|---|---|
-| `#__content.state` | `#__content.state` | Transform/Verify |
-| `#__content.state` | `#__workflow_stages.id` | Map |
-| Source article ID | `#__workflow_associations.item_id` | Use target article ID |
-| No source equivalent | `#__workflow_associations.extension` | Create expected Joomla 6 context |
-| No source equivalent | Workflow and transition IDs | Preserve target-owned records |
-
-```mermaid
-sequenceDiagram
-    participant S as Joomla 3 Article
-    participant M as Migration Mapper
-    participant A as Joomla 6 Article
-    participant W as Workflow Association
-
-    S->>M: Read source state and IDs
-    M->>A: Insert transformed article
-    M->>W: Resolve target stage
-    W->>W: Create item_id + stage_id + extension
-    M->>A: Validate state and workflow consistency
-```
+> [!CAUTION]
+> Do not hard-code workflow stage IDs. Resolve them from the target Joomla 6 workflow configuration.
 
 ---
 
@@ -344,380 +335,144 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph J3["Joomla 3"]
-        J3ART["#__content"]
-        J3TAGS["#__tags"]
-        J3TAGMAP["#__contentitem_tag_map"]
-        J3FIELDS["#__fields"]
-        J3VALUES["#__fields_values"]
+    J3CONTENT["J3 content"] --> CMAP["content ID map"] --> J6CONTENT["J6 content"]
+    J3TAGS["J3 tags"] --> TMAP["tag ID map"] --> J6TAGS["J6 tags"]
+    J3FIELDS["J3 fields"] --> FMAP["field ID map"] --> J6FIELDS["J6 fields"]
 
-        J3ART --> J3TAGMAP
-        J3TAGS --> J3TAGMAP
-        J3ART --> J3VALUES
-        J3FIELDS --> J3VALUES
-    end
-
-    subgraph MAPPING["Required mapping"]
-        CONTENTMAP["Content ID map"]
-        TAGMAP["Tag ID map"]
-        FIELDMAP["Field ID map"]
-        CONTEXT["Context and type-alias validation"]
-    end
-
-    subgraph J6["Joomla 6"]
-        J6ART["#__content"]
-        J6TAGS["#__tags"]
-        J6TAGMAP["#__contentitem_tag_map"]
-        J6FIELDS["#__fields"]
-        J6VALUES["#__fields_values"]
-    end
-
-    J3ART --> CONTENTMAP --> J6ART
-    J3TAGS --> TAGMAP --> J6TAGS
-    J3FIELDS --> FIELDMAP --> J6FIELDS
-
-    J6ART --> J6TAGMAP
+    J6CONTENT --> J6TAGMAP["J6 contentitem_tag_map"]
     J6TAGS --> J6TAGMAP
-    J6ART --> J6VALUES
+    J6CONTENT --> J6VALUES["J6 fields_values"]
     J6FIELDS --> J6VALUES
-    CONTEXT --> J6TAGMAP
-    CONTEXT --> J6VALUES
 ```
 
-### Column and relationship mapping
+| Mapping table | Columns to remap |
+|---|---|
+| `#__contentitem_tag_map` | `content_item_id`, `core_content_id`, `tag_id`, content type reference |
+| `#__fields_values` | `field_id`, `item_id` |
+| `#__fields_categories` | `field_id`, `category_id` |
 
-| Source | Target | Action |
-|---|---|---|
-| Tag `parent_id` | Target tag parent | Remap parent-first |
-| Tag `lft`, `rgt`, `level`, `path` | Target tree values | Rebuild |
-| Tag map `content_item_id` | Target content ID | Remap |
-| Tag map `tag_id` | Target tag ID | Remap |
-| Tag map `type_alias` | Joomla 6 content context | Verify/Transform |
-| Field `group_id` | Target group ID | Remap |
-| Field `type` | Installed Joomla 6 field plugin | Verify dependency |
-| Field value `field_id` | Target field ID | Remap |
-| Field value `item_id` | Target context-specific item ID | Remap |
-| Field value `value` | Target value | Keep/Transform |
-
-> [!WARNING]
-> `#__fields_values.item_id` is not self-describing. Its meaning depends on the field context, so a valid field mapping alone is not enough.
+> [!IMPORTANT]
+> `#__fields_values.item_id` is not self-describing. Its meaning depends on the field `context`.
 
 ---
 
-## 8. Menu, Module, and Template Gap
-
-### 8.1 Stable logical relationships
+## 8. Module and Template Gap
 
 ```mermaid
 flowchart LR
-    MT["#__menu_types"] -->|menutype| MENU["#__menu"]
-    EXT["#__extensions"] -->|extension_id → component_id| MENU
-    STYLE["#__template_styles"] -->|id → template_style_id| MENU
-    MODULE["#__modules"] -->|id → moduleid| MM["#__modules_menu"]
-    MENU -->|id → menuid| MM
+    J3MODULE["J3 #__modules"] --> CODE["Install compatible Joomla 6 module"]
+    CODE --> TYPE["Map module type"]
+    J3MODULE --> POSITION["Map template position"]
+    J3MODULE --> PARAMS["Transform params"]
+
+    TYPE --> J6MODULE["J6 #__modules"]
+    POSITION --> J6MODULE
+    PARAMS --> J6MODULE
+
+    J6MODULE --> ASSIGN["Rebuild #__modules_menu"]
+    J6MENU["J6 #__menu"] --> ASSIGN
 ```
 
-The relationship concepts remain, but the referenced IDs are installation-specific.
-
-### 8.2 Menu transformation
-
-```mermaid
-flowchart TD
-    J3MENU["Joomla 3 menu item"]
-    J3MENU --> TYPE["Keep menutype, title, alias, type"]
-    J3MENU --> COMPONENT["Map component_id by extension identity"]
-    J3MENU --> LINK["Rewrite IDs and option/view/task in link"]
-    J3MENU --> ACCESS["Remap access and template_style_id"]
-    J3MENU --> TREE["Rebuild parent, lft, rgt, level, path"]
-    J3MENU --> RESET["Reset checkout values"]
-
-    TYPE --> J6MENU["Joomla 6 menu item"]
-    COMPONENT --> J6MENU
-    LINK --> J6MENU
-    ACCESS --> J6MENU
-    TREE --> J6MENU
-    RESET --> J6MENU
-```
-
-| Source column | Target handling |
+| Joomla 3 value | Joomla 6 handling |
 |---|---|
-| `component_id` | Map using `type + element + folder + client_id` identity |
-| `link` | Rewrite article/category/custom IDs and renamed component values |
-| `parent_id` | Remap parent-first |
-| `lft`, `rgt`, `level`, `path` | Rebuild |
-| `access` | Remap view level |
-| `template_style_id` | Map to target style |
-| `home` | Validate one default menu per required language |
-| `client_id` | Migrate frontend records only unless explicitly required |
-
-### 8.3 Module transformation
-
-```mermaid
-flowchart TD
-    J3MOD["Joomla 3 module instance"]
-    INSTALL["Install compatible Joomla 6 module code"]
-    TYPE["Map module type"]
-    POSITION["Map template position"]
-    PARAMS["Transform params"]
-    ACCESS["Remap asset and access"]
-    J6MOD["Joomla 6 module instance"]
-    ASSIGN["Rebuild #__modules_menu"]
-
-    J3MOD --> INSTALL --> TYPE --> J6MOD
-    J3MOD --> POSITION --> J6MOD
-    J3MOD --> PARAMS --> J6MOD
-    J3MOD --> ACCESS --> J6MOD
-    J6MOD --> ASSIGN
-```
-
-| Source | Target | Action |
-|---|---|---|
-| `module` | Installed Joomla 6 module element | Verify/Map |
-| `position` | Joomla 6 template position | Map |
-| `params` | Target module options | Transform |
-| `asset_id`, `access` | Target ACL/view level | Rebuild/Remap |
-| `moduleid` in bridge | Target module ID | Remap |
-| Positive/negative `menuid` | Target menu ID while preserving sign | Remap |
-| Administrator modules | Joomla 6 administrator modules | Skip by default |
+| `module` | Target module extension must exist |
+| `position` | Map old template position to target template position |
+| `params` | Transform extension-specific JSON |
+| `asset_id` | Assign target-created asset |
+| `moduleid`, `menuid` | Remap both sides of `#__modules_menu` |
 
 ---
 
 ## 9. User and ACL Gap
 
-### 9.1 Shared relationship model
-
 ```mermaid
 flowchart LR
-    USERS["#__users"] -->|user_id| MAP["#__user_usergroup_map"]
-    GROUPS["#__usergroups"] -->|group_id| MAP
-    GROUPS -->|IDs in rules JSON| VIEW["#__viewlevels"]
-    ASSETS["#__assets"] --> CONTENT["Content / Categories / Modules"]
-    VIEW --> CONTENT
+    J3GROUP["J3 usergroups"] --> GMAP["Map group by meaning"] --> J6GROUP["J6 usergroups"]
+    J3VIEW["J3 viewlevels.rules"] --> RULEMAP["Rewrite group IDs in JSON"] --> J6VIEW["J6 viewlevels.rules"]
+    J3ASSET["J3 assets"] -.-> REBUILD["Keep target core assets and rebuild object assets"] --> J6ASSET["J6 assets"]
+    J3USER["J3 users"] --> USERMAP["Selective identity migration"] --> J6USER["J6 users"]
+    J6USER --> MFA["Fresh #__user_mfa enrollment"]
 ```
 
-### 9.2 ACL migration handling
-
-```mermaid
-flowchart LR
-    subgraph J3["Joomla 3"]
-        J3GROUP["User groups"]
-        J3VIEW["View levels"]
-        J3ASSET["ACL asset tree"]
-    end
-
-    subgraph MAP["Migration"]
-        GROUPMAP["Map groups by meaning"]
-        RULEMAP["Rewrite group IDs in viewlevel.rules"]
-        ASSETBUILD["Rebuild assets for migrated objects"]
-    end
-
-    subgraph J6["Joomla 6"]
-        J6GROUP["User groups"]
-        J6VIEW["View levels"]
-        J6ASSET["Expanded ACL asset tree"]
-        NEWASSETS["Workflow / Scheduler / Privacy / Logging assets"]
-    end
-
-    J3GROUP --> GROUPMAP --> J6GROUP
-    J3VIEW --> RULEMAP --> J6VIEW
-    J3ASSET -.-> ASSETBUILD --> J6ASSET
-    J6ASSET --> NEWASSETS
-```
-
-### 9.3 User and security mapping
-
-| Source | Target | Action |
-|---|---|---|
-| `name`, `username`, `email` | Same logical fields | Keep/Verify uniqueness |
-| `password` | Joomla 6 password field | Keep only after compatibility testing |
-| `block`, registration/visit dates | Same logical fields | Keep/Transform |
-| Reset/activation fields | Target security fields | Transform/Reset |
-| `#__user_usergroup_map` IDs | Target user/group IDs | Remap |
-| `#__viewlevels.rules` | Target group IDs in JSON | Transform |
-| `#__assets` IDs/tree | Joomla 6 target asset tree | Rebuild |
-| `#__user_keys` | Target authentication keys | Skip |
-| Joomla 3 OTP data | `#__user_mfa` | Skip direct migration; re-enroll |
-| `#__session` | Target session table | Skip all rows |
-
-```mermaid
-flowchart TD
-    J3USER["Joomla 3 user"]
-    J3USER --> IDENTITY["Keep identity and compatible password hash"]
-    J3USER --> GROUPS["Remap groups and view levels"]
-    J3USER --> RESET["Reset temporary authentication state"]
-    J3USER --> SKIP["Skip sessions, user_keys, OTP secrets"]
-    J3USER --> MFA["Require MFA re-enrollment"]
-
-    IDENTITY --> J6USER["Joomla 6 user"]
-    GROUPS --> J6USER
-    RESET --> J6USER
-    MFA --> J6USER
-```
+| Data | Decision |
+|---|---|
+| User identity and compatible password hash | Migrate selectively |
+| User-group assignments | Remap both IDs |
+| View-level JSON rules | Rewrite group IDs |
+| ACL asset IDs and tree boundaries | Rebuild |
+| Sessions and remember-me keys | Skip |
+| OTP/MFA secrets | Do not copy directly; require re-enrollment |
 
 ---
 
 ## 10. Extension and System Gap
 
-### 10.1 Target ownership model
-
 ```mermaid
 flowchart LR
-    J3EXT["J3 #__extensions"] -->|identity only| MAP["type + element + folder + client_id"]
+    J3EXT["J3 #__extensions"] --> IDENTITY["type + element + folder + client_id"]
     INSTALL["Install Joomla 6-compatible package"] --> J6EXT["J6 #__extensions"]
-    MAP --> J6EXT
+    IDENTITY --> MAP["extension ID map"] --> J6EXT
 
-    INSTALL --> SCHEMA["#__schemas"]
-    INSTALL --> SITES["#__update_sites"]
-    SITES --> DISCOVERY["#__updates"]
+    INSTALL --> SCHEMA["J6 #__schemas"]
+    INSTALL --> SITE["J6 #__update_sites"]
+    SITE --> UPDATE["J6 #__updates discovery"]
 
     J3SCHEMA["J3 #__schemas"] -.->|do not copy| SCHEMA
-    J3SITES["J3 #__update_sites"] -.->|do not copy| SITES
-    J3UPDATES["J3 #__updates"] -.->|rebuild| DISCOVERY
+    J3UPDATE["J3 #__updates"] -.->|rebuild| UPDATE
 ```
 
-### 10.2 Extension mapping rules
-
-| Joomla 3 value | Joomla 6 handling |
-|---|---|
-| `extension_id` | Do not preserve as identity |
-| `type`, `element`, `folder`, `client_id` | Use as logical extension identity |
-| `manifest_cache`, `params` | Preserve target installer values or selectively transform |
-| `schema_version`/schema rows | Let installer/update SQL create them |
-| Update-site IDs and links | Preserve target-created records |
-| Plugin ordering/enabled/access | Verify and configure on target |
-
-### 10.3 New Joomla 6 subsystem ownership
+### New Joomla 6 subsystems
 
 ```mermaid
-flowchart TD
-    EXT["Installed Joomla 6 extensions"]
-    USERS["#__users"]
-
-    EXT --> SCHED["#__scheduler_tasks"]
-    EXT --> ACTIONCFG["#__action_logs_extensions / config"]
-    EXT --> MAIL["#__mail_templates"]
-    EXT --> TOURS["#__guidedtours / steps"]
-
-    USERS --> PRIVACY["#__privacy_requests / consents"]
-    USERS --> MFA["#__user_mfa"]
-    USERS --> ACTIONS["#__action_logs"]
+flowchart TB
+    CORE["Joomla 6 and installed extensions"]
+    CORE --> WF["Workflow"]
+    CORE --> SCHED["Scheduler"]
+    CORE --> LOG["Action logs"]
+    CORE --> PRIV["Privacy"]
+    CORE --> MAIL["Mail templates"]
+    CORE --> TOUR["Guided tours"]
+    USERS["Joomla 6 users"] --> MFA["MFA"]
 ```
-
-| Subsystem | Default decision |
-|---|---|
-| Scheduler tasks | Keep core tasks; recreate extension tasks through installers/configuration |
-| Scheduler logs | Start empty |
-| Action logs | Start fresh unless retention is required |
-| Privacy records | Migrate only under approved legal rules |
-| Mail templates | Keep defaults or recreate approved overrides |
-| Guided tours | Keep installer-created records |
-| MFA | Require re-enrollment |
 
 ---
 
-## 11. Search, Runtime, and Generated Data Gap
+## 11. Runtime and Generated Data
 
 ```mermaid
 flowchart LR
-    subgraph SOURCE["Joomla 3 source"]
-        SESSION["#__session"]
-        FINDER["#__finder_*"]
-        UPDATES["#__updates"]
-        KEYS["#__user_keys"]
-        CACHE["Cache"]
-    end
-
-    subgraph ACTION["Decision"]
-        SKIP["Skip source rows"]
-        REBUILD["Regenerate in Joomla 6"]
-    end
-
-    subgraph TARGET["Joomla 6 target"]
-        NEWSESSION["Fresh sessions"]
-        NEWFINDER["Rebuilt Smart Search"]
-        NEWUPDATES["Rediscovered updates"]
-        NEWKEYS["New authentication keys"]
-        NEWCACHE["Fresh cache"]
-    end
-
-    SESSION --> SKIP --> NEWSESSION
-    KEYS --> SKIP --> NEWKEYS
-    CACHE --> SKIP --> NEWCACHE
-    FINDER --> REBUILD --> NEWFINDER
-    UPDATES --> REBUILD --> NEWUPDATES
+    SESSION["J3 sessions"] -->|SKIP| NEWSESSION["Fresh J6 sessions"]
+    FINDER["J3 Finder index"] -->|REBUILD| NEWFINDER["Re-indexed J6 Finder"]
+    CACHE["J3 cache"] -->|SKIP| NEWCACHE["Fresh J6 cache"]
+    UPDATES["J3 update discovery"] -->|REBUILD| NEWUPDATES["J6 update discovery"]
+    KEYS["J3 auth keys"] -->|SKIP| NEWKEYS["Fresh J6 keys"]
 ```
-
-| Source data | Reason not to copy | Target action |
-|---|---|---|
-| Sessions | Runtime and security-sensitive | Start empty |
-| Smart Search indexes | Generated from target content and plugins | Re-index |
-| Updates | Generated discovery state | Rediscover |
-| Authentication keys | Invalid and security-sensitive | Recreate through normal login flows |
-| Cache | Temporary | Clear and regenerate |
-| Scheduler/action logs | Target-generated history | Start fresh by default |
 
 ---
 
 ## 12. End-to-End Article Migration Example
 
-### 12.1 Example source record
+### Example source and target IDs
 
-```text
-Joomla 3 article ID:     25
-Category ID:              8
-Created-by user ID:      42
-Access level ID:          1
-Asset ID:               300
-State:                    1
-Featured:                 1
-```
-
-### 12.2 Example target mappings
-
-```text
-Article ID:      25 → 125
-Category ID:      8 → 108
-User ID:         42 → 242
-Access ID:        1 → 1
-Asset ID:       300 → 900
-State:            1 → Published
-Workflow stage:        → 1
-```
-
-### 12.3 Migration flow
+| Reference | Joomla 3 | Joomla 6 |
+|---|---:|---:|
+| Article | `25` | `125` |
+| Category | `8` | `108` |
+| Author | `42` | `242` |
+| View level | `1` | `1` after validation |
+| Asset | `300` | `900` |
+| Workflow stage | Not applicable | `1` resolved from target |
 
 ```mermaid
 flowchart LR
-    SOURCE["J3 Article 25"]
-    MAPCAT["catid 8 → 108"]
-    MAPUSER["created_by 42 → 242"]
-    MAPACCESS["access 1 → 1"]
-    BUILDASSET["Create asset 900"]
-    STATE["state 1 → Published stage 1"]
-    TARGET["J6 Article 125"]
-    WF["Workflow association\nitem_id=125, stage_id=1"]
-
-    SOURCE --> MAPCAT --> TARGET
-    SOURCE --> MAPUSER --> TARGET
-    SOURCE --> MAPACCESS --> TARGET
-    SOURCE --> BUILDASSET --> TARGET
-    SOURCE --> STATE --> TARGET
-    STATE --> WF
-    TARGET --> WF
+    SOURCE["J3 article 25"] --> CAT["Map category 8 to 108"]
+    CAT --> USER["Map user 42 to 242"]
+    USER --> ACCESS["Validate viewlevel"]
+    ACCESS --> ASSET["Create target asset 900"]
+    ASSET --> INSERT["Insert J6 article 125"]
+    INSERT --> WF["Create workflow association article 125 to stage 1"]
+    WF --> CHECK["Validate row JSON ACL URL and rendered page"]
 ```
-
-### 12.4 Expected records
-
-| Target table | Example result |
-|---|---|
-| `#__content` | Article `125`, `catid=108`, `created_by=242`, `asset_id=900` |
-| `#__assets` | New article asset with a valid parent and rules |
-| `#__content_frontpage` | Target article `125` if featured |
-| `#__workflow_associations` | `item_id=125`, mapped `stage_id=1`, valid extension context |
-| Mapping table | Source `25` → target `125` |
-
-> [!NOTE]
-> The IDs above are illustrative. A production script must resolve every mapping from actual target records rather than hard-coding values.
 
 ---
 
@@ -725,116 +480,54 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    ENTITY["Joomla 3 table or entity"]
-    EQUIV{"Equivalent exists in Joomla 6?"}
-    GENERATED{"Generated, runtime, or security data?"}
-    BUSINESS{"Required business data?"}
-    EXTOWNED{"Owned by an extension?"}
-    VERIFIED{"Physical schema and behavior verified?"}
-
-    ENTITY --> EQUIV
-
-    EQUIV -->|No| TARGETNEW["Keep/configure Joomla 6 subsystem"]
-    EQUIV -->|Yes| GENERATED
-
-    GENERATED -->|Yes| REBUILD["Skip source rows and rebuild"]
-    GENERATED -->|No| BUSINESS
-
+    SOURCE["Joomla 3 table or entity"] --> EXISTS{"Equivalent in Joomla 6"}
+    EXISTS -->|No| NEW["Keep or configure new Joomla 6 subsystem"]
+    EXISTS -->|Yes| GENERATED{"Runtime generated or security-sensitive"}
+    GENERATED -->|Yes| REBUILD["Skip rows and rebuild"]
+    GENERATED -->|No| BUSINESS{"Required business data"}
     BUSINESS -->|No| SKIP["Archive or skip"]
-    BUSINESS -->|Yes| EXTOWNED
-
-    EXTOWNED -->|Yes| INSTALL["Install compatible extension first"]
-    EXTOWNED -->|No| VERIFIED
-    INSTALL --> VERIFIED
-
-    VERIFIED -->|Yes| COPY["Copy selectively and validate"]
-    VERIFIED -->|No| TRANSFORM["Transform, remap IDs, rebuild relationships"]
-
-    TARGETNEW --> TEST["Reconcile and functionally test"]
-    REBUILD --> TEST
+    BUSINESS -->|Yes| EXTENSION{"Extension-owned"}
+    EXTENSION -->|Yes| INSTALL["Install compatible extension first"]
+    EXTENSION -->|No| COMPARE["Compare physical schemas"]
+    INSTALL --> COMPARE
+    COMPARE --> SAFE{"Directly compatible"}
+    SAFE -->|No| TRANSFORM["Transform remap and rebuild relationships"]
+    SAFE -->|Yes| COPY["Copy selectively"]
+    TRANSFORM --> TEST["Reconcile and functionally test"]
     COPY --> TEST
-    TRANSFORM --> TEST
+    NEW --> TEST
+    REBUILD --> TEST
 ```
 
 ---
 
-## 14. Recommended Migration Dependency Order
+## 14. Validation Checklist
 
-```mermaid
-flowchart TD
-    INSTALL["1. Install Joomla 6 and compatible extensions"]
-    AUDIT["2. Audit source schema and business scope"]
-    MAPS["3. Create source-to-target mapping tables"]
-    USERS["4. Users, custom groups, view levels"]
-    CATEGORIES["5. Categories and required component roots"]
-    CONTENT["6. Articles and content assets"]
-    WORKFLOW["7. Workflow associations"]
-    TAGS["8. Tags and custom fields"]
-    MENUS["9. Frontend menus and rewritten links"]
-    STYLES["10. Template styles and position mapping"]
-    MODULES["11. Frontend modules and assignments"]
-    CUSTOM["12. Custom and third-party business data"]
-    REBUILD["13. Rebuild trees, ACL, Finder, cache"]
-    VALIDATE["14. Validate counts, hashes, URLs, permissions, rendering"]
+### Mermaid rendering
 
-    INSTALL --> AUDIT --> MAPS --> USERS --> CATEGORIES --> CONTENT --> WORKFLOW
-    WORKFLOW --> TAGS --> MENUS --> STYLES --> MODULES --> CUSTOM --> REBUILD --> VALIDATE
-```
+- [ ] Every Mermaid block renders on GitHub without a syntax error.
+- [ ] ER entities use simple data types such as `int`, `varchar`, `text`, and `datetime`.
+- [ ] Attribute annotations are enclosed in quotes.
+- [ ] Table comparison diagrams contain exactly one Joomla 3 table and one Joomla 6 table connected by `compare`.
+- [ ] Flowchart node IDs are unique within each block.
 
-> [!NOTE]
-> The exact order is project-dependent. For example, categories may need users first for creator references, and custom components may require their Joomla 6 schema before any core menu items can point to them.
+### Schema comparison
 
----
+- [ ] Export `SHOW CREATE TABLE` for each compared table.
+- [ ] Compare column names, types, lengths, unsigned flags, nullability, defaults, indexes, charset, and collation.
+- [ ] Replace example annotations when the real project schema differs.
 
-## 15. Validation Checklist
+### Migration validation
 
-### Schema validation
-
-- [ ] Export `SHOW CREATE TABLE` for every table included in the migration.
-- [ ] Compare column names, types, unsigned flags, nullability, defaults, indexes, charset, and collation.
-- [ ] Mark every source column as Keep, Remap, Transform, Verify, Rebuild, Reset, Skip, Target-owned, or Add relationship.
-
-### Relationship validation
-
-- [ ] Every migrated article references an existing target category, user, access level, and asset.
-- [ ] Every migrated menu item references an installed component and valid target IDs.
-- [ ] Every module assignment references valid target module and menu IDs.
-- [ ] Every tag and custom-field mapping references valid target entities.
-- [ ] Every required article has a valid Joomla 6 workflow association.
-
-### Tree and ACL validation
-
-- [ ] Category, menu, tag, user-group, and asset trees have valid parents and nested-set values.
-- [ ] View-level JSON contains target user-group IDs.
-- [ ] Joomla 6 core assets were not overwritten.
-- [ ] Custom component and migrated-object assets inherit from correct parents.
-
-### Generated-data validation
-
-- [ ] Sessions, authentication keys, and MFA secrets were not imported.
-- [ ] Finder indexes and update discovery were regenerated.
-- [ ] Cache and temporary data were cleared.
-- [ ] Scheduler and action logs started fresh unless an exception was approved.
-
-### Functional validation
-
-- [ ] Backend list, create, edit, publish, archive, trash, and delete actions work.
-- [ ] Frontend routes and legacy redirects work.
-- [ ] Modules appear on expected pages and template positions.
-- [ ] User roles and access levels behave correctly.
-- [ ] Multilingual associations, tags, fields, search, media, header, and footer render correctly.
+- [ ] Build maps for users, groups, view levels, categories, content, assets, tags, fields, extensions, menus, modules, and styles.
+- [ ] Rebuild category, tag, menu, user-group, and asset trees.
+- [ ] Validate and transform all JSON fields.
+- [ ] Rewrite IDs embedded in menu links and configuration.
+- [ ] Create valid Joomla 6 workflow associations.
+- [ ] Start sessions, cache, Finder, updates, scheduler logs, and MFA records fresh unless an approved exception exists.
+- [ ] Compare row counts, content hashes, relationships, URLs, ACL behavior, and rendered pages.
 
 ---
-
-## 16. Key Conclusions
-
-1. **Most Joomla 3 business entities still exist in Joomla 6**, but the physical schemas and installation-owned IDs must be validated.
-2. **A matching table name is not proof of direct-copy compatibility.**
-3. **Nested-set structures require rebuild or strict validation** for categories, menus, tags, user groups, and assets.
-4. **Joomla 6 workflow is a new relationship layer** that may require one association per migrated article.
-5. **Extension registry, schema, update-site, and system records are target-owned.** Install extensions instead of copying registry rows.
-6. **Sessions, cache, Finder indexes, update discovery, authentication keys, MFA secrets, and generated logs should normally start fresh.**
-7. **Implementation requires both table-level and column-level mappings**, plus reconciliation and functional tests.
 
 ## Related Documentation
 
