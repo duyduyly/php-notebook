@@ -415,7 +415,7 @@ Create a complete, human-reviewable migration specification before inserting any
 Use the repository migration framework under:
 
 ```text
-docs/joomla/learning/database/migration-plan/
+docs/joomla/learning/database/migration/
 ```
 
 The main tutorial that explains how to generate the inventory and mapping package is:
@@ -466,13 +466,13 @@ Recommended names:
 
 The Joomla core migration folder already contains complete examples that can be used as references:
 
-- [`joomla-core-migration-groups-v3.md`](../joomla-core-migration-groups-v3.md)
-- [`joomla-core-migration-fields-v3.md`](../joomla-core-migration-fields-v3.md)
-- [`joomla-core-migration-groups-v6.md`](../joomla-core-migration-groups-v6.md)
-- [`joomla-core-migration-fields-v6.md`](../joomla-core-migration-fields-v6.md)
-- [`joomla-core-j3-j6-migration-contract.md`](../joomla-core-j3-j6-migration-contract.md)
-- [`table-mapping-migration.md`](../table-mapping-migration.md)
-- [`field-mapping-migration.md`](../field-mapping-migration.md)
+- [`joomla-core-migration-groups-v3.md`](../01-joomla-core-migration-groups-v3.md)
+- [`joomla-core-migration-fields-v3.md`](../03-joomla-core-migration-fields-v3.md)
+- [`joomla-core-migration-groups-v6.md`](../02-joomla-core-migration-groups-v6.md)
+- [`joomla-core-migration-fields-v6.md`](../04-joomla-core-migration-fields-v6.md)
+- [`joomla-core-j3-j6-migration-contract.md`](../05-joomla-core-j3-j6-migration-contract.md)
+- [`06-joomla-core-table-mapping-migration.md`](../06-joomla-core-table-mapping-migration.md)
+- [`09-joomla-core-field-mapping-migration.md`](../09-joomla-core-field-mapping-migration.md)
 
 Reusable templates are available under:
 
@@ -1177,7 +1177,7 @@ FINAL VERIFICATION
 Example:
 
 ```text
-migration-plan/
+migration/
 ├── <scope>-migration-groups-source.md
 ├── <scope>-migration-fields-source.md
 ├── <scope>-migration-groups-target.md

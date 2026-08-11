@@ -1,4 +1,4 @@
-# Joomla Core Migration Field Inventory — Joomla 3
+# Joomla Core Migration Field Inventory — Joomla 6
 
 ## Inventory Rule
 
@@ -6,35 +6,42 @@
 > **Field inventory = 100%**  
 > **Mapping decision = required before migration**
 
-Source of truth: Joomla CMS `3.10.12` → `installation/sql/mysql/joomla.sql`.
+Source of truth: Joomla CMS `6.1.2` official MySQL fresh-install DDL:
 
-Companion: [`joomla-core-migration-groups-v3.md`](./joomla-core-migration-groups-v3.md)
+- `installation/sql/mysql/base.sql`
+- `installation/sql/mysql/extensions.sql`
+- `installation/sql/mysql/supports.sql`
+
+Companion: [`joomla-core-migration-groups-v6.md`](02-joomla-core-migration-groups-v6.md)
 
 ```text
-Core tables = 78
-Physical fields = 711
-Unique (table, field) = 711
+Core tables = 76
+Physical fields = 832
+Unique (table, field) = 832
 Duplicates = 0
+Missing official tables = 0
+Missing official fields = 0
 Baseline physical field coverage = 100%
 ```
 
-> `100%` is the official Joomla 3.10.12 baseline. Production must still be reconciled with `information_schema.COLUMNS`.
+> `100%` is the official Joomla 6.1.2 fresh-install baseline. Production must still be reconciled with `information_schema.COLUMNS`.
 
 ## Metadata Contract
 
-For every table this file preserves the ordered field list and exact official `CREATE TABLE` DDL. The DDL preserves data type, full type, length/precision/scale, nullability, default, auto-increment/extra attributes, charset/collation, comments, generated expressions, exact indexes/keys, engine, table collation and table comment.
+For every table this file preserves the ordered field list and exact official `CREATE TABLE` DDL. The DDL preserves data type, full type, length/precision/scale, nullability, default, auto-increment/extra attributes, charset/collation, comments, generated/runtime expressions, exact indexes/keys, engine, table collation, and table comment where present.
 
-Migration annotations are separate from official schema facts. Unlisted fields default to `Structured=NO`, `Reference=—`, and inherit the table migration policy pending the final mapping contract.
+Migration policy is separate from the physical schema definition.
 
 ## G0 — System Reference
 
-**Tables:** 5 · **Fields:** 43
+**Tables:** 6 · **Fields:** 55
 
 ### `#__extensions`
 
-**Fields (18):** `extension_id`, `package_id`, `name`, `type`, `element`, `folder`, `client_id`, `enabled`, `access`, `protected`, `manifest_cache`, `params`, `custom_data`, `system_data`, `checked_out`, `checked_out_time`, `ordering`, `state`
+**Fields (20):** `extension_id`, `package_id`, `name`, `type`, `element`, `changelogurl`, `folder`, `client_id`, `enabled`, `access`, `protected`, `locked`, `manifest_cache`, `params`, `custom_data`, `checked_out`, `checked_out_time`, `ordering`, `state`, `note`
 
-**Policy:** `REFERENCE / TARGET-SYSTEM`
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__extensions` (
@@ -43,31 +50,34 @@ CREATE TABLE IF NOT EXISTS `#__extensions` (
   `name` varchar(100) NOT NULL,
   `type` varchar(20) NOT NULL,
   `element` varchar(100) NOT NULL,
+  `changelogurl` text,
   `folder` varchar(100) NOT NULL,
   `client_id` tinyint NOT NULL,
   `enabled` tinyint NOT NULL DEFAULT 0,
   `access` int unsigned NOT NULL DEFAULT 1,
-  `protected` tinyint NOT NULL DEFAULT 0,
+  `protected` tinyint NOT NULL DEFAULT 0 COMMENT 'Flag to indicate if the extension is protected. Protected extensions cannot be disabled.',
+  `locked` tinyint NOT NULL DEFAULT 0 COMMENT 'Flag to indicate if the extension is locked. Locked extensions cannot be uninstalled.',
   `manifest_cache` text NOT NULL,
   `params` text NOT NULL,
   `custom_data` text NOT NULL,
-  `system_data` text NOT NULL,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `ordering` int DEFAULT 0,
   `state` int DEFAULT 0,
+  `note` varchar(255),
   PRIMARY KEY (`extension_id`),
   KEY `element_clientid` (`element`,`client_id`),
   KEY `element_folder_clientid` (`element`,`folder`,`client_id`),
   KEY `extension` (`type`,`element`,`folder`,`client_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=10000;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
 ### `#__schemas`
 
 **Fields (2):** `extension_id`, `version_id`
 
-**Policy:** `REFERENCE / TARGET-SYSTEM`
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__schemas` (
@@ -79,9 +89,10 @@ CREATE TABLE IF NOT EXISTS `#__schemas` (
 
 ### `#__update_sites`
 
-**Fields (7):** `update_site_id`, `name`, `type`, `location`, `enabled`, `last_check_timestamp`, `extra_query`
+**Fields (9):** `update_site_id`, `name`, `type`, `location`, `enabled`, `last_check_timestamp`, `extra_query`, `checked_out`, `checked_out_time`
 
-**Policy:** `REFERENCE / TARGET-SYSTEM`
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__update_sites` (
@@ -92,6 +103,8 @@ CREATE TABLE IF NOT EXISTS `#__update_sites` (
   `enabled` int DEFAULT 0,
   `last_check_timestamp` bigint DEFAULT 0,
   `extra_query` varchar(1000) DEFAULT '',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`update_site_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Update Sites';
 ```
@@ -100,7 +113,8 @@ CREATE TABLE IF NOT EXISTS `#__update_sites` (
 
 **Fields (2):** `update_site_id`, `extension_id`
 
-**Policy:** `REFERENCE / TARGET-SYSTEM`
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__update_sites_extensions` (
@@ -112,9 +126,10 @@ CREATE TABLE IF NOT EXISTS `#__update_sites_extensions` (
 
 ### `#__updates`
 
-**Fields (14):** `update_id`, `update_site_id`, `extension_id`, `name`, `description`, `element`, `type`, `folder`, `client_id`, `version`, `data`, `detailsurl`, `infourl`, `extra_query`
+**Fields (15):** `update_id`, `update_site_id`, `extension_id`, `name`, `description`, `element`, `type`, `folder`, `client_id`, `version`, `data`, `detailsurl`, `infourl`, `changelogurl`, `extra_query`
 
-**Policy:** `REFERENCE / TARGET-SYSTEM`
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__updates` (
@@ -131,10 +146,33 @@ CREATE TABLE IF NOT EXISTS `#__updates` (
   `data` text NOT NULL,
   `detailsurl` text NOT NULL,
   `infourl` text NOT NULL,
+  `changelogurl` text,
   `extra_query` varchar(1000) DEFAULT '',
   PRIMARY KEY (`update_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Available Updates';
 ```
+
+### `#__tuf_metadata`
+
+**Fields (7):** `id`, `update_site_id`, `root`, `targets`, `snapshot`, `timestamp`, `mirrors`
+
+**Policy:** `REFERENCE_ONLY / TARGET_OWNED`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__tuf_metadata` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `update_site_id` int DEFAULT 0,
+  `root` text DEFAULT NULL,
+  `targets` text DEFAULT NULL,
+  `snapshot` text DEFAULT NULL,
+  `timestamp` text DEFAULT NULL,
+  `mirrors` text DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Secure TUF Updates';
+```
+
+---
 
 ## G1 — Users and Access Foundation
 
@@ -144,7 +182,8 @@ CREATE TABLE IF NOT EXISTS `#__updates` (
 
 **Fields (14):** `lang_id`, `asset_id`, `lang_code`, `title`, `title_native`, `sef`, `image`, `description`, `metakey`, `metadesc`, `sitename`, `published`, `access`, `ordering`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__languages` (
@@ -156,7 +195,7 @@ CREATE TABLE IF NOT EXISTS `#__languages` (
   `sef` varchar(50) NOT NULL,
   `image` varchar(50) NOT NULL,
   `description` varchar(512) NOT NULL,
-  `metakey` text NOT NULL,
+  `metakey` text,
   `metadesc` text NOT NULL,
   `sitename` varchar(1024) NOT NULL DEFAULT '',
   `published` int NOT NULL DEFAULT 0,
@@ -174,7 +213,8 @@ CREATE TABLE IF NOT EXISTS `#__languages` (
 
 **Fields (5):** `id`, `parent_id`, `lft`, `rgt`, `title`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__usergroups` (
@@ -195,7 +235,8 @@ CREATE TABLE IF NOT EXISTS `#__usergroups` (
 
 **Fields (17):** `id`, `name`, `username`, `email`, `password`, `block`, `sendEmail`, `registerDate`, `lastvisitDate`, `activation`, `params`, `lastResetTime`, `resetCount`, `otpKey`, `otep`, `requireReset`, `authProvider`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__users` (
@@ -206,14 +247,14 @@ CREATE TABLE IF NOT EXISTS `#__users` (
   `password` varchar(100) NOT NULL DEFAULT '',
   `block` tinyint NOT NULL DEFAULT 0,
   `sendEmail` tinyint DEFAULT 0,
-  `registerDate` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `lastvisitDate` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `registerDate` datetime NOT NULL,
+  `lastvisitDate` datetime,
   `activation` varchar(100) NOT NULL DEFAULT '',
   `params` text NOT NULL,
-  `lastResetTime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' COMMENT 'Date of last password reset',
+  `lastResetTime` datetime COMMENT 'Date of last password reset',
   `resetCount` int NOT NULL DEFAULT 0 COMMENT 'Count of password resets since lastResetTime',
   `otpKey` varchar(1000) NOT NULL DEFAULT '' COMMENT 'Two factor authentication encrypted keys',
-  `otep` varchar(1000) NOT NULL DEFAULT '' COMMENT 'One time emergency passwords',
+  `otep` varchar(1000) NOT NULL DEFAULT '' COMMENT 'Backup Codes',
   `requireReset` tinyint NOT NULL DEFAULT 0 COMMENT 'Require user to reset password on next login',
   `authProvider` varchar(100) NOT NULL DEFAULT '' COMMENT 'Name of used authentication plugin',
   PRIMARY KEY (`id`),
@@ -228,7 +269,8 @@ CREATE TABLE IF NOT EXISTS `#__users` (
 
 **Fields (2):** `user_id`, `group_id`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__user_usergroup_map` (
@@ -242,7 +284,8 @@ CREATE TABLE IF NOT EXISTS `#__user_usergroup_map` (
 
 **Fields (4):** `id`, `title`, `ordering`, `rules`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__viewlevels` (
@@ -259,7 +302,8 @@ CREATE TABLE IF NOT EXISTS `#__viewlevels` (
 
 **Fields (4):** `user_id`, `profile_key`, `profile_value`, `ordering`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__user_profiles` (
@@ -271,15 +315,18 @@ CREATE TABLE IF NOT EXISTS `#__user_profiles` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Simple user profile storage table';
 ```
 
+---
+
 ## G2 — Taxonomy and Shared Definitions
 
-**Tables:** 7 · **Fields:** 116
+**Tables:** 10 · **Fields:** 154
 
 ### `#__assets`
 
 **Fields (8):** `id`, `parent_id`, `lft`, `rgt`, `level`, `name`, `title`, `rules`
 
-**Policy:** `ACL / REBUILD-OR-RECONCILE`
+**Policy:** `REBUILD / RECONCILE`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__assets` (
@@ -288,7 +335,7 @@ CREATE TABLE IF NOT EXISTS `#__assets` (
   `lft` int NOT NULL DEFAULT 0 COMMENT 'Nested set lft.',
   `rgt` int NOT NULL DEFAULT 0 COMMENT 'Nested set rgt.',
   `level` int unsigned NOT NULL COMMENT 'The cached level in the nested tree.',
-  `name` varchar(50) NOT NULL COMMENT 'The unique name for the asset.\n',
+  `name` varchar(50) NOT NULL COMMENT 'The unique name for the asset.',
   `title` varchar(100) NOT NULL COMMENT 'The descriptive title for the asset.',
   `rules` varchar(5120) NOT NULL COMMENT 'JSON encoded access control.',
   PRIMARY KEY (`id`),
@@ -302,7 +349,8 @@ CREATE TABLE IF NOT EXISTS `#__assets` (
 
 **Fields (27):** `id`, `asset_id`, `parent_id`, `lft`, `rgt`, `level`, `path`, `extension`, `title`, `alias`, `note`, `description`, `published`, `checked_out`, `checked_out_time`, `access`, `params`, `metadesc`, `metakey`, `metadata`, `created_user_id`, `created_time`, `modified_user_id`, `modified_time`, `hits`, `language`, `version`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__categories` (
@@ -319,17 +367,17 @@ CREATE TABLE IF NOT EXISTS `#__categories` (
   `note` varchar(255) NOT NULL DEFAULT '',
   `description` mediumtext,
   `published` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `access` int unsigned NOT NULL DEFAULT 0,
   `params` text,
   `metadesc` varchar(1024) NOT NULL DEFAULT '' COMMENT 'The meta description for the page.',
-  `metakey` varchar(1024) NOT NULL DEFAULT '' COMMENT 'The meta keywords for the page.',
+  `metakey` varchar(1024) NOT NULL DEFAULT '' COMMENT 'The keywords for the page.',
   `metadata` varchar(2048) NOT NULL DEFAULT '' COMMENT 'JSON encoded metadata properties.',
   `created_user_id` int unsigned NOT NULL DEFAULT 0,
-  `created_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created_time` datetime NOT NULL,
   `modified_user_id` int unsigned NOT NULL DEFAULT 0,
-  `modified_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified_time` datetime NOT NULL,
   `hits` int unsigned NOT NULL DEFAULT 0,
   `language` char(7) NOT NULL DEFAULT '',
   `version` int unsigned NOT NULL DEFAULT 1,
@@ -348,7 +396,8 @@ CREATE TABLE IF NOT EXISTS `#__categories` (
 
 **Fields (30):** `id`, `parent_id`, `lft`, `rgt`, `level`, `path`, `title`, `alias`, `note`, `description`, `published`, `checked_out`, `checked_out_time`, `access`, `params`, `metadesc`, `metakey`, `metadata`, `created_user_id`, `created_time`, `created_by_alias`, `modified_user_id`, `modified_time`, `images`, `urls`, `hits`, `language`, `version`, `publish_up`, `publish_down`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__tags` (
@@ -363,25 +412,25 @@ CREATE TABLE IF NOT EXISTS `#__tags` (
   `note` varchar(255) NOT NULL DEFAULT '',
   `description` mediumtext NOT NULL,
   `published` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `access` int unsigned NOT NULL DEFAULT 0,
   `params` text NOT NULL,
   `metadesc` varchar(1024) NOT NULL COMMENT 'The meta description for the page.',
-  `metakey` varchar(1024) NOT NULL COMMENT 'The meta keywords for the page.',
+  `metakey` varchar(1024) NOT NULL DEFAULT '' COMMENT 'The keywords for the page.',
   `metadata` varchar(2048) NOT NULL COMMENT 'JSON encoded metadata properties.',
   `created_user_id` int unsigned NOT NULL DEFAULT 0,
-  `created_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created_time` datetime NOT NULL,
   `created_by_alias` varchar(255) NOT NULL DEFAULT '',
   `modified_user_id` int unsigned NOT NULL DEFAULT 0,
-  `modified_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified_time` datetime NOT NULL,
   `images` text NOT NULL,
   `urls` text NOT NULL,
   `hits` int unsigned NOT NULL DEFAULT 0,
   `language` char(7) NOT NULL,
   `version` int unsigned NOT NULL DEFAULT 1,
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `publish_up` datetime,
+  `publish_down` datetime,
   PRIMARY KEY (`id`),
   KEY `tag_idx` (`published`,`access`),
   KEY `idx_access` (`access`),
@@ -397,14 +446,15 @@ CREATE TABLE IF NOT EXISTS `#__tags` (
 
 **Fields (8):** `type_id`, `type_title`, `type_alias`, `table`, `rules`, `field_mappings`, `router`, `content_history_options`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `REFERENCE_ONLY / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__content_types` (
   `type_id` int unsigned NOT NULL AUTO_INCREMENT,
   `type_title` varchar(255) NOT NULL DEFAULT '',
   `type_alias` varchar(400) NOT NULL DEFAULT '',
-  `table` varchar(255) NOT NULL DEFAULT '',
+  `table` varchar(2048) NOT NULL DEFAULT '',
   `rules` text NOT NULL,
   `field_mappings` text NOT NULL,
   `router` varchar(255) NOT NULL DEFAULT '',
@@ -418,7 +468,8 @@ CREATE TABLE IF NOT EXISTS `#__content_types` (
 
 **Fields (17):** `id`, `asset_id`, `context`, `title`, `note`, `description`, `state`, `checked_out`, `checked_out_time`, `ordering`, `params`, `language`, `created`, `created_by`, `modified`, `modified_by`, `access`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__fields_groups` (
@@ -429,14 +480,14 @@ CREATE TABLE IF NOT EXISTS `#__fields_groups` (
   `note` varchar(255) NOT NULL DEFAULT '',
   `description` text NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `ordering` int NOT NULL DEFAULT 0,
   `params` text NOT NULL,
   `language` char(7) NOT NULL DEFAULT '',
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created` datetime NOT NULL,
   `created_by` int unsigned NOT NULL DEFAULT 0,
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
   `access` int NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
@@ -451,9 +502,10 @@ CREATE TABLE IF NOT EXISTS `#__fields_groups` (
 
 ### `#__fields`
 
-**Fields (24):** `id`, `asset_id`, `context`, `group_id`, `title`, `name`, `label`, `default_value`, `type`, `note`, `description`, `state`, `required`, `checked_out`, `checked_out_time`, `ordering`, `params`, `fieldparams`, `language`, `created_time`, `created_user_id`, `modified_time`, `modified_by`, `access`
+**Fields (25):** `id`, `asset_id`, `context`, `group_id`, `title`, `name`, `label`, `default_value`, `type`, `note`, `description`, `state`, `required`, `only_use_in_subform`, `checked_out`, `checked_out_time`, `ordering`, `params`, `fieldparams`, `language`, `created_time`, `created_user_id`, `modified_time`, `modified_by`, `access`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__fields` (
@@ -470,15 +522,16 @@ CREATE TABLE IF NOT EXISTS `#__fields` (
   `description` text NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
   `required` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `only_use_in_subform` tinyint NOT NULL DEFAULT 0,
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `ordering` int NOT NULL DEFAULT 0,
   `params` text NOT NULL,
-  `fieldparams` text NOT NULL,
+  `fieldparams` mediumtext NOT NULL,
   `language` char(7) NOT NULL DEFAULT '',
-  `created_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created_time` datetime NOT NULL,
   `created_user_id` int unsigned NOT NULL DEFAULT 0,
-  `modified_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified_time` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
   `access` int NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
@@ -495,7 +548,8 @@ CREATE TABLE IF NOT EXISTS `#__fields` (
 
 **Fields (2):** `field_id`, `category_id`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__fields_categories` (
@@ -505,15 +559,114 @@ CREATE TABLE IF NOT EXISTS `#__fields_categories` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
+### `#__workflows`
+
+**Fields (14):** `id`, `asset_id`, `published`, `title`, `description`, `extension`, `default`, `ordering`, `created`, `created_by`, `modified`, `modified_by`, `checked_out_time`, `checked_out`
+
+**Policy:** `RECREATE / MAP`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__workflows` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `asset_id` int DEFAULT 0,
+  `published` tinyint NOT NULL DEFAULT 0,
+  `title` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `extension` varchar(50) NOT NULL,
+  `default` tinyint NOT NULL  DEFAULT 0,
+  `ordering` int NOT NULL DEFAULT 0,
+  `created` datetime NOT NULL,
+  `created_by` int NOT NULL DEFAULT 0,
+  `modified` datetime NOT NULL,
+  `modified_by` int NOT NULL DEFAULT 0,
+  `checked_out_time` datetime,
+  `checked_out` int unsigned,
+  PRIMARY KEY (`id`),
+  KEY `idx_asset_id` (`asset_id`),
+  KEY `idx_title` (`title`(191)),
+  KEY `idx_extension` (`extension`),
+  KEY `idx_default` (`default`),
+  KEY `idx_created` (`created`),
+  KEY `idx_created_by` (`created_by`),
+  KEY `idx_modified` (`modified`),
+  KEY `idx_modified_by` (`modified_by`),
+  KEY `idx_checked_out` (`checked_out`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__workflow_stages`
+
+**Fields (11):** `id`, `asset_id`, `ordering`, `workflow_id`, `published`, `title`, `description`, `default`, `position`, `checked_out_time`, `checked_out`
+
+**Policy:** `RECREATE / MAP`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__workflow_stages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `asset_id` int DEFAULT 0,
+  `ordering` int NOT NULL DEFAULT 0,
+  `workflow_id` int NOT NULL,
+  `published` tinyint NOT NULL DEFAULT 0,
+  `title` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `default` tinyint NOT NULL DEFAULT 0,
+  `position` text,
+  `checked_out_time` datetime,
+  `checked_out` int unsigned,
+  PRIMARY KEY (`id`),
+  KEY `idx_workflow_id` (`workflow_id`),
+  KEY `idx_checked_out` (`checked_out`),
+  KEY `idx_title` (`title`(191)),
+  KEY `idx_asset_id` (`asset_id`),
+  KEY `idx_default` (`default`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__workflow_transitions`
+
+**Fields (12):** `id`, `asset_id`, `ordering`, `workflow_id`, `published`, `title`, `description`, `from_stage_id`, `to_stage_id`, `options`, `checked_out_time`, `checked_out`
+
+**Policy:** `RECREATE / MAP`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__workflow_transitions` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `asset_id` int DEFAULT 0,
+  `ordering` int NOT NULL DEFAULT 0,
+  `workflow_id` int NOT NULL,
+  `published` tinyint NOT NULL DEFAULT 0,
+  `title` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `from_stage_id` int NOT NULL,
+  `to_stage_id` int NOT NULL,
+  `options` text NOT NULL,
+  `checked_out_time` datetime,
+  `checked_out` int unsigned,
+  PRIMARY KEY (`id`),
+  KEY `idx_title` (`title`(191)),
+  KEY `idx_asset_id` (`asset_id`),
+  KEY `idx_checked_out` (`checked_out`),
+  KEY `idx_from_stage_id` (`from_stage_id`),
+  KEY `idx_to_stage_id` (`to_stage_id`),
+  KEY `idx_workflow_id` (`workflow_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
 ## G3 — Main Content
 
-**Tables:** 3 · **Fields:** 37
+**Tables:** 3 · **Fields:** 38
 
 ### `#__content`
 
-**Fields (31):** `id`, `asset_id`, `title`, `alias`, `introtext`, `fulltext`, `state`, `catid`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `checked_out`, `checked_out_time`, `publish_up`, `publish_down`, `images`, `urls`, `attribs`, `version`, `ordering`, `metakey`, `metadesc`, `access`, `hits`, `metadata`, `featured`, `language`, `xreference`, `note`
+**Fields (30):** `id`, `asset_id`, `title`, `alias`, `introtext`, `fulltext`, `state`, `catid`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `checked_out`, `checked_out_time`, `publish_up`, `publish_down`, `images`, `urls`, `attribs`, `version`, `ordering`, `metakey`, `metadesc`, `access`, `hits`, `metadata`, `featured`, `language`, `note`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__content` (
@@ -525,28 +678,27 @@ CREATE TABLE IF NOT EXISTS `#__content` (
   `fulltext` mediumtext NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
   `catid` int unsigned NOT NULL DEFAULT 0,
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created` datetime NOT NULL,
   `created_by` int unsigned NOT NULL DEFAULT 0,
   `created_by_alias` varchar(255) NOT NULL DEFAULT '',
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime NULL DEFAULT NULL,
+  `publish_up` datetime NULL DEFAULT NULL,
+  `publish_down` datetime NULL DEFAULT NULL,
   `images` text NOT NULL,
   `urls` text NOT NULL,
   `attribs` varchar(5120) NOT NULL,
   `version` int unsigned NOT NULL DEFAULT 1,
   `ordering` int NOT NULL DEFAULT 0,
-  `metakey` text NOT NULL,
+  `metakey` text,
   `metadesc` text NOT NULL,
   `access` int unsigned NOT NULL DEFAULT 0,
   `hits` int unsigned NOT NULL DEFAULT 0,
   `metadata` text NOT NULL,
   `featured` tinyint unsigned NOT NULL DEFAULT 0 COMMENT 'Set if article is featured.',
   `language` char(7) NOT NULL COMMENT 'The language code for the article.',
-  `xreference` varchar(50) NOT NULL DEFAULT '' COMMENT 'A reference to enable linkages to external data sets.',
   `note` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `idx_access` (`access`),
@@ -556,21 +708,23 @@ CREATE TABLE IF NOT EXISTS `#__content` (
   KEY `idx_createdby` (`created_by`),
   KEY `idx_featured_catid` (`featured`,`catid`),
   KEY `idx_language` (`language`),
-  KEY `idx_xreference` (`xreference`),
   KEY `idx_alias` (`alias`(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
 ### `#__content_frontpage`
 
-**Fields (2):** `content_id`, `ordering`
+**Fields (4):** `content_id`, `ordering`, `featured_up`, `featured_down`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__content_frontpage` (
   `content_id` int NOT NULL DEFAULT 0,
   `ordering` int NOT NULL DEFAULT 0,
+  `featured_up` datetime,
+  `featured_down` datetime,
   PRIMARY KEY (`content_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
@@ -579,7 +733,8 @@ CREATE TABLE IF NOT EXISTS `#__content_frontpage` (
 
 **Fields (4):** `content_id`, `rating_sum`, `rating_count`, `lastip`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__content_rating` (
@@ -591,15 +746,18 @@ CREATE TABLE IF NOT EXISTS `#__content_rating` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
+---
+
 ## G4 — Content Relations
 
-**Tables:** 6 · **Fields:** 58
+**Tables:** 8 · **Fields:** 66
 
 ### `#__contentitem_tag_map`
 
 **Fields (6):** `type_alias`, `core_content_id`, `content_item_id`, `tag_id`, `tag_date`, `type_id`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__contentitem_tag_map` (
@@ -620,13 +778,14 @@ CREATE TABLE IF NOT EXISTS `#__contentitem_tag_map` (
 
 **Fields (3):** `field_id`, `item_id`, `value`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__fields_values` (
   `field_id` int unsigned NOT NULL,
   `item_id` varchar(255) NOT NULL COMMENT 'Allow references to items which have strings as ids, eg. none db systems.',
-  `value` text,
+  `value` mediumtext,
   KEY `idx_field_id` (`field_id`),
   KEY `idx_item_id` (`item_id`(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
@@ -636,7 +795,8 @@ CREATE TABLE IF NOT EXISTS `#__fields_values` (
 
 **Fields (3):** `id`, `context`, `key`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__associations` (
@@ -652,7 +812,8 @@ CREATE TABLE IF NOT EXISTS `#__associations` (
 
 **Fields (4):** `ucm_id`, `ucm_item_id`, `ucm_type_id`, `ucm_language_id`
 
-**Policy:** `DERIVED/RELATIONAL / REVIEW`
+**Policy:** `REBUILD / VALIDATE`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__ucm_base` (
@@ -669,9 +830,10 @@ CREATE TABLE IF NOT EXISTS `#__ucm_base` (
 
 ### `#__ucm_content`
 
-**Fields (32):** `core_content_id`, `core_type_alias`, `core_title`, `core_alias`, `core_body`, `core_state`, `core_checked_out_time`, `core_checked_out_user_id`, `core_access`, `core_params`, `core_featured`, `core_metadata`, `core_created_user_id`, `core_created_by_alias`, `core_created_time`, `core_modified_user_id`, `core_modified_time`, `core_language`, `core_publish_up`, `core_publish_down`, `core_content_item_id`, `asset_id`, `core_images`, `core_urls`, `core_hits`, `core_version`, `core_ordering`, `core_metakey`, `core_metadesc`, `core_catid`, `core_xreference`, `core_type_id`
+**Fields (31):** `core_content_id`, `core_type_alias`, `core_title`, `core_alias`, `core_body`, `core_state`, `core_checked_out_time`, `core_checked_out_user_id`, `core_access`, `core_params`, `core_featured`, `core_metadata`, `core_created_user_id`, `core_created_by_alias`, `core_created_time`, `core_modified_user_id`, `core_modified_time`, `core_language`, `core_publish_up`, `core_publish_down`, `core_content_item_id`, `asset_id`, `core_images`, `core_urls`, `core_hits`, `core_version`, `core_ordering`, `core_metakey`, `core_metadesc`, `core_catid`, `core_type_id`
 
-**Policy:** `DERIVED/RELATIONAL / REVIEW`
+**Policy:** `REBUILD / VALIDATE`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__ucm_content` (
@@ -681,20 +843,20 @@ CREATE TABLE IF NOT EXISTS `#__ucm_content` (
   `core_alias` varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
   `core_body` mediumtext,
   `core_state` tinyint NOT NULL DEFAULT 0,
-  `core_checked_out_time` varchar(255) NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `core_checked_out_user_id` int unsigned NOT NULL DEFAULT 0,
+  `core_checked_out_time` datetime,
+  `core_checked_out_user_id` int unsigned,
   `core_access` int unsigned NOT NULL DEFAULT 0,
   `core_params` text,
   `core_featured` tinyint unsigned NOT NULL DEFAULT 0,
   `core_metadata` varchar(2048) NOT NULL DEFAULT '' COMMENT 'JSON encoded metadata properties.',
   `core_created_user_id` int unsigned NOT NULL DEFAULT 0,
   `core_created_by_alias` varchar(255) NOT NULL DEFAULT '',
-  `core_created_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `core_created_time` datetime NOT NULL,
   `core_modified_user_id` int unsigned NOT NULL DEFAULT 0 COMMENT 'Most recent user that modified',
-  `core_modified_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `core_modified_time` datetime NOT NULL,
   `core_language` char(7) NOT NULL DEFAULT '',
-  `core_publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `core_publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `core_publish_up` datetime,
+  `core_publish_down` datetime,
   `core_content_item_id` int unsigned NOT NULL DEFAULT 0 COMMENT 'ID from the individual type table',
   `asset_id` int unsigned NOT NULL DEFAULT 0 COMMENT 'FK to the #__assets table.',
   `core_images` text,
@@ -705,7 +867,6 @@ CREATE TABLE IF NOT EXISTS `#__ucm_content` (
   `core_metakey` text,
   `core_metadesc` text,
   `core_catid` int unsigned NOT NULL DEFAULT 0,
-  `core_xreference` varchar(50) NOT NULL DEFAULT '' COMMENT 'A reference to enable linkages to external data sets.',
   `core_type_id` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`core_content_id`),
   KEY `tag_idx` (`core_state`,`core_access`),
@@ -723,39 +884,82 @@ CREATE TABLE IF NOT EXISTS `#__ucm_content` (
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Contains core content data in name spaced fields';
 ```
 
-### `#__ucm_history`
+### `#__history`
 
-**Fields (10):** `version_id`, `ucm_item_id`, `ucm_type_id`, `version_note`, `save_date`, `editor_user_id`, `character_count`, `sha1_hash`, `version_data`, `keep_forever`
+**Fields (11):** `version_id`, `item_id`, `version_note`, `save_date`, `editor_user_id`, `character_count`, `sha1_hash`, `version_data`, `keep_forever`, `is_current`, `is_legacy`
 
-**Policy:** `DERIVED/RELATIONAL / REVIEW`
+**Policy:** `ARCHIVE / OPTIONAL_MIGRATE`  
+**Official source:** `supports.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__ucm_history` (
+CREATE TABLE IF NOT EXISTS `#__history` (
   `version_id` int unsigned NOT NULL AUTO_INCREMENT,
-  `ucm_item_id` int unsigned NOT NULL,
-  `ucm_type_id` int unsigned NOT NULL,
+  `item_id` VARCHAR(50) NOT NULL,
   `version_note` varchar(255) NOT NULL DEFAULT '' COMMENT 'Optional version name',
-  `save_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `save_date` datetime NOT NULL,
   `editor_user_id` int unsigned NOT NULL DEFAULT 0,
   `character_count` int unsigned NOT NULL DEFAULT 0 COMMENT 'Number of characters in this version.',
   `sha1_hash` varchar(50) NOT NULL DEFAULT '' COMMENT 'SHA1 hash of the version_data column.',
   `version_data` mediumtext NOT NULL COMMENT 'json-encoded string of version data',
   `keep_forever` tinyint NOT NULL DEFAULT 0 COMMENT '0=auto delete; 1=keep',
+  `is_current` tinyint NOT NULL DEFAULT 0,
+  `is_legacy` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`version_id`),
-  KEY `idx_ucm_item_id` (`ucm_type_id`,`ucm_item_id`),
+  KEY `idx_ucm_item_id` (`item_id`),
   KEY `idx_save_date` (`save_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
+### `#__workflow_associations`
+
+**Fields (3):** `item_id`, `stage_id`, `extension`
+
+**Policy:** `GENERATE / MAP`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__workflow_associations` (
+  `item_id` int NOT NULL DEFAULT 0 COMMENT 'Extension table id value',
+  `stage_id` int NOT NULL COMMENT 'Foreign Key to #__workflow_stages.id',
+  `extension` varchar(50) NOT NULL,
+  PRIMARY KEY (`item_id`, `extension`),
+  KEY `idx_item_stage_extension` (`item_id`, `stage_id`, `extension`),
+  KEY `idx_item_id` (`item_id`),
+  KEY `idx_stage_id` (`stage_id`),
+  KEY `idx_extension` (`extension`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__schemaorg`
+
+**Fields (5):** `id`, `itemId`, `context`, `schemaType`, `schema`
+
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__schemaorg` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `itemId` int unsigned,
+  `context` varchar(100),
+  `schemaType` varchar(100),
+  `schema` text,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
 ## G5 — Menu and Presentation
 
-**Tables:** 3 · **Fields:** 38
+**Tables:** 4 · **Fields:** 50
 
 ### `#__template_styles`
 
 **Fields (8):** `id`, `template`, `client_id`, `home`, `title`, `inheritable`, `parent`, `params`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `TRANSFORM / RECREATE`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__template_styles` (
@@ -774,11 +978,36 @@ CREATE TABLE IF NOT EXISTS `#__template_styles` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=9;
 ```
 
+### `#__template_overrides`
+
+**Fields (9):** `id`, `template`, `hash_id`, `extension_id`, `state`, `action`, `client_id`, `created_date`, `modified_date`
+
+**Policy:** `REBUILD / REVIEW`  
+**Official source:** `base.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__template_overrides` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `template` varchar(50) NOT NULL DEFAULT '',
+  `hash_id` varchar(255) NOT NULL DEFAULT '',
+  `extension_id` int DEFAULT 0,
+  `state` tinyint NOT NULL DEFAULT 0,
+  `action` varchar(50) NOT NULL DEFAULT '',
+  `client_id` tinyint unsigned NOT NULL DEFAULT 0,
+  `created_date` datetime NOT NULL,
+  `modified_date` datetime,
+  PRIMARY KEY (`id`),
+  KEY `idx_template` (`template`),
+  KEY `idx_extension_id` (`extension_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
 ### `#__menu_types`
 
-**Fields (6):** `id`, `asset_id`, `menutype`, `title`, `description`, `client_id`
+**Fields (7):** `id`, `asset_id`, `menutype`, `title`, `description`, `client_id`, `ordering`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__menu_types` (
@@ -788,6 +1017,7 @@ CREATE TABLE IF NOT EXISTS `#__menu_types` (
   `title` varchar(48) NOT NULL,
   `description` varchar(255) NOT NULL DEFAULT '',
   `client_id` int NOT NULL DEFAULT 0,
+  `ordering` int NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_menutype` (`menutype`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
@@ -795,9 +1025,10 @@ CREATE TABLE IF NOT EXISTS `#__menu_types` (
 
 ### `#__menu`
 
-**Fields (24):** `id`, `menutype`, `title`, `alias`, `note`, `path`, `link`, `type`, `published`, `parent_id`, `level`, `component_id`, `checked_out`, `checked_out_time`, `browserNav`, `access`, `img`, `template_style_id`, `params`, `lft`, `rgt`, `home`, `language`, `client_id`
+**Fields (26):** `id`, `menutype`, `title`, `alias`, `note`, `path`, `link`, `type`, `published`, `parent_id`, `level`, `component_id`, `checked_out`, `checked_out_time`, `browserNav`, `access`, `img`, `template_style_id`, `params`, `lft`, `rgt`, `home`, `language`, `client_id`, `publish_up`, `publish_down`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__menu` (
@@ -813,8 +1044,8 @@ CREATE TABLE IF NOT EXISTS `#__menu` (
   `parent_id` int unsigned NOT NULL DEFAULT 1 COMMENT 'The parent menu item in the menu tree.',
   `level` int unsigned NOT NULL DEFAULT 0 COMMENT 'The relative level in the tree.',
   `component_id` int unsigned NOT NULL DEFAULT 0 COMMENT 'FK to #__extensions.id',
-  `checked_out` int unsigned NOT NULL DEFAULT 0 COMMENT 'FK to #__users.id',
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' COMMENT 'The time the menu item was checked out.',
+  `checked_out` int unsigned COMMENT 'FK to #__users.id',
+  `checked_out_time` datetime COMMENT 'The time the menu item was checked out.',
   `browserNav` tinyint NOT NULL DEFAULT 0 COMMENT 'The click behaviour of the link.',
   `access` int unsigned NOT NULL DEFAULT 0 COMMENT 'The access level required to view the menu item.',
   `img` varchar(255) NOT NULL COMMENT 'The image of the menu item.',
@@ -825,6 +1056,8 @@ CREATE TABLE IF NOT EXISTS `#__menu` (
   `home` tinyint unsigned NOT NULL DEFAULT 0 COMMENT 'Indicates if this menu item is the home or default page.',
   `language` char(7) NOT NULL DEFAULT '',
   `client_id` tinyint NOT NULL DEFAULT 0,
+  `publish_up` datetime,
+  `publish_down` datetime,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_id_parent_id_alias_language` (`client_id`,`parent_id`,`alias`(100),`language`),
   KEY `idx_componentid` (`component_id`,`menutype`,`published`,`access`),
@@ -836,6 +1069,8 @@ CREATE TABLE IF NOT EXISTS `#__menu` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=102;
 ```
 
+---
+
 ## G6 — Modules
 
 **Tables:** 2 · **Fields:** 20
@@ -844,7 +1079,8 @@ CREATE TABLE IF NOT EXISTS `#__menu` (
 
 **Fields (18):** `id`, `asset_id`, `title`, `note`, `content`, `ordering`, `position`, `checked_out`, `checked_out_time`, `publish_up`, `publish_down`, `published`, `module`, `access`, `showtitle`, `params`, `client_id`, `language`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__modules` (
@@ -855,10 +1091,10 @@ CREATE TABLE IF NOT EXISTS `#__modules` (
   `content` text,
   `ordering` int NOT NULL DEFAULT 0,
   `position` varchar(50) NOT NULL DEFAULT '',
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
+  `publish_up` datetime,
+  `publish_down` datetime,
   `published` tinyint NOT NULL DEFAULT 0,
   `module` varchar(50) DEFAULT NULL,
   `access` int unsigned NOT NULL DEFAULT 0,
@@ -877,7 +1113,8 @@ CREATE TABLE IF NOT EXISTS `#__modules` (
 
 **Fields (2):** `moduleid`, `menuid`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__modules_menu` (
@@ -887,15 +1124,18 @@ CREATE TABLE IF NOT EXISTS `#__modules_menu` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
+---
+
 ## G7 — Supporting Core Components
 
-**Tables:** 14 · **Fields:** 189
+**Tables:** 16 · **Fields:** 217
 
 ### `#__contact_details`
 
-**Fields (43):** `id`, `name`, `alias`, `con_position`, `address`, `suburb`, `state`, `country`, `postcode`, `telephone`, `fax`, `misc`, `image`, `email_to`, `default_con`, `published`, `checked_out`, `checked_out_time`, `ordering`, `params`, `user_id`, `catid`, `access`, `mobile`, `webpage`, `sortname1`, `sortname2`, `sortname3`, `language`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `metakey`, `metadesc`, `metadata`, `featured`, `xreference`, `publish_up`, `publish_down`, `version`, `hits`
+**Fields (42):** `id`, `name`, `alias`, `con_position`, `address`, `suburb`, `state`, `country`, `postcode`, `telephone`, `fax`, `misc`, `image`, `email_to`, `default_con`, `published`, `checked_out`, `checked_out_time`, `ordering`, `params`, `user_id`, `catid`, `access`, `mobile`, `webpage`, `sortname1`, `sortname2`, `sortname3`, `language`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `metakey`, `metadesc`, `metadata`, `featured`, `publish_up`, `publish_down`, `version`, `hits`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__contact_details` (
@@ -915,8 +1155,8 @@ CREATE TABLE IF NOT EXISTS `#__contact_details` (
   `email_to` varchar(255),
   `default_con` tinyint unsigned NOT NULL DEFAULT 0,
   `published` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `ordering` int NOT NULL DEFAULT 0,
   `params` text NOT NULL,
   `user_id` int NOT NULL DEFAULT 0,
@@ -928,18 +1168,17 @@ CREATE TABLE IF NOT EXISTS `#__contact_details` (
   `sortname2` varchar(255) NOT NULL DEFAULT '',
   `sortname3` varchar(255) NOT NULL DEFAULT '',
   `language` varchar(7) NOT NULL,
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created` datetime NOT NULL,
   `created_by` int unsigned NOT NULL DEFAULT 0,
   `created_by_alias` varchar(255) NOT NULL DEFAULT '',
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
-  `metakey` text NOT NULL,
+  `metakey` text,
   `metadesc` text NOT NULL,
   `metadata` text NOT NULL,
   `featured` tinyint unsigned NOT NULL DEFAULT 0 COMMENT 'Set if contact is featured.',
-  `xreference` varchar(50) NOT NULL DEFAULT '' COMMENT 'A reference to enable linkages to external data sets.',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `publish_up` datetime,
+  `publish_down` datetime,
   `version` int unsigned NOT NULL DEFAULT 1,
   `hits` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
@@ -949,16 +1188,16 @@ CREATE TABLE IF NOT EXISTS `#__contact_details` (
   KEY `idx_catid` (`catid`),
   KEY `idx_createdby` (`created_by`),
   KEY `idx_featured_catid` (`featured`,`catid`),
-  KEY `idx_language` (`language`),
-  KEY `idx_xreference` (`xreference`)
+  KEY `idx_language` (`language`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
 ### `#__newsfeeds`
 
-**Fields (30):** `catid`, `id`, `name`, `alias`, `link`, `published`, `numarticles`, `cache_time`, `checked_out`, `checked_out_time`, `ordering`, `rtl`, `access`, `language`, `params`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `metakey`, `metadesc`, `metadata`, `xreference`, `publish_up`, `publish_down`, `description`, `version`, `hits`, `images`
+**Fields (29):** `catid`, `id`, `name`, `alias`, `link`, `published`, `numarticles`, `cache_time`, `checked_out`, `checked_out_time`, `ordering`, `rtl`, `access`, `language`, `params`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `metakey`, `metadesc`, `metadata`, `publish_up`, `publish_down`, `description`, `version`, `hits`, `images`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__newsfeeds` (
@@ -970,24 +1209,23 @@ CREATE TABLE IF NOT EXISTS `#__newsfeeds` (
   `published` tinyint NOT NULL DEFAULT 0,
   `numarticles` int unsigned NOT NULL DEFAULT 1,
   `cache_time` int unsigned NOT NULL DEFAULT 3600,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `ordering` int NOT NULL DEFAULT 0,
   `rtl` tinyint NOT NULL DEFAULT 0,
   `access` int unsigned NOT NULL DEFAULT 0,
   `language` char(7) NOT NULL DEFAULT '',
   `params` text NOT NULL,
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created` datetime NOT NULL,
   `created_by` int unsigned NOT NULL DEFAULT 0,
   `created_by_alias` varchar(255) NOT NULL DEFAULT '',
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
-  `metakey` text NOT NULL,
+  `metakey` text,
   `metadesc` text NOT NULL,
   `metadata` text NOT NULL,
-  `xreference` varchar(50) NOT NULL DEFAULT '' COMMENT 'A reference to enable linkages to external data sets.',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `publish_up` datetime,
+  `publish_down` datetime,
   `description` text NOT NULL,
   `version` int unsigned NOT NULL DEFAULT 1,
   `hits` int unsigned NOT NULL DEFAULT 0,
@@ -998,8 +1236,7 @@ CREATE TABLE IF NOT EXISTS `#__newsfeeds` (
   KEY `idx_state` (`published`),
   KEY `idx_catid` (`catid`),
   KEY `idx_createdby` (`created_by`),
-  KEY `idx_language` (`language`),
-  KEY `idx_xreference` (`xreference`)
+  KEY `idx_language` (`language`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
@@ -1007,7 +1244,8 @@ CREATE TABLE IF NOT EXISTS `#__newsfeeds` (
 
 **Fields (34):** `id`, `cid`, `type`, `name`, `alias`, `imptotal`, `impmade`, `clicks`, `clickurl`, `state`, `catid`, `description`, `custombannercode`, `sticky`, `ordering`, `metakey`, `params`, `own_prefix`, `metakey_prefix`, `purchase_type`, `track_clicks`, `track_impressions`, `checked_out`, `checked_out_time`, `publish_up`, `publish_down`, `reset`, `created`, `language`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `version`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__banners` (
@@ -1019,30 +1257,30 @@ CREATE TABLE IF NOT EXISTS `#__banners` (
   `imptotal` int NOT NULL DEFAULT 0,
   `impmade` int NOT NULL DEFAULT 0,
   `clicks` int NOT NULL DEFAULT 0,
-  `clickurl` varchar(200) NOT NULL DEFAULT '',
+  `clickurl` varchar(2048) NOT NULL DEFAULT '',
   `state` tinyint NOT NULL DEFAULT 0,
   `catid` int unsigned NOT NULL DEFAULT 0,
   `description` text NOT NULL,
   `custombannercode` varchar(2048) NOT NULL,
   `sticky` tinyint unsigned NOT NULL DEFAULT 0,
   `ordering` int NOT NULL DEFAULT 0,
-  `metakey` text NOT NULL,
+  `metakey` text,
   `params` text NOT NULL,
   `own_prefix` tinyint NOT NULL DEFAULT 0,
   `metakey_prefix` varchar(400) NOT NULL DEFAULT '',
   `purchase_type` tinyint NOT NULL DEFAULT -1,
   `track_clicks` tinyint NOT NULL DEFAULT -1,
   `track_impressions` tinyint NOT NULL DEFAULT -1,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `reset` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
+  `publish_up` datetime,
+  `publish_down` datetime,
+  `reset` datetime,
+  `created` datetime NOT NULL,
   `language` char(7) NOT NULL DEFAULT '',
   `created_by` int unsigned NOT NULL DEFAULT 0,
   `created_by_alias` varchar(255) NOT NULL DEFAULT '',
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `modified` datetime NOT NULL,
   `modified_by` int unsigned NOT NULL DEFAULT 0,
   `version` int unsigned NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
@@ -1058,7 +1296,8 @@ CREATE TABLE IF NOT EXISTS `#__banners` (
 
 **Fields (14):** `id`, `name`, `contact`, `email`, `extrainfo`, `state`, `checked_out`, `checked_out_time`, `metakey`, `own_prefix`, `metakey_prefix`, `purchase_type`, `track_clicks`, `track_impressions`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__banner_clients` (
@@ -1068,9 +1307,9 @@ CREATE TABLE IF NOT EXISTS `#__banner_clients` (
   `email` varchar(255) NOT NULL DEFAULT '',
   `extrainfo` text NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `metakey` text NOT NULL,
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
+  `metakey` text,
   `own_prefix` tinyint NOT NULL DEFAULT 0,
   `metakey_prefix` varchar(400) NOT NULL DEFAULT '',
   `purchase_type` tinyint NOT NULL DEFAULT -1,
@@ -1086,7 +1325,8 @@ CREATE TABLE IF NOT EXISTS `#__banner_clients` (
 
 **Fields (4):** `track_date`, `track_type`, `banner_id`, `count`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `ARCHIVE / OPTIONAL_MIGRATE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__banner_tracks` (
@@ -1105,7 +1345,8 @@ CREATE TABLE IF NOT EXISTS `#__banner_tracks` (
 
 **Fields (10):** `id`, `old_url`, `new_url`, `referer`, `comment`, `hits`, `published`, `created_date`, `modified_date`, `header`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__redirect_links` (
@@ -1116,12 +1357,12 @@ CREATE TABLE IF NOT EXISTS `#__redirect_links` (
   `comment` varchar(255) NOT NULL DEFAULT '',
   `hits` int unsigned NOT NULL DEFAULT 0,
   `published` tinyint NOT NULL,
-  `created_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `modified_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created_date` datetime NOT NULL,
+  `modified_date` datetime NOT NULL,
   `header` smallint NOT NULL DEFAULT 301,
   PRIMARY KEY (`id`),
   KEY `idx_old_url` (`old_url`(100)),
-  KEY `idx_link_modifed` (`modified_date`)
+  KEY `idx_link_modified` (`modified_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
@@ -1129,7 +1370,8 @@ CREATE TABLE IF NOT EXISTS `#__redirect_links` (
 
 **Fields (9):** `message_id`, `user_id_from`, `user_id_to`, `folder_id`, `date_time`, `state`, `priority`, `subject`, `message`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / OPTIONAL`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__messages` (
@@ -1137,7 +1379,7 @@ CREATE TABLE IF NOT EXISTS `#__messages` (
   `user_id_from` int unsigned NOT NULL DEFAULT 0,
   `user_id_to` int unsigned NOT NULL DEFAULT 0,
   `folder_id` tinyint unsigned NOT NULL DEFAULT 0,
-  `date_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `date_time` datetime NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
   `priority` tinyint unsigned NOT NULL DEFAULT 0,
   `subject` varchar(255) NOT NULL DEFAULT '',
@@ -1151,7 +1393,8 @@ CREATE TABLE IF NOT EXISTS `#__messages` (
 
 **Fields (3):** `user_id`, `cfg_name`, `cfg_value`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / OPTIONAL`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__messages_cfg` (
@@ -1166,7 +1409,8 @@ CREATE TABLE IF NOT EXISTS `#__messages_cfg` (
 
 **Fields (15):** `id`, `user_id`, `catid`, `subject`, `body`, `state`, `checked_out`, `checked_out_time`, `created_user_id`, `created_time`, `modified_user_id`, `modified_time`, `review_time`, `publish_up`, `publish_down`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / MAP`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__user_notes` (
@@ -1176,15 +1420,15 @@ CREATE TABLE IF NOT EXISTS `#__user_notes` (
   `subject` varchar(100) NOT NULL DEFAULT '',
   `body` text NOT NULL,
   `state` tinyint NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
   `created_user_id` int unsigned NOT NULL DEFAULT 0,
-  `created_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `modified_user_id` int unsigned NOT NULL,
-  `modified_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `review_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_up` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_down` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created_time` datetime NOT NULL,
+  `modified_user_id` int unsigned NOT NULL DEFAULT 0,
+  `modified_time` datetime NOT NULL,
+  `review_time` datetime,
+  `publish_up` datetime,
+  `publish_down` datetime,
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_category_id` (`catid`)
@@ -1195,17 +1439,18 @@ CREATE TABLE IF NOT EXISTS `#__user_notes` (
 
 **Fields (7):** `id`, `email`, `requested_at`, `status`, `request_type`, `confirm_token`, `confirm_token_created_at`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / ARCHIVE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__privacy_requests` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `email` varchar(100) NOT NULL DEFAULT '',
-  `requested_at` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `requested_at` datetime NOT NULL,
   `status` tinyint NOT NULL DEFAULT 0,
   `request_type` varchar(25) NOT NULL DEFAULT '',
   `confirm_token` varchar(100) NOT NULL DEFAULT '',
-  `confirm_token_created_at` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `confirm_token_created_at` datetime,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
@@ -1214,14 +1459,15 @@ CREATE TABLE IF NOT EXISTS `#__privacy_requests` (
 
 **Fields (8):** `id`, `user_id`, `state`, `created`, `subject`, `body`, `remind`, `token`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / ARCHIVE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__privacy_consents` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL DEFAULT 0,
   `state` int NOT NULL DEFAULT 1,
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `created` datetime NOT NULL,
   `subject` varchar(255) NOT NULL DEFAULT '',
   `body` text NOT NULL,
   `remind` tinyint NOT NULL DEFAULT 0,
@@ -1231,11 +1477,76 @@ CREATE TABLE IF NOT EXISTS `#__privacy_consents` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
+### `#__mail_templates`
+
+**Fields (8):** `template_id`, `extension`, `language`, `subject`, `body`, `htmlbody`, `attachments`, `params`
+
+**Policy:** `MERGE / RECREATE`  
+**Official source:** `supports.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__mail_templates` (
+  `template_id` VARCHAR(127) NOT NULL DEFAULT '',
+  `extension` VARCHAR(127) NOT NULL DEFAULT '',
+  `language` char(7) NOT NULL DEFAULT '',
+  `subject` VARCHAR(255) NOT NULL DEFAULT '',
+  `body` TEXT NOT NULL,
+  `htmlbody` MEDIUMTEXT NOT NULL,
+  `attachments` TEXT NOT NULL,
+  `params` TEXT NOT NULL,
+  PRIMARY KEY (`template_id`, `language`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__scheduler_tasks`
+
+**Fields (22):** `id`, `asset_id`, `title`, `type`, `execution_rules`, `cron_rules`, `state`, `last_exit_code`, `last_execution`, `next_execution`, `times_executed`, `times_failed`, `locked`, `priority`, `ordering`, `cli_exclusive`, `params`, `note`, `created`, `created_by`, `checked_out`, `checked_out_time`
+
+**Policy:** `RECREATE / SELECTIVE`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__scheduler_tasks` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `asset_id` int unsigned NOT NULL DEFAULT 0 COMMENT 'FK to the #__assets table.',
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `type` varchar(128) NOT NULL COMMENT 'unique identifier for job defined by plugin',
+  `execution_rules` text COMMENT 'Execution Rules, Unprocessed',
+  `cron_rules` text COMMENT 'Processed execution rules, crontab-like JSON form',
+  `state` tinyint NOT NULL DEFAULT FALSE,
+  `last_exit_code` int NOT NULL DEFAULT 0 COMMENT 'Exit code when job was last run',
+  `last_execution` datetime COMMENT 'Timestamp of last run',
+  `next_execution` datetime COMMENT 'Timestamp of next (planned) run, referred for execution on trigger',
+  `times_executed` int DEFAULT 0 COMMENT 'Count of successful triggers',
+  `times_failed` int DEFAULT 0 COMMENT 'Count of failures',
+  `locked` datetime,
+  `priority` smallint NOT NULL DEFAULT 0,
+  `ordering` int NOT NULL DEFAULT 0 COMMENT 'Configurable list ordering',
+  `cli_exclusive` smallint NOT NULL DEFAULT 0 COMMENT 'If 1, the task is only accessible via CLI',
+  `params` text NOT NULL,
+  `note` text,
+  `created` datetime NOT NULL,
+  `created_by` int UNSIGNED NOT NULL DEFAULT 0,
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
+  PRIMARY KEY (id),
+  KEY `idx_type` (`type`),
+  KEY `idx_state` (`state`),
+  KEY `idx_last_exit` (`last_exit_code`),
+  KEY `idx_next_exec` (`next_execution`),
+  KEY `idx_locked` (`locked`),
+  KEY `idx_priority` (`priority`),
+  KEY `idx_cli_exclusive` (`cli_exclusive`),
+  KEY `idx_checked_out` (`checked_out`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 DEFAULT COLLATE = utf8mb4_unicode_ci;
+```
+
 ### `#__action_logs_extensions`
 
 **Fields (2):** `id`, `extension`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `TARGET_OWNED / MERGE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__action_logs_extensions` (
@@ -1249,7 +1560,8 @@ CREATE TABLE IF NOT EXISTS `#__action_logs_extensions` (
 
 **Fields (7):** `id`, `type_title`, `type_alias`, `id_holder`, `title_holder`, `table_name`, `text_prefix`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `TARGET_OWNED / MERGE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__action_log_config` (
@@ -1268,7 +1580,8 @@ CREATE TABLE IF NOT EXISTS `#__action_log_config` (
 
 **Fields (3):** `user_id`, `notify`, `extensions`
 
-**Policy:** `CORE DATA / MAP`
+**Policy:** `MIGRATE / REVIEW`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__action_logs_users` (
@@ -1280,15 +1593,18 @@ CREATE TABLE IF NOT EXISTS `#__action_logs_users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-## G8 — Runtime, Generated, and Excluded Data
+---
 
-**Tables:** 32 · **Fields:** 164
+## G8 — Runtime, Generated, and Target-Owned Data
+
+**Tables:** 21 · **Fields:** 186
 
 ### `#__session`
 
 **Fields (7):** `session_id`, `client_id`, `guest`, `time`, `data`, `userid`, `username`
 
-**Policy:** `RUNTIME / IGNORE`
+**Policy:** `IGNORE`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__session` (
@@ -1308,9 +1624,10 @@ CREATE TABLE IF NOT EXISTS `#__session` (
 
 ### `#__user_keys`
 
-**Fields (7):** `id`, `user_id`, `token`, `series`, `invalid`, `time`, `uastring`
+**Fields (6):** `id`, `user_id`, `token`, `series`, `time`, `uastring`
 
-**Policy:** `RUNTIME / IGNORE`
+**Policy:** `IGNORE`  
+**Official source:** `base.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__user_keys` (
@@ -1318,7 +1635,6 @@ CREATE TABLE IF NOT EXISTS `#__user_keys` (
   `user_id` varchar(150) NOT NULL,
   `token` varchar(255) NOT NULL,
   `series` varchar(191) NOT NULL,
-  `invalid` tinyint NOT NULL,
   `time` varchar(200) NOT NULL,
   `uastring` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
@@ -1327,492 +1643,87 @@ CREATE TABLE IF NOT EXISTS `#__user_keys` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-### `#__finder_filters`
+### `#__user_mfa`
 
-**Fields (14):** `filter_id`, `title`, `alias`, `state`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `checked_out`, `checked_out_time`, `map_count`, `data`, `params`
+**Fields (10):** `id`, `user_id`, `title`, `method`, `default`, `options`, `created_on`, `last_used`, `tries`, `last_try`
 
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_filters` (
-  `filter_id` int unsigned NOT NULL AUTO_INCREMENT,
-  `title` varchar(255) NOT NULL,
-  `alias` varchar(255) NOT NULL,
-  `state` tinyint NOT NULL DEFAULT 1,
-  `created` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `created_by` int unsigned NOT NULL,
-  `created_by_alias` varchar(255) NOT NULL,
-  `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `modified_by` int unsigned NOT NULL DEFAULT 0,
-  `checked_out` int unsigned NOT NULL DEFAULT 0,
-  `checked_out_time` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `map_count` int unsigned NOT NULL DEFAULT 0,
-  `data` text NOT NULL,
-  `params` mediumtext,
-  PRIMARY KEY (`filter_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links`
-
-**Fields (19):** `link_id`, `url`, `route`, `title`, `description`, `indexdate`, `md5sum`, `published`, `state`, `access`, `language`, `publish_start_date`, `publish_end_date`, `start_date`, `end_date`, `list_price`, `sale_price`, `type_id`, `object`
-
-**Policy:** `GENERATED / REBUILD`
+**Policy:** `RECREATE / RE-ENROL`  
+**Official source:** `base.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links` (
-  `link_id` int unsigned NOT NULL AUTO_INCREMENT,
-  `url` varchar(255) NOT NULL,
-  `route` varchar(255) NOT NULL,
-  `title` varchar(400) DEFAULT NULL,
-  `description` text,
-  `indexdate` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `md5sum` varchar(32) DEFAULT NULL,
-  `published` tinyint NOT NULL DEFAULT 1,
-  `state` int DEFAULT 1,
-  `access` int DEFAULT 0,
-  `language` varchar(8) NOT NULL,
-  `publish_start_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `publish_end_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `start_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `end_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `list_price` double unsigned NOT NULL DEFAULT 0,
-  `sale_price` double unsigned NOT NULL DEFAULT 0,
-  `type_id` int NOT NULL,
-  `object` mediumblob NOT NULL,
-  PRIMARY KEY (`link_id`),
-  KEY `idx_type` (`type_id`),
-  KEY `idx_title` (`title`(100)),
-  KEY `idx_md5` (`md5sum`),
-  KEY `idx_url` (`url`(75)),
-  KEY `idx_published_list` (`published`,`state`,`access`,`publish_start_date`,`publish_end_date`,`list_price`),
-  KEY `idx_published_sale` (`published`,`state`,`access`,`publish_start_date`,`publish_end_date`,`sale_price`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms0`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms0` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms1`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms1` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms2`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms2` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms3`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms3` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms4`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms4` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms5`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms5` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms6`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms6` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms7`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms7` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms8`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms8` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_terms9`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_terms9` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termsa`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termsa` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termsb`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termsb` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termsc`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termsc` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termsd`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termsd` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termse`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termse` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_links_termsf`
-
-**Fields (3):** `link_id`, `term_id`, `weight`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_links_termsf` (
-  `link_id` int unsigned NOT NULL,
-  `term_id` int unsigned NOT NULL,
-  `weight` float unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`term_id`),
-  KEY `idx_term_weight` (`term_id`,`weight`),
-  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_taxonomy`
-
-**Fields (6):** `id`, `parent_id`, `title`, `state`, `access`, `ordering`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_taxonomy` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `parent_id` int unsigned NOT NULL DEFAULT 0,
-  `title` varchar(255) NOT NULL,
-  `state` tinyint unsigned NOT NULL DEFAULT 1,
-  `access` tinyint unsigned NOT NULL DEFAULT 0,
-  `ordering` tinyint unsigned NOT NULL DEFAULT 0,
+CREATE TABLE IF NOT EXISTS `#__user_mfa` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `method` varchar(100) NOT NULL,
+  `default` tinyint NOT NULL DEFAULT 0,
+  `options` mediumtext NOT NULL,
+  `created_on` datetime NOT NULL,
+  `last_used` datetime,
+  `tries` int NOT NULL DEFAULT 0,
+  `last_try` datetime,
   PRIMARY KEY (`id`),
-  KEY `parent_id` (`parent_id`),
-  KEY `state` (`state`),
-  KEY `ordering` (`ordering`),
-  KEY `access` (`access`),
-  KEY `idx_parent_published` (`parent_id`,`state`,`access`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci COMMENT='Multi-factor Authentication settings';
 ```
 
-### `#__finder_taxonomy_map`
+### `#__webauthn_credentials`
 
-**Fields (2):** `link_id`, `node_id`
+**Fields (4):** `id`, `user_id`, `label`, `credential`
 
-**Policy:** `GENERATED / REBUILD`
+**Policy:** `RECREATE / RE-ENROL`  
+**Official source:** `supports.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__finder_taxonomy_map` (
-  `link_id` int unsigned NOT NULL,
-  `node_id` int unsigned NOT NULL,
-  PRIMARY KEY (`link_id`,`node_id`),
-  KEY `link_id` (`link_id`),
-  KEY `node_id` (`node_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
+CREATE TABLE IF NOT EXISTS `#__webauthn_credentials` (
+    `id`         VARCHAR(1000)   NOT NULL COMMENT 'Credential ID',
+    `user_id`    VARCHAR(128)    NOT NULL COMMENT 'User handle',
+    `label`      VARCHAR(190)    NOT NULL COMMENT 'Human readable label',
+    `credential` MEDIUMTEXT      NOT NULL COMMENT 'Credential source data, JSON format',
+    PRIMARY KEY (`id`(100)),
+    INDEX (`user_id`(100))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-### `#__finder_terms`
+### `#__scheduler_logs`
 
-**Fields (9):** `term_id`, `term`, `stem`, `common`, `phrase`, `weight`, `soundex`, `links`, `language`
+**Fields (9):** `id`, `taskname`, `tasktype`, `duration`, `jobid`, `taskid`, `exitcode`, `lastdate`, `nextdate`
 
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_terms` (
-  `term_id` int unsigned NOT NULL AUTO_INCREMENT,
-  `term` varchar(75) NOT NULL,
-  `stem` varchar(75) NOT NULL,
-  `common` tinyint unsigned NOT NULL DEFAULT 0,
-  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
-  `weight` float unsigned NOT NULL DEFAULT 0,
-  `soundex` varchar(75) NOT NULL,
-  `links` int NOT NULL DEFAULT 0,
-  `language` char(3) NOT NULL DEFAULT '',
-  PRIMARY KEY (`term_id`),
-  UNIQUE KEY `idx_term` (`term`),
-  KEY `idx_term_phrase` (`term`,`phrase`),
-  KEY `idx_stem_phrase` (`stem`,`phrase`),
-  KEY `idx_soundex_phrase` (`soundex`,`phrase`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_terms_common`
-
-**Fields (2):** `term`, `language`
-
-**Policy:** `GENERATED / REBUILD`
+**Policy:** `IGNORE / ARCHIVE`  
+**Official source:** `extensions.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__finder_terms_common` (
-  `term` varchar(75) NOT NULL,
-  `language` varchar(3) NOT NULL,
-  KEY `idx_word_lang` (`term`,`language`),
-  KEY `idx_lang` (`language`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_tokens`
-
-**Fields (7):** `term`, `stem`, `common`, `phrase`, `weight`, `context`, `language`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_tokens` (
-  `term` varchar(75) NOT NULL,
-  `stem` varchar(75) NOT NULL,
-  `common` tinyint unsigned NOT NULL DEFAULT 0,
-  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
-  `weight` float unsigned NOT NULL DEFAULT 1,
-  `context` tinyint unsigned NOT NULL DEFAULT 2,
-  `language` char(3) NOT NULL DEFAULT '',
-  KEY `idx_word` (`term`),
-  KEY `idx_context` (`context`)
-) ENGINE=MEMORY DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_tokens_aggregate`
-
-**Fields (11):** `term_id`, `map_suffix`, `term`, `stem`, `common`, `phrase`, `term_weight`, `context`, `context_weight`, `total_weight`, `language`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_tokens_aggregate` (
-  `term_id` int unsigned NOT NULL,
-  `map_suffix` char(1) NOT NULL,
-  `term` varchar(75) NOT NULL,
-  `stem` varchar(75) NOT NULL,
-  `common` tinyint unsigned NOT NULL DEFAULT 0,
-  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
-  `term_weight` float unsigned NOT NULL,
-  `context` tinyint unsigned NOT NULL DEFAULT 2,
-  `context_weight` float unsigned NOT NULL,
-  `total_weight` float unsigned NOT NULL,
-  `language` char(3) NOT NULL DEFAULT '',
-  KEY `token` (`term`),
-  KEY `keyword_id` (`term_id`)
-) ENGINE=MEMORY DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
-```
-
-### `#__finder_types`
-
-**Fields (3):** `id`, `title`, `mime`
-
-**Policy:** `GENERATED / REBUILD`
-
-```sql
-CREATE TABLE IF NOT EXISTS `#__finder_types` (
+CREATE TABLE IF NOT EXISTS `#__scheduler_logs` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) NOT NULL,
-  `mime` varchar(100) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `title` (`title`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_general_ci;
+  `taskname` varchar(255) NOT NULL DEFAULT '',
+  `tasktype` varchar(128) NOT NULL COMMENT 'unique identifier for job defined by plugin',
+  `duration` DECIMAL(5,3) NOT NULL,
+  `jobid` int UNSIGNED NOT NULL,
+  `taskid` int UNSIGNED NOT NULL,
+  `exitcode` int NOT NULL,
+  `lastdate` datetime COMMENT 'Timestamp of last run',
+  `nextdate` datetime COMMENT 'Timestamp of next (planned) run, referred for execution on trigger',
+  PRIMARY KEY (id),
+  KEY `idx_taskname` (`taskname`),
+  KEY `idx_tasktype` (`tasktype`),
+  KEY `idx_lastdate` (`lastdate`),
+  KEY `idx_nextdate` (`nextdate`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 DEFAULT COLLATE = utf8mb4_unicode_ci;
 ```
 
 ### `#__action_logs`
 
 **Fields (8):** `id`, `message_language_key`, `message`, `log_date`, `extension`, `user_id`, `item_id`, `ip_address`
 
-**Policy:** `HISTORY / ARCHIVE-OR-IGNORE`
+**Policy:** `IGNORE / ARCHIVE`  
+**Official source:** `extensions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__action_logs` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `message_language_key` varchar(255) NOT NULL DEFAULT '',
   `message` text NOT NULL,
-  `log_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `log_date` datetime NOT NULL,
   `extension` varchar(50) NOT NULL DEFAULT '',
   `user_id` int NOT NULL DEFAULT 0,
   `item_id` int NOT NULL DEFAULT 0,
@@ -1825,32 +1736,264 @@ CREATE TABLE IF NOT EXISTS `#__action_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-### `#__core_log_searches`
+### `#__finder_filters`
 
-**Fields (2):** `search_term`, `hits`
+**Fields (14):** `filter_id`, `title`, `alias`, `state`, `created`, `created_by`, `created_by_alias`, `modified`, `modified_by`, `checked_out`, `checked_out_time`, `map_count`, `data`, `params`
 
-**Policy:** `HISTORY / ARCHIVE-OR-IGNORE`
+**Policy:** `MIGRATE / RECREATE / REVIEW`  
+**Official source:** `extensions.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__core_log_searches` (
-  `search_term` varchar(128) NOT NULL DEFAULT '',
-  `hits` int unsigned NOT NULL DEFAULT 0
+CREATE TABLE IF NOT EXISTS `#__finder_filters` (
+  `filter_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `alias` varchar(255) NOT NULL,
+  `state` tinyint NOT NULL DEFAULT 1,
+  `created` datetime NOT NULL,
+  `created_by` int unsigned NOT NULL DEFAULT 0,
+  `created_by_alias` varchar(255) NOT NULL DEFAULT '',
+  `modified` datetime NOT NULL,
+  `modified_by` int unsigned NOT NULL DEFAULT 0,
+  `checked_out` int unsigned,
+  `checked_out_time` datetime,
+  `map_count` int unsigned NOT NULL DEFAULT 0,
+  `data` text,
+  `params` mediumtext,
+  PRIMARY KEY (`filter_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-### `#__overrider`
+### `#__finder_links`
 
-**Fields (4):** `id`, `constant`, `string`, `file`
+**Fields (19):** `link_id`, `url`, `route`, `title`, `description`, `indexdate`, `md5sum`, `published`, `state`, `access`, `language`, `publish_start_date`, `publish_end_date`, `start_date`, `end_date`, `list_price`, `sale_price`, `type_id`, `object`
 
-**Policy:** `SYSTEM / REVIEW-OR-REBUILD`
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__overrider` (
-  `id` int NOT NULL AUTO_INCREMENT COMMENT 'Primary Key',
-  `constant` varchar(255) NOT NULL,
-  `string` text NOT NULL,
-  `file` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS `#__finder_links` (
+  `link_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `url` varchar(255) NOT NULL,
+  `route` varchar(400) NOT NULL,
+  `title` varchar(400) DEFAULT NULL,
+  `description` text,
+  `indexdate` datetime NOT NULL,
+  `md5sum` varchar(32) DEFAULT NULL,
+  `published` tinyint NOT NULL DEFAULT 1,
+  `state` int NOT NULL DEFAULT 1,
+  `access` int NOT NULL DEFAULT 0,
+  `language` char(7) NOT NULL DEFAULT '',
+  `publish_start_date` datetime,
+  `publish_end_date` datetime,
+  `start_date` datetime,
+  `end_date` datetime,
+  `list_price` double unsigned NOT NULL DEFAULT 0,
+  `sale_price` double unsigned NOT NULL DEFAULT 0,
+  `type_id` int NOT NULL,
+  `object` mediumblob,
+  PRIMARY KEY (`link_id`),
+  KEY `idx_type` (`type_id`),
+  KEY `idx_title` (`title`(100)),
+  KEY `idx_md5` (`md5sum`),
+  KEY `idx_url` (`url`(75)),
+  KEY `idx_language` (`language`),
+  KEY `idx_published_list` (`published`,`state`,`access`,`publish_start_date`,`publish_end_date`,`list_price`),
+  KEY `idx_published_sale` (`published`,`state`,`access`,`publish_start_date`,`publish_end_date`,`sale_price`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_links_terms`
+
+**Fields (3):** `link_id`, `term_id`, `weight`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_links_terms` (
+  `link_id` int unsigned NOT NULL,
+  `term_id` int unsigned NOT NULL,
+  `weight` float unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY (`link_id`,`term_id`),
+  KEY `idx_term_weight` (`term_id`,`weight`),
+  KEY `idx_link_term_weight` (`link_id`,`term_id`,`weight`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_logging`
+
+**Fields (5):** `searchterm`, `md5sum`, `query`, `hits`, `results`
+
+**Policy:** `IGNORE / ARCHIVE`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_logging` (
+  `searchterm` VARCHAR(255) NOT NULL DEFAULT '',
+  `md5sum` VARCHAR(32) NOT NULL DEFAULT '',
+  `query` BLOB NOT NULL,
+  `hits` int NOT NULL DEFAULT 1,
+  `results` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`md5sum`),
+  INDEX `searchterm` (`searchterm`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_taxonomy`
+
+**Fields (11):** `id`, `parent_id`, `lft`, `rgt`, `level`, `path`, `title`, `alias`, `state`, `access`, `language`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_taxonomy` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `parent_id` int UNSIGNED NOT NULL DEFAULT '0',
+  `lft` int NOT NULL DEFAULT '0',
+  `rgt` int NOT NULL DEFAULT '0',
+  `level` int UNSIGNED NOT NULL DEFAULT '0',
+  `path` VARCHAR(400) NOT NULL DEFAULT '',
+  `title` VARCHAR(255) NOT NULL DEFAULT '',
+  `alias` VARCHAR(400) NOT NULL DEFAULT '',
+  `state` tinyint UNSIGNED NOT NULL DEFAULT '1',
+  `access` tinyint UNSIGNED NOT NULL DEFAULT '1',
+  `language` CHAR(7) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  INDEX `idx_state` (`state`),
+  INDEX `idx_access` (`access`),
+  INDEX `idx_path` (`path`(100)),
+  INDEX `idx_level` (`level`),
+  INDEX `idx_left_right` (`lft`, `rgt`),
+  INDEX `idx_alias` (`alias`(100)),
+  INDEX `idx_language` (`language`),
+  INDEX `idx_parent_published` (`parent_id`, `state`, `access`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_taxonomy_map`
+
+**Fields (2):** `link_id`, `node_id`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_taxonomy_map` (
+  `link_id` int unsigned NOT NULL,
+  `node_id` int unsigned NOT NULL,
+  PRIMARY KEY (`link_id`,`node_id`),
+  KEY `link_id` (`link_id`),
+  KEY `node_id` (`node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_terms`
+
+**Fields (9):** `term_id`, `term`, `stem`, `common`, `phrase`, `weight`, `soundex`, `links`, `language`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_terms` (
+  `term_id` int unsigned NOT NULL AUTO_INCREMENT,
+  `term` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `stem` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `common` tinyint unsigned NOT NULL DEFAULT 0,
+  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
+  `weight` float unsigned NOT NULL DEFAULT 0,
+  `soundex` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `links` int NOT NULL DEFAULT 0,
+  `language` char(7) NOT NULL DEFAULT '',
+  PRIMARY KEY (`term_id`),
+  UNIQUE KEY `idx_term_language` (`term`,`language`),
+  KEY `idx_stem` (`stem`),
+  KEY `idx_term_phrase` (`term`,`phrase`),
+  KEY `idx_stem_phrase` (`stem`,`phrase`),
+  KEY `idx_soundex_phrase` (`soundex`,`phrase`),
+  KEY `idx_language` (`language`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_terms_common`
+
+**Fields (3):** `term`, `language`, `custom`
+
+**Policy:** `TARGET_OWNED / REVIEW`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_terms_common` (
+  `term` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `language` char(7) NOT NULL DEFAULT '',
+  `custom` int NOT NULL DEFAULT '0',
+  UNIQUE KEY `idx_term_language` (`term`,`language`),
+  KEY `idx_lang` (`language`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_tokens`
+
+**Fields (7):** `term`, `stem`, `common`, `phrase`, `weight`, `context`, `language`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_tokens` (
+  `term` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `stem` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `common` tinyint unsigned NOT NULL DEFAULT 0,
+  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
+  `weight` float unsigned NOT NULL DEFAULT 1,
+  `context` tinyint unsigned NOT NULL DEFAULT 2,
+  `language` char(7) NOT NULL DEFAULT '',
+  KEY `idx_word` (`term`),
+  KEY `idx_stem` (`stem`),
+  KEY `idx_context` (`context`),
+  KEY `idx_language` (`language`)
+) ENGINE=MEMORY DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_tokens_aggregate`
+
+**Fields (10):** `term_id`, `term`, `stem`, `common`, `phrase`, `term_weight`, `context`, `context_weight`, `total_weight`, `language`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_tokens_aggregate` (
+  `term_id` int unsigned NOT NULL,
+  `term` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `stem` varchar(75) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `common` tinyint unsigned NOT NULL DEFAULT 0,
+  `phrase` tinyint unsigned NOT NULL DEFAULT 0,
+  `term_weight` float unsigned NOT NULL DEFAULT 0,
+  `context` tinyint unsigned NOT NULL DEFAULT 2,
+  `context_weight` float unsigned NOT NULL DEFAULT 0,
+  `total_weight` float unsigned NOT NULL DEFAULT 0,
+  `language` char(7) NOT NULL DEFAULT '',
+  KEY `token` (`term`),
+  KEY `keyword_id` (`term_id`)
+) ENGINE=MEMORY DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+### `#__finder_types`
+
+**Fields (3):** `id`, `title`, `mime`
+
+**Policy:** `REBUILD`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__finder_types` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(100) NOT NULL,
+  `mime` varchar(100) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `title` (`title`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
@@ -1858,7 +2001,8 @@ CREATE TABLE IF NOT EXISTS `#__overrider` (
 
 **Fields (14):** `postinstall_message_id`, `extension_id`, `title_key`, `description_key`, `action_key`, `language_extension`, `language_client_id`, `type`, `action_file`, `action`, `condition_file`, `condition_method`, `version_introduced`, `enabled`
 
-**Policy:** `SYSTEM / IGNORE`
+**Policy:** `TARGET_OWNED`  
+**Official source:** `supports.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `#__postinstall_messages` (
@@ -1880,319 +2024,166 @@ CREATE TABLE IF NOT EXISTS `#__postinstall_messages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-### `#__utf8_conversion`
+### `#__overrider`
 
-**Fields (1):** `converted`
+**Fields (4):** `id`, `constant`, `string`, `file`
 
-**Policy:** `SYSTEM / IGNORE`
+**Policy:** `MIGRATE / RECREATE / REVIEW`  
+**Official source:** `supports.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `#__utf8_conversion` (
-  `converted` tinyint NOT NULL DEFAULT 0
+CREATE TABLE IF NOT EXISTS `#__overrider` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT 'Primary Key',
+  `constant` varchar(255) NOT NULL,
+  `string` text NOT NULL,
+  `file` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-## Special Migration Annotations
+### `#__guidedtours`
 
-Format: `table.field | structured | reference/dependency | migration hint`
+**Fields (18):** `id`, `title`, `uid`, `description`, `ordering`, `extensions`, `url`, `created`, `created_by`, `modified`, `modified_by`, `checked_out_time`, `checked_out`, `published`, `language`, `note`, `access`, `autostart`
 
-```text
-#__extensions.package_id | NO | #__extensions.extension_id (package parent, logical) | REFERENCE_ONLY
-#__extensions.access | NO | #__viewlevels.id | REFERENCE_ONLY
-#__extensions.manifest_cache | JSON manifest cache | — | REFERENCE_ONLY
-#__extensions.params | JSON / Joomla Registry | — | REFERENCE_ONLY
-#__extensions.custom_data | Extension-specific structured data | — | REFERENCE_ONLY
-#__extensions.system_data | Extension-specific structured data | — | REFERENCE_ONLY
-#__schemas.extension_id | NO | #__extensions.extension_id | REFERENCE_ONLY
-#__update_sites.location | URL | — | REFERENCE_ONLY
-#__update_sites.extra_query | Query/credential parameters | — | REFERENCE_ONLY
-#__update_sites_extensions.update_site_id | NO | #__update_sites.update_site_id | REFERENCE_ONLY
-#__update_sites_extensions.extension_id | NO | #__extensions.extension_id | REFERENCE_ONLY
-#__updates.update_site_id | NO | #__update_sites.update_site_id | REFERENCE_ONLY
-#__updates.extension_id | NO | #__extensions.extension_id | REFERENCE_ONLY
-#__updates.data | Update metadata payload | — | REFERENCE_ONLY
-#__updates.detailsurl | URL | — | REFERENCE_ONLY
-#__updates.infourl | URL | — | REFERENCE_ONLY
-#__updates.extra_query | Query/credential parameters | — | REFERENCE_ONLY
-#__languages.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__languages.image | File/media reference | — | STRUCTURED/REVIEW
-#__languages.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__usergroups.parent_id | NO | #__usergroups.id (self tree) | LOOKUP/REVIEW
-#__users.id | NO | Referenced by many core tables | LOOKUP/REVIEW
-#__users.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__users.otpKey | SECURITY / encrypted 2FA material | — | STRUCTURED/REVIEW
-#__users.otep | SECURITY / emergency codes | — | STRUCTURED/REVIEW
-#__user_usergroup_map.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__user_usergroup_map.group_id | NO | #__usergroups.id | LOOKUP/REVIEW
-#__viewlevels.rules | JSON / user group IDs | Embeds #__usergroups.id in JSON | STRUCTURED/REVIEW
-#__user_profiles.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__user_profiles.profile_value | Key-dependent structured value | — | STRUCTURED/REVIEW
-#__assets.parent_id | NO | #__assets.id (self tree) | REBUILD/RECONCILE
-#__assets.rules | JSON / ACL group IDs | Embeds #__usergroups.id in ACL JSON | STRUCTURED/ACL
-#__categories.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__categories.parent_id | NO | #__categories.id (self tree) | LOOKUP/REVIEW
-#__categories.path | Derived hierarchy path | — | STRUCTURED/REVIEW
-#__categories.description | HTML / internal links possible | — | STRUCTURED/REVIEW
-#__categories.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__categories.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__categories.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__categories.metadata | JSON metadata | — | STRUCTURED/REVIEW
-#__categories.created_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__categories.modified_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__categories.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__tags.parent_id | NO | #__tags.id (self tree) | LOOKUP/REVIEW
-#__tags.path | Derived hierarchy path | — | STRUCTURED/REVIEW
-#__tags.description | HTML / internal links possible | — | STRUCTURED/REVIEW
-#__tags.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__tags.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__tags.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__tags.metadata | JSON metadata | — | STRUCTURED/REVIEW
-#__tags.created_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__tags.modified_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__tags.images | JSON media references | — | STRUCTURED/REVIEW
-#__tags.urls | JSON URL references | — | STRUCTURED/REVIEW
-#__tags.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__content_types.table | JSON table metadata | — | STRUCTURED/REVIEW
-#__content_types.rules | Structured ACL/config | — | STRUCTURED/REVIEW
-#__content_types.field_mappings | JSON field mapping metadata | — | STRUCTURED/REVIEW
-#__content_types.router | Callable/router metadata | — | STRUCTURED/REVIEW
-#__content_types.content_history_options | JSON history config | — | STRUCTURED/REVIEW
-#__fields_groups.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__fields_groups.context | NO | Joomla content context (semantic) | LOOKUP/REVIEW
-#__fields_groups.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__fields_groups.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__fields_groups.created_by | NO | #__users.id | LOOKUP/REVIEW
-#__fields_groups.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__fields_groups.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__fields.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__fields.context | NO | Joomla content context (semantic) | LOOKUP/REVIEW
-#__fields.group_id | NO | #__fields_groups.id | LOOKUP/REVIEW
-#__fields.default_value | Field-type dependent structured value | — | STRUCTURED/REVIEW
-#__fields.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__fields.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__fields.fieldparams | JSON / field plugin config | — | STRUCTURED/REVIEW
-#__fields.created_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__fields.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__fields.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__fields_categories.field_id | NO | #__fields.id | LOOKUP/REVIEW
-#__fields_categories.category_id | NO | #__categories.id | LOOKUP/REVIEW
-#__content.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__content.introtext | HTML / embedded links & media | — | STRUCTURED/REVIEW
-#__content.fulltext | HTML / embedded links & media | — | STRUCTURED/REVIEW
-#__content.catid | NO | #__categories.id | LOOKUP/REVIEW
-#__content.created_by | NO | #__users.id | LOOKUP/REVIEW
-#__content.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__content.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__content.images | JSON media references | — | STRUCTURED/REVIEW
-#__content.urls | JSON URL references | — | STRUCTURED/REVIEW
-#__content.attribs | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__content.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__content.metadata | JSON metadata | — | STRUCTURED/REVIEW
-#__content.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__content_frontpage.content_id | NO | #__content.id | LOOKUP/REVIEW
-#__content_rating.content_id | NO | #__content.id | LOOKUP/REVIEW
-#__contentitem_tag_map.core_content_id | NO | #__ucm_content.core_content_id | LOOKUP/REVIEW
-#__contentitem_tag_map.content_item_id | NO | Context-dependent content item PK | LOOKUP/REVIEW
-#__contentitem_tag_map.tag_id | NO | #__tags.id | LOOKUP/REVIEW
-#__contentitem_tag_map.type_id | NO | #__content_types.type_id | LOOKUP/REVIEW
-#__fields_values.field_id | NO | #__fields.id | LOOKUP/REVIEW
-#__fields_values.item_id | NO | Context-dependent item PK | LOOKUP/REVIEW
-#__fields_values.value | Field-type dependent value | — | STRUCTURED/REVIEW
-#__ucm_base.ucm_item_id | NO | Context-dependent item PK | LOOKUP/REVIEW
-#__ucm_base.ucm_type_id | NO | #__content_types.type_id | LOOKUP/REVIEW
-#__ucm_content.core_body | HTML/text depending content type | — | STRUCTURED/REVIEW
-#__ucm_content.core_checked_out_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__ucm_content.core_access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__ucm_content.core_params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__ucm_content.core_metadata | JSON metadata | — | STRUCTURED/REVIEW
-#__ucm_content.core_created_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__ucm_content.core_modified_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__ucm_content.core_content_item_id | NO | Context-dependent item PK | LOOKUP/REVIEW
-#__ucm_content.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__ucm_content.core_images | JSON media references | — | STRUCTURED/REVIEW
-#__ucm_content.core_urls | JSON URL references | — | STRUCTURED/REVIEW
-#__ucm_content.core_catid | NO | Context-dependent category ID | LOOKUP/REVIEW
-#__ucm_content.core_type_id | NO | #__content_types.type_id | LOOKUP/REVIEW
-#__ucm_history.ucm_item_id | NO | Context-dependent item PK | LOOKUP/REVIEW
-#__ucm_history.ucm_type_id | NO | #__content_types.type_id | LOOKUP/REVIEW
-#__ucm_history.editor_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__ucm_history.version_data | JSON-encoded version snapshot | — | STRUCTURED/REVIEW
-#__template_styles.template | NO | #__extensions.element (logical template identity) | LOOKUP/REVIEW
-#__template_styles.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__menu_types.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__menu.menutype | NO | #__menu_types.menutype (logical) | LOOKUP/REVIEW
-#__menu.path | Derived hierarchy path | — | STRUCTURED/REVIEW
-#__menu.link | URL/query with embedded IDs | Embedded component/content/category IDs may require remap | STRUCTURED/REVIEW
-#__menu.parent_id | NO | #__menu.id (self tree) | LOOKUP/REVIEW
-#__menu.component_id | NO | #__extensions.extension_id | LOOKUP/REVIEW
-#__menu.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__menu.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__menu.img | File/media reference | — | STRUCTURED/REVIEW
-#__menu.template_style_id | NO | #__template_styles.id | LOOKUP/REVIEW
-#__menu.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__menu.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__modules.asset_id | NO | #__assets.id | LOOKUP/REVIEW
-#__modules.content | HTML/text depending module | — | STRUCTURED/REVIEW
-#__modules.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__modules.module | NO | #__extensions.element (logical module identity) | LOOKUP/REVIEW
-#__modules.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__modules.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__modules.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__modules_menu.moduleid | NO | #__modules.id | LOOKUP/REVIEW
-#__modules_menu.menuid | NO | #__menu.id; 0=all; negative=exclude | LOOKUP/REVIEW
-#__contact_details.image | File/media reference | — | STRUCTURED/REVIEW
-#__contact_details.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__contact_details.params | Structured config / review | — | STRUCTURED/REVIEW
-#__contact_details.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__contact_details.catid | NO | #__categories.id | LOOKUP/REVIEW
-#__contact_details.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__contact_details.webpage | URL / reference | — | STRUCTURED/REVIEW
-#__contact_details.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__contact_details.created_by | NO | #__users.id | LOOKUP/REVIEW
-#__contact_details.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__contact_details.metadata | Structured config / review | — | STRUCTURED/REVIEW
-#__newsfeeds.catid | NO | #__categories.id | LOOKUP/REVIEW
-#__newsfeeds.link | URL / reference | — | STRUCTURED/REVIEW
-#__newsfeeds.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__newsfeeds.access | NO | #__viewlevels.id | LOOKUP/REVIEW
-#__newsfeeds.language | NO | #__languages.lang_code (logical) | LOOKUP/REVIEW
-#__newsfeeds.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__newsfeeds.created_by | NO | #__users.id | LOOKUP/REVIEW
-#__newsfeeds.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__newsfeeds.metadata | JSON metadata | — | STRUCTURED/REVIEW
-#__newsfeeds.description | HTML/text | — | STRUCTURED/REVIEW
-#__newsfeeds.images | JSON media references | — | STRUCTURED/REVIEW
-#__banners.cid | NO | #__banner_clients.id | LOOKUP/REVIEW
-#__banners.clickurl | URL / reference | — | STRUCTURED/REVIEW
-#__banners.catid | NO | #__categories.id | LOOKUP/REVIEW
-#__banners.params | Structured config / review | — | STRUCTURED/REVIEW
-#__banners.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__banners.created_by | NO | #__users.id | LOOKUP/REVIEW
-#__banners.modified_by | NO | #__users.id | LOOKUP/REVIEW
-#__banner_tracks.banner_id | NO | #__banners.id | LOOKUP/REVIEW
-#__redirect_links.old_url | URL / reference | — | STRUCTURED/REVIEW
-#__redirect_links.new_url | URL / reference | — | STRUCTURED/REVIEW
-#__redirect_links.referer | URL / reference | — | STRUCTURED/REVIEW
-#__messages.user_id_from | NO | #__users.id | LOOKUP/REVIEW
-#__messages.user_id_to | NO | #__users.id | LOOKUP/REVIEW
-#__messages_cfg.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__user_notes.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__user_notes.catid | NO | #__categories.id | LOOKUP/REVIEW
-#__user_notes.checked_out | NO | #__users.id | LOOKUP/REVIEW
-#__user_notes.created_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__user_notes.modified_user_id | NO | #__users.id | LOOKUP/REVIEW
-#__privacy_consents.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__privacy_consents.body | Consent text/HTML | — | STRUCTURED/REVIEW
-#__action_log_config.id_holder | Schema metadata / dynamic reference | — | STRUCTURED/REVIEW
-#__action_log_config.title_holder | Schema metadata / dynamic reference | — | STRUCTURED/REVIEW
-#__action_log_config.table_name | Schema metadata / dynamic reference | — | STRUCTURED/REVIEW
-#__action_logs_users.user_id | NO | #__users.id | LOOKUP/REVIEW
-#__action_logs_users.extensions | Structured extension list | — | STRUCTURED/REVIEW
-#__session.userid | NO | #__users.id | IGNORE
-#__user_keys.token | SECURITY / authentication token | — | IGNORE
-#__user_keys.series | SECURITY / remember-me series | — | IGNORE
-#__finder_filters.data | Structured filter data | — | REBUILD
-#__finder_filters.params | JSON / Joomla Registry | — | REBUILD
-#__finder_links.type_id | NO | #__finder_types.id | REBUILD
-#__finder_links.object | Serialized/index object blob | — | REBUILD
-#__finder_links_terms0.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms0.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms1.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms1.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms2.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms2.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms3.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms3.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms4.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms4.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms5.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms5.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms6.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms6.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms7.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms7.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms8.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms8.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_terms9.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_terms9.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termsa.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termsa.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termsb.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termsb.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termsc.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termsc.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termsd.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termsd.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termse.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termse.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_links_termsf.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_links_termsf.term_id | NO | #__finder_terms.term_id | REBUILD
-#__finder_taxonomy.parent_id | NO | #__finder_taxonomy.id | REBUILD
-#__finder_taxonomy_map.link_id | NO | #__finder_links.link_id | REBUILD
-#__finder_taxonomy_map.node_id | NO | #__finder_taxonomy.id | REBUILD
-#__finder_tokens_aggregate.term_id | NO | #__finder_terms.term_id | REBUILD
-#__action_logs.message | Structured/action message payload | — | ARCHIVE/IGNORE
-#__action_logs.user_id | NO | #__users.id | ARCHIVE/IGNORE
-#__action_logs.item_id | NO | Context-dependent by extension/action type | ARCHIVE/IGNORE
-#__postinstall_messages.extension_id | NO | #__extensions.extension_id | IGNORE
-#__postinstall_messages.action_file | File/RAD URI | — | IGNORE
-#__postinstall_messages.condition_file | File/RAD URI | — | IGNORE
+**Policy:** `TARGET_OWNED`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__guidedtours` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) DEFAULT '' NOT NULL,
+  `uid` varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `description` text NOT NULL,
+  `ordering` int NOT NULL DEFAULT 0,
+  `extensions` text NOT NULL,
+  `url` varchar(255) NOT NULL,
+  `created` datetime NOT NULL,
+  `created_by` int NOT NULL DEFAULT 0,
+  `modified` datetime NOT NULL,
+  `modified_by` int NOT NULL DEFAULT 0,
+  `checked_out_time` datetime,
+  `checked_out` int unsigned,
+  `published` tinyint NOT NULL DEFAULT 0,
+  `language` varchar(7) NOT NULL,
+  `note` varchar(255) NOT NULL DEFAULT '',
+  `access` int unsigned NOT NULL DEFAULT 0,
+  `autostart` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_access` (`access`),
+  KEY `idx_state` (`published`),
+  KEY `idx_language` (`language`),
+  KEY `idx_uid` (`uid`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
 ```
 
-## Coverage Summary
+### `#__guidedtour_steps`
 
-- `G0`: 5 tables / 43 fields
-- `G1`: 6 tables / 46 fields
-- `G2`: 7 tables / 116 fields
-- `G3`: 3 tables / 37 fields
-- `G4`: 6 tables / 58 fields
-- `G5`: 3 tables / 38 fields
-- `G6`: 2 tables / 20 fields
-- `G7`: 14 tables / 189 fields
-- `G8`: 32 tables / 164 fields
-- **Total: 78 tables / 711 fields**
+**Fields (20):** `id`, `tour_id`, `title`, `published`, `description`, `ordering`, `position`, `target`, `type`, `interactive_type`, `url`, `created`, `created_by`, `modified`, `modified_by`, `checked_out_time`, `checked_out`, `language`, `note`, `params`
+
+**Policy:** `TARGET_OWNED`  
+**Official source:** `extensions.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__guidedtour_steps` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `tour_id` int NOT NULL DEFAULT 0,
+  `title` varchar(255) NOT NULL,
+  `published` tinyint NOT NULL DEFAULT 0,
+  `description` text NOT NULL,
+  `ordering` int NOT NULL DEFAULT 0,
+  `position` varchar(255) NOT NULL,
+  `target` varchar(255) NOT NULL,
+  `type` int NOT NULL,
+  `interactive_type` int NOT NULL DEFAULT 1,
+  `url` varchar(255) NOT NULL,
+  `created` datetime NOT NULL,
+  `created_by` int unsigned NOT NULL DEFAULT 0,
+  `modified` datetime NOT NULL,
+  `modified_by` int unsigned NOT NULL DEFAULT 0,
+  `checked_out_time` datetime,
+  `checked_out` int unsigned,
+  `language` varchar(7) NOT NULL,
+  `note` varchar(255) NOT NULL DEFAULT '',
+  `params` text,
+  PRIMARY KEY (`id`),
+  KEY `idx_tour` (`tour_id`),
+  KEY `idx_state` (`published`),
+  KEY `idx_language` (`language`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 DEFAULT COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
+## Coverage Reconciliation
+
+| Check | Result |
+|---|---:|
+| Official physical tables | 76 |
+| Documented tables | 76 |
+| Official physical fields | 832 |
+| Documented `(table, field)` pairs | 832 |
+| Unique `(table, field)` pairs | 832 |
+| Duplicate fields | 0 |
+| Missing tables | 0 |
+| Extra tables | 0 |
+| Missing fields | 0 |
+| Extra fields | 0 |
+| Per-table field-count mismatches | 0 |
+| **Baseline field coverage** | **100%** |
 
 ```text
-Documented table sections = 78
-Physical fields = 711
-Unique (table, field) = 711
-Duplicate fields = 0
-Missing table DDL = 0
-Tables with zero fields = 0
-Baseline field coverage = 100%
+Official tables                  = 76
+Manifest tables                  = 76
+Official (table, field) pairs    = 832
+Manifest (table, field) pairs    = 832
+Unique manifest pairs            = 832
+Missing official tables          = 0
+Unexpected manifest tables       = 0
+Missing official fields          = 0
+Unexpected manifest fields       = 0
+Duplicate fields                 = 0
+Per-table field-count mismatches = 0
+
+JOOMLA 6.1.2 FIELD INVENTORY     = PASS
 ```
 
 ## Production Database Reconciliation
 
+Before migration execution, compare the real Joomla 6 target to this official baseline:
+
 ```sql
 SELECT
-    TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION,
-    COLUMN_DEFAULT, IS_NULLABLE, DATA_TYPE,
-    CHARACTER_MAXIMUM_LENGTH, CHARACTER_OCTET_LENGTH,
-    NUMERIC_PRECISION, NUMERIC_SCALE, DATETIME_PRECISION,
-    CHARACTER_SET_NAME, COLLATION_NAME, COLUMN_TYPE,
-    COLUMN_KEY, EXTRA, PRIVILEGES, COLUMN_COMMENT,
+    TABLE_NAME,
+    COLUMN_NAME,
+    ORDINAL_POSITION,
+    COLUMN_DEFAULT,
+    IS_NULLABLE,
+    DATA_TYPE,
+    CHARACTER_MAXIMUM_LENGTH,
+    CHARACTER_OCTET_LENGTH,
+    NUMERIC_PRECISION,
+    NUMERIC_SCALE,
+    DATETIME_PRECISION,
+    CHARACTER_SET_NAME,
+    COLLATION_NAME,
+    COLUMN_TYPE,
+    COLUMN_KEY,
+    EXTRA,
+    PRIVILEGES,
+    COLUMN_COMMENT,
     GENERATION_EXPRESSION
 FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = :joomla3_database
+WHERE TABLE_SCHEMA = '<JOOMLA6_DATABASE>'
 ORDER BY TABLE_NAME, ORDINAL_POSITION;
 ```
 
-Classify every difference: `OFFICIAL`, `CUSTOM_COLUMN`, `MISSING_FROM_PRODUCTION`, `MODIFIED_DEFINITION`, `EXTENSION_FIELD`, or `UNKNOWN`.
-
-## Final Field Coverage Gate
+Production PASS requires:
 
 ```text
-Baseline tables documented = 78/78
-Baseline fields documented = 711/711
-Exact DDL captured = 100%
-Structured/reference review = 100%
-Production fields inventoried = 100%
-Production differences classified = 100%
-Field mapping decisions completed = 100%
-Missing fields = 0
-Duplicate fields = 0
-Unknown fields = 0
-Unmapped required fields = 0
-JOOMLA 3 CORE FIELD INVENTORY = PASS
+Actual target core tables inventoried = 100%
+Actual target core fields inventoried = 100%
+Missing expected core fields          = 0
+Unexplained target-only fields        = 0
+Duplicate inventory fields            = 0
+Unclassified fields                   = 0
 ```

@@ -4,12 +4,12 @@
 
 > **Every Joomla 3 core source table must appear exactly once and resolve to one final table-level migration decision.**
 
-This file materializes the table-level portion of [`joomla-core-j3-j6-migration-contract.md`](./joomla-core-j3-j6-migration-contract.md) into seed-ready mapping rows. It is derived from the four canonical manifests and intentionally does not duplicate their DDL or field lists:
+This file materializes the table-level portion of [`joomla-core-j3-j6-migration-contract.md`](05-joomla-core-j3-j6-migration-contract.md) into seed-ready mapping rows. It is derived from the four canonical manifests and intentionally does not duplicate their DDL or field lists:
 
-- [`joomla-core-migration-groups-v3.md`](./joomla-core-migration-groups-v3.md)
-- [`joomla-core-migration-fields-v3.md`](./joomla-core-migration-fields-v3.md)
-- [`joomla-core-migration-groups-v6.md`](./joomla-core-migration-groups-v6.md)
-- [`joomla-core-migration-fields-v6.md`](./joomla-core-migration-fields-v6.md)
+- [`joomla-core-migration-groups-v3.md`](01-joomla-core-migration-groups-v3.md)
+- [`joomla-core-migration-fields-v3.md`](03-joomla-core-migration-fields-v3.md)
+- [`joomla-core-migration-groups-v6.md`](02-joomla-core-migration-groups-v6.md)
+- [`joomla-core-migration-fields-v6.md`](04-joomla-core-migration-fields-v6.md)
 
 ```text
 Joomla 3 source tables       = 78

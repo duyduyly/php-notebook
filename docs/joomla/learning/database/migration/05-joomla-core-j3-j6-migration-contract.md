@@ -9,10 +9,10 @@
 
 This document is the migration contract that connects the four schema manifests:
 
-- [`joomla-core-migration-groups-v3.md`](./joomla-core-migration-groups-v3.md)
-- [`joomla-core-migration-fields-v3.md`](./joomla-core-migration-fields-v3.md)
-- [`joomla-core-migration-groups-v6.md`](./joomla-core-migration-groups-v6.md)
-- [`joomla-core-migration-fields-v6.md`](./joomla-core-migration-fields-v6.md)
+- [`joomla-core-migration-groups-v3.md`](01-joomla-core-migration-groups-v3.md)
+- [`joomla-core-migration-fields-v3.md`](03-joomla-core-migration-fields-v3.md)
+- [`joomla-core-migration-groups-v6.md`](02-joomla-core-migration-groups-v6.md)
+- [`joomla-core-migration-fields-v6.md`](04-joomla-core-migration-fields-v6.md)
 
 The contract does **not** define 100% migration as "copy every Joomla 3 row into Joomla 6". Runtime, generated, security-token, obsolete, and target-owned data must not be blindly copied.
 

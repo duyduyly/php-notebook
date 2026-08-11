@@ -295,6 +295,6 @@ Unclassified tables                      = 0
 TABLE MANIFEST                            = PASS
 ```
 
-The companion [`joomla-core-migration-fields-v6.md`](./joomla-core-migration-fields-v6.md) must independently reconcile every official `(table, field)` pair before field coverage can be marked PASS.
+The companion [`joomla-core-migration-fields-v6.md`](04-joomla-core-migration-fields-v6.md) must independently reconcile every official `(table, field)` pair before field coverage can be marked PASS.
 
 > The 76-table / 832-field numbers are the official Joomla 6.1.2 fresh-install baseline. A real target database must still be reconciled against `information_schema.TABLES` and `information_schema.COLUMNS` to detect customization, extension-owned objects, or later Joomla 6.x changes.

@@ -128,11 +128,11 @@ Generate a complete migration-group/table manifest for both the **source** and *
 
 ### Use this plan
 
-[`migration-group-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-group-generation-plan.md)
+[`migration-group-generation-plan.md`](./migration-group-generation-plan.md)
 
 ### Use this template
 
-[`database-migration-groups-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-groups-template.md)
+[`database-migration-groups-template.md`](../templates/database-migration-groups-template.md)
 
 ## Input
 
@@ -166,8 +166,8 @@ joomla-core-migration-groups-v6.md
 
 ## Reference examples
 
-- [Joomla 3 core migration groups](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-groups-v3.md)
-- [Joomla 6 core migration groups](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-groups-v6.md)
+- [Joomla 3 core migration groups](../01-joomla-core-migration-groups-v3.md)
+- [Joomla 6 core migration groups](../02-joomla-core-migration-groups-v6.md)
 
 ## Required coverage
 
@@ -201,11 +201,11 @@ Generate complete physical field inventories for every table that passed Step 1.
 
 ### Use this plan
 
-[`migration-field-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-field-generation-plan.md)
+[`migration-field-generation-plan.md`](./migration-field-generation-plan.md)
 
 ### Use this template
 
-[`database-migration-field-inventory-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-field-inventory-template.md)
+[`database-migration-field-inventory-template.md`](../templates/database-migration-field-inventory-template.md)
 
 ## Input
 
@@ -239,8 +239,8 @@ joomla-core-migration-fields-v6.md
 
 ## Reference examples
 
-- [Joomla 3 core migration fields](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-fields-v3.md)
-- [Joomla 6 core migration fields](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-fields-v6.md)
+- [Joomla 3 core migration fields](../03-joomla-core-migration-fields-v3.md)
+- [Joomla 6 core migration fields](../04-joomla-core-migration-fields-v6.md)
 
 ## Required field information
 
@@ -302,11 +302,11 @@ Create the migration decision contract that defines how source and target schema
 
 ### Use this plan
 
-[`migration-contract-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-contract-generation-plan.md)
+[`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
 
 ### Use this template
 
-[`database-migration-contract-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-contract-template.md)
+[`database-migration-contract-template.md`](../templates/database-migration-contract-template.md)
 
 ## Input
 
@@ -365,7 +365,7 @@ joomla-core-j3-j6-migration-contract.md
 
 ## Reference example
 
-- [Joomla 3 → Joomla 6 core migration contract](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-j3-j6-migration-contract.md)
+- [Joomla 3 → Joomla 6 core migration contract](../05-joomla-core-j3-j6-migration-contract.md)
 
 ## Required contract coverage
 
@@ -434,13 +434,13 @@ The field inventories are useful for confirming that two same-name tables are ge
 
 Use the rules in **Step 4 of this file**:
 
-[`migration-mapping-plan-tutorial.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-mapping-plan-tutorial.md)
+[`migration-mapping-plan-tutorial.md`](#step-4--generate-the-table-mapping)
 
 ## Use this template
 
 The repository template name is:
 
-[`database-migration-table-mapping-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-table-mapping-template.md)
+[`database-migration-table-mapping-template.md`](../templates/database-migration-table-mapping-template.md)
 
 > This is the canonical table-mapping template. Use this repository filename instead of informal names such as `table-mapping-migration-templace.md`.
 
@@ -470,7 +470,7 @@ when multiple migration scopes may coexist in the repository or mapping database
 
 ## Reference example
 
-- [Joomla core table mapping](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/table-mapping-migration.md)
+- [Joomla core table mapping](../06-joomla-core-table-mapping-migration.md)
 
 The Joomla core file predates the scope-prefix convention; new generated mapping files should follow the scoped filename rule above.
 
@@ -547,11 +547,11 @@ The table mapping is mandatory because field mapping must not guess the target t
 
 ## Use this plan
 
-[`migration-field-mapping-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-field-mapping-generation-plan.md)
+[`migration-field-mapping-generation-plan.md`](./migration-field-mapping-generation-plan.md)
 
 ## Use this template
 
-[`database-migration-field-mapping-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-field-mapping-template.md)
+[`database-migration-field-mapping-template.md`](../templates/database-migration-field-mapping-template.md)
 
 ## Required output filename
 
@@ -577,7 +577,7 @@ field-mapping-migration.md
 
 ## Reference example
 
-- [Joomla core field mapping](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/field-mapping-migration.md)
+- [Joomla core field mapping](../09-joomla-core-field-mapping-migration.md)
 
 The Joomla core example predates the scope-prefix convention; new generated files should use the scoped filename rule.
 
