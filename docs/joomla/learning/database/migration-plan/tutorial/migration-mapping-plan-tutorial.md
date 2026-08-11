@@ -1,218 +1,250 @@
 # Migration Mapping Plan Tutorial
 
-## Purpose
+> Build a complete, reusable migration-mapping package from an **ERD and/or database schema**, then materialize table and field mappings for the migration inventory and mapping database.
 
-> **Goal: build a reusable, evidence-backed migration mapping package that accounts for 100% of in-scope source tables and fields, resolves 100% of required target tables and fields, and is ready to materialize into the migration mapping database.**
+## Overview
 
-This tutorial orchestrates the existing migration-plan tutorials and templates into one end-to-end workflow.
-
-It is reusable for:
-
-- Joomla core migrations;
-- Joomla third-party extensions;
-- custom Joomla extensions;
-- version-to-version database migrations;
-- subsystem migrations;
-- other database-backed applications where complete source and target inventories can be produced.
-
-The tutorial does **not** define 100% migration as “copy everything 1:1”. It defines 100% mapping as:
-
-> **Every in-scope source table and field is explicitly accounted for, every required target table and field is explicitly resolved, and no mapping remains unknown, ambiguous, pending, or silently dropped.**
-
-Production migration success still requires runtime value/ID mapping, record accounting, execution, and post-migration verification.
+- [Input Data](#input-data)
+- [End-to-End Flow](#end-to-end-flow)
+- [Step 1 — Generate Migration Group Tables](#step-1--generate-migration-group-tables)
+- [Step 2 — Generate Migration Field Inventories](#step-2--generate-migration-field-inventories)
+- [Step 3 — Generate the Migration Contract](#step-3--generate-the-migration-contract)
+- [Step 4 — Generate the Table Mapping](#step-4--generate-the-table-mapping)
+- [Step 5 — Generate the Field Mapping](#step-5--generate-the-field-mapping)
+- [Required Naming Convention](#required-naming-convention)
+- [Final Artifact Set](#final-artifact-set)
+- [Final Mapping Gate](#final-mapping-gate)
 
 ---
 
-## Documents Used by This Tutorial
+## Input Data
 
-### Tutorials
+The workflow can start from either of these inputs:
 
-- [`migration-group-generation-plan.md`](./migration-group-generation-plan.md)
-- [`migration-field-generation-plan.md`](./migration-field-generation-plan.md)
-- [`migration-field-mapping-generation-plan.md`](./migration-field-mapping-generation-plan.md)
-- [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
+```text
+ERD
+or
+Database / schema
+or
+ERD + Database / schema
+```
 
-### Templates
+### Recommended priority
 
-- [`../templates/database-migration-groups-template.md`](../templates/database-migration-groups-template.md)
-- [`../templates/database-migration-field-inventory-template.md`](../templates/database-migration-field-inventory-template.md)
-- [`../templates/database-migration-field-mapping-template.md`](../templates/database-migration-field-mapping-template.md)
-- [`../templates/database-migration-contract-template.md`](../templates/database-migration-contract-template.md)
+```text
+Actual database/schema metadata
+        ↓
+Authoritative installation / migration DDL
+        ↓
+ERD
+        ↓
+Documentation / notes
+```
+
+An ERD is useful for understanding relationships and migration scope, but it may omit physical columns, indexes, defaults, generated columns, logical references, or production-only schema changes.
+
+For a production claim of **100% inventory and mapping coverage**, reconcile the generated artifacts against the actual source and target databases before execution.
+
+Useful database evidence includes:
+
+```text
+information_schema.TABLES
+information_schema.COLUMNS
+information_schema.STATISTICS
+information_schema.KEY_COLUMN_USAGE
+SHOW CREATE TABLE
+```
 
 ---
 
-# End-to-End Flow
+## End-to-End Flow
 
 ```mermaid
 flowchart TD
-    A[Freeze migration scope and versions]
-    B1[Step 1A: Source migration groups]
-    B2[Step 1B: Target migration groups]
-    C1[Step 2A: Source field inventory]
-    C2[Step 2B: Target field inventory]
-    D[Step 3: Create migration contract skeleton]
-    E[Step 4: Generate table mapping]
-    F[Step 5: Generate field mapping]
-    G[Step 6: Finalize ID/value/structured/dependency rules]
-    H[Step 7: Finalize migration contract]
-    I[Step 8: Materialize mapping database]
-    J[Definition-level mapping PASS]
-    K[Production reconciliation and migration execution]
+    A[ERD and/or Source + Target Databases]
+
+    B1[Step 1: Source Migration Groups]
+    B2[Step 1: Target Migration Groups]
+
+    C1[Step 2: Source Field Inventory]
+    C2[Step 2: Target Field Inventory]
+
+    D[Step 3: Migration Contract]
+    E[Step 4: Table Mapping]
+    F[Step 5: Field Mapping]
+
+    G[Migration Inventory DB]
+    H[Migration Mapping DB]
 
     A --> B1
     A --> B2
     B1 --> C1
     B2 --> C2
+    B1 --> D
+    B2 --> D
     C1 --> D
     C2 --> D
+    A --> D
     D --> E
+    B1 --> E
+    B2 --> E
+    C1 -. validation evidence .-> E
+    C2 -. validation evidence .-> E
     E --> F
+    C1 --> F
+    C2 --> F
+    D --> F
+    E --> G
     F --> G
-    G --> H
-    H --> I
-    I --> J
-    J --> K
+    E --> H
+    F --> H
 ```
 
-The output of each step is a hard prerequisite for the next step. Do not skip a failed gate.
+### Workflow rule
 
----
-
-# Step 0 — Freeze the Migration Scope
-
-Before generating any mapping document, record the exact migration identity.
-
-Required values:
+Each step produces an artifact that becomes input to the next step.
 
 ```text
-MIGRATION_SCOPE
-SOURCE_SYSTEM
-SOURCE_VERSION
-TARGET_SYSTEM
-TARGET_VERSION
-SOURCE_DATABASE
-TARGET_DATABASE
-SOURCE_SCHEMA_AUTHORITY
-TARGET_SCHEMA_AUTHORITY
+GROUP INVENTORY PASS
+        ↓
+FIELD INVENTORY PASS
+        ↓
+MIGRATION CONTRACT
+        ↓
+TABLE MAPPING PASS
+        ↓
+FIELD MAPPING PASS
 ```
 
-Examples of schema authority:
-
-```text
-official installation SQL
-official release package
-official repository migration files
-actual production CREATE TABLE metadata
-ORM/database migration definitions
-```
-
-## Step 0 gate
-
-```text
-Migration scope explicit             = YES
-Source system/version explicit       = YES
-Target system/version explicit       = YES
-Source schema authority explicit     = YES
-Target schema authority explicit     = YES
-```
-
-Do not continue if the versions or migration scope are still ambiguous.
+Do not generate final mappings from guessed table or field sets.
 
 ---
 
 # Step 1 — Generate Migration Group Tables
 
-Use:
+## Goal
 
-- [`migration-group-generation-plan.md`](./migration-group-generation-plan.md)
-- [`../templates/database-migration-groups-template.md`](../templates/database-migration-groups-template.md)
+Generate a complete migration-group/table manifest for both the **source** and **target** schemas.
 
-Generate a migration-group Markdown file for **both sides** of the migration.
+### Use this plan
 
-Recommended outputs:
+[`migration-group-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-group-generation-plan.md)
 
-```text
-<scope>-migration-groups-source.md
-<scope>-migration-groups-target.md
-```
+### Use this template
 
-For version-labelled projects, equivalent names are acceptable:
+[`database-migration-groups-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-groups-template.md)
+
+## Input
 
 ```text
-<scope>-migration-groups-v1.md
-<scope>-migration-groups-v2.md
+ERD and/or database schema
+source or target system/version
+migration scope
+schema authority / DDL when available
 ```
 
-The important requirement is that `SOURCE` and `TARGET` are unambiguous.
-
-## Step 1A — Source migration groups
-
-Run the migration-group generation plan against the source schema.
-
-The generated file must explicitly classify every physical source table in scope.
-
-Required result:
+Run the process twice:
 
 ```text
-Source physical tables discovered     = 100%
-Source tables explicitly classified   = 100%
-Missing source tables                 = 0
-Duplicate source tables               = 0
-Unknown ownership                     = 0
-Wildcard final table entries          = 0
-SOURCE MIGRATION GROUP                = PASS
+SOURCE → migration group manifest
+TARGET → migration group manifest
 ```
 
-## Step 1B — Target migration groups
-
-Repeat the same process against the target schema.
-
-Required result:
+## Recommended outputs
 
 ```text
-Target physical tables discovered     = 100%
-Target tables explicitly classified   = 100%
-Missing target tables                 = 0
-Duplicate target tables               = 0
-Unknown ownership                     = 0
-Wildcard final table entries          = 0
-TARGET MIGRATION GROUP                = PASS
+<scope>-migration-groups-<source-version>.md
+<scope>-migration-groups-<target-version>.md
 ```
 
-## Step 1 outputs
+Example:
 
 ```text
-SOURCE GROUP MANIFEST = PASS
-TARGET GROUP MANIFEST = PASS
+joomla-core-migration-groups-v3.md
+joomla-core-migration-groups-v6.md
 ```
 
-These two files define the table universes used by every later step.
+## Reference examples
+
+- [Joomla 3 core migration groups](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-groups-v3.md)
+- [Joomla 6 core migration groups](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-groups-v6.md)
+
+## Required coverage
+
+The generated files must explicitly classify every physical table in the declared scope.
+
+```text
+Source tables discovered/classified = 100%
+Target tables discovered/classified = 100%
+Missing tables                      = 0
+Duplicate tables                    = 0
+Unknown ownership                   = 0
+Wildcard final table entries        = 0
+```
+
+### Step 1 PASS
+
+```text
+SOURCE MIGRATION GROUP = PASS
+TARGET MIGRATION GROUP = PASS
+```
+
+These files become the authoritative table universes used by the following steps.
 
 ---
 
-# Step 2 — Generate Source and Target Field Inventories
+# Step 2 — Generate Migration Field Inventories
 
-Use:
+## Goal
 
-- [`migration-field-generation-plan.md`](./migration-field-generation-plan.md)
-- [`../templates/database-migration-field-inventory-template.md`](../templates/database-migration-field-inventory-template.md)
+Generate complete physical field inventories for every table that passed Step 1.
 
-Generate one field-inventory file for each side.
+### Use this plan
 
-Recommended outputs:
+[`migration-field-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-field-generation-plan.md)
+
+### Use this template
+
+[`database-migration-field-inventory-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-field-inventory-template.md)
+
+## Input
 
 ```text
-<scope>-migration-fields-source.md
-<scope>-migration-fields-target.md
+Step 1 source migration-group manifest
+Step 1 target migration-group manifest
+ERD and/or database schema
+schema DDL / authoritative schema evidence
 ```
 
-Each field inventory must be derived from the effective table set that passed Step 1.
+Run the process twice:
 
-## Step 2A — Source field inventory
+```text
+SOURCE groups → SOURCE field inventory
+TARGET groups → TARGET field inventory
+```
 
-Every physical field in every in-scope source table must be explicit.
+## Recommended outputs
 
-Preserve at minimum:
+```text
+<scope>-migration-fields-<source-version>.md
+<scope>-migration-fields-<target-version>.md
+```
+
+Example:
+
+```text
+joomla-core-migration-fields-v3.md
+joomla-core-migration-fields-v6.md
+```
+
+## Reference examples
+
+- [Joomla 3 core migration fields](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-fields-v3.md)
+- [Joomla 6 core migration fields](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-migration-fields-v6.md)
+
+## Required field information
+
+For each physical field preserve enough schema metadata to validate migration compatibility:
 
 ```text
 table
@@ -223,91 +255,73 @@ COLUMN_TYPE
 length / precision / scale
 nullable
 default
+generated / identity / auto-increment state
 charset / collation
-extra / generated / identity state
-PK / UNIQUE / INDEX metadata
+PK / COMPOSITE_PK / UNIQUE / INDEX information
 physical FK metadata when declared
 schema evidence
 ```
 
-Required result:
+Logical and embedded references may be annotated here when known, but their final migration decision belongs in the field-mapping step.
+
+## Required coverage
 
 ```text
-Source in-scope tables                = 100%
-Source physical fields inventoried    = 100%
-Unique source (table, field) pairs    = 100%
-Missing source fields                 = 0
-Duplicate source fields               = 0
-Unexplained production deviations     = 0
-SOURCE FIELD INVENTORY                = PASS
+Source physical fields inventoried       = 100%
+Target physical fields inventoried       = 100%
+Unique source (table, field) pairs       = 100%
+Unique target (table, field) pairs       = 100%
+Missing fields                           = 0
+Duplicate fields                         = 0
+Unexplained schema deviations            = 0
 ```
 
-## Step 2B — Target field inventory
-
-Repeat the same process against the target table universe.
-
-Required result:
+### Step 2 PASS
 
 ```text
-Target in-scope tables                = 100%
-Target physical fields inventoried    = 100%
-Unique target (table, field) pairs    = 100%
-Missing target fields                 = 0
-Duplicate target fields               = 0
-Unexplained production deviations     = 0
-TARGET FIELD INVENTORY                = PASS
+SOURCE FIELD INVENTORY = PASS
+TARGET FIELD INVENTORY = PASS
 ```
 
-## Step 2 outputs
-
-At this point the migration has four authoritative inventory artifacts:
+At this point, the migration has four schema artifacts:
 
 ```text
-1. source migration groups
-2. source field inventory
-3. target migration groups
-4. target field inventory
+1. Source migration groups
+2. Target migration groups
+3. Source field inventory
+4. Target field inventory
 ```
-
-These four files are the fixed schema baseline for mapping.
 
 ---
 
-# Step 3 — Create the Migration Contract Skeleton
+# Step 3 — Generate the Migration Contract
 
-Use:
+## Goal
 
-- [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
-- [`../templates/database-migration-contract-template.md`](../templates/database-migration-contract-template.md)
+Create the migration decision contract that defines how source and target schema/data are allowed to be handled.
 
-Create a **contract skeleton**, not a final PASS contract yet.
+### Use this plan
 
-Recommended output:
+[`migration-contract-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-contract-generation-plan.md)
+
+### Use this template
+
+[`database-migration-contract-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-contract-template.md)
+
+## Input
 
 ```text
-<scope>-migration-contract.md
+Source migration-group manifest
+Target migration-group manifest
+Source migration-field inventory
+Target migration-field inventory
+ERD and/or source + target databases
+business / application migration rules
 ```
 
-At this stage fill only the parts that can already be proven:
+The ERD/database evidence is still relevant here because schema identity alone does not prove migration semantics.
 
-```text
-migration scope
-source/target systems and versions
-source/target table counts
-source/target field counts
-schema authorities
-allowed final decisions
-mapping precedence
-production reconciliation rules
-backup/recovery rules
-final gate definitions
-```
-
-Do not mark table mapping, field mapping, target resolution, ID mapping, or runtime verification as PASS yet.
-
-## Why the contract is created before mapping
-
-The contract defines the vocabulary and rules used by both table and field mapping:
+The contract must define the controlled decisions used later by table and field mappings, for example:
 
 ```text
 DIRECT
@@ -324,146 +338,258 @@ TARGET_OWNED
 RECREATE
 ```
 
-Forbidden final states:
+Unresolved final decisions such as the following are forbidden:
 
 ```text
 UNKNOWN
 PENDING
 REVIEW
 OPTIONAL
-SELECTIVE
 UNMAPPED
 AMBIGUOUS
 TBD
 A / B
 ```
 
-This prevents table mapping and field mapping from inventing different decision vocabularies.
-
-## Step 3 gate
+## Recommended output
 
 ```text
-Inventory baselines copied from PASS artifacts = YES
-Canonical final decisions defined             = YES
-Invalid final decisions forbidden             = YES
-Final production gates defined                 = YES
-Contract status                                = DRAFT / NOT YET PASS
+<scope>-migration-contract.md
 ```
+
+Example:
+
+```text
+joomla-core-j3-j6-migration-contract.md
+```
+
+## Reference example
+
+- [Joomla 3 → Joomla 6 core migration contract](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/joomla-core-j3-j6-migration-contract.md)
+
+## Required contract coverage
+
+The contract must establish rules for at least:
+
+```text
+source table accounting
+source field accounting
+target-only structures
+target-only fields
+ID / identity mapping
+value mapping
+physical + logical references
+structured values
+source-only data
+runtime / generated / security data
+dependencies
+record accounting
+verification / error handling
+```
+
+### Step 3 PASS condition
+
+The contract is ready to drive mapping when:
+
+```text
+Schema baseline established             = YES
+Allowed final decisions defined         = YES
+Invalid final states forbidden          = YES
+Table/field accounting rules defined    = YES
+ID/value/reference rules defined        = YES
+Verification gates defined              = YES
+```
+
+> The migration contract defines the rules. Steps 4 and 5 materialize those rules into explicit table and field mappings.
 
 ---
 
 # Step 4 — Generate the Table Mapping
 
-Use the **table-mapping section** of:
+## Goal
 
-- [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
+Generate the table-level mapping file used to populate or validate the **migration inventory** and **migration mapping database**.
 
-and the four PASS inventory artifacts from Steps 1–2.
+## Input
 
-Recommended output:
+Primary inputs:
+
+```text
+Source migration-group manifest
+Target migration-group manifest
+Migration contract
+```
+
+Validation evidence already available from Step 2:
+
+```text
+Source field inventory
+Target field inventory
+ERD and/or database schema
+```
+
+The field inventories are useful for confirming that two same-name tables are genuinely compatible and for detecting structural changes that require `TRANSFORM`, `REBUILD`, or another explicit decision.
+
+## Use this tutorial
+
+Use the rules in **Step 4 of this file**:
+
+[`migration-mapping-plan-tutorial.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-mapping-plan-tutorial.md)
+
+## Use this template
+
+The repository template name is:
+
+[`database-migration-table-mapping-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-table-mapping-template.md)
+
+> This is the canonical table-mapping template. Use this repository filename instead of informal names such as `table-mapping-migration-templace.md`.
+
+## Required output filename
+
+The generated mapping file **must use the migration scope as a prefix**:
 
 ```text
 <scope>-table-mapping-migration.md
 ```
 
-Until a dedicated reusable table-mapping template exists, use the canonical table matrix defined by the migration-contract generation plan.
-
-Recommended mapping columns:
-
-| # | Group | Source Table | Target / Destination | Mapping Type | ID Strategy | Identity Key | Depends On | Produces Map | Consumes Maps | Execution Order | Verify | Reason |
-|---:|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | `Gx` | `<source_table>` | `<target / archive / none>` | `<decision>` | `<id strategy>` | `<identity>` | `<dependencies>` | `<map>` | `<maps>` | `<order>` | `<verify>` | `<reason>` |
-
-## Required table cases
-
-The mapping must explicitly handle:
+Examples:
 
 ```text
-same-name table
-renamed table
-restructured table
-one-to-one table mapping
-one-to-many table mapping
-many-to-one table mapping
+hikashop-table-mapping-migration.md
+acymailing-table-mapping-migration.md
+joomla-core-table-mapping-migration.md
+```
+
+Do not generate generic filenames such as:
+
+```text
+table-mapping-migration.md
+```
+
+when multiple migration scopes may coexist in the repository or mapping database.
+
+## Reference example
+
+- [Joomla core table mapping](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/table-mapping-migration.md)
+
+The Joomla core file predates the scope-prefix convention; new generated mapping files should follow the scoped filename rule above.
+
+## Required table mapping cases
+
+Account for all relevant structural cases:
+
+```text
+ONE_TO_ONE
+ONE_TO_MANY
+MANY_TO_ONE
 source-only table
 target-only table
-generated/rebuilt table
-runtime/security table
-archive-only table
-target-owned table
-```
-
-## Source table gate
-
-Every source table must be accounted for exactly once at the table-decision level.
-
-```text
-Distinct source tables accounted      = 100%
-Missing source table decisions        = 0
-Duplicate final source decisions      = 0
-Unknown table decisions               = 0
-Ambiguous table decisions             = 0
-Unverifiable table decisions          = 0
-```
-
-## Target table anti-join
-
-After resolving source tables, compute target tables that have no source-table representation.
-
-Every target-only table must receive one explicit resolution:
-
-```text
-TARGET_OWNED
+renamed table
+restructured table
+DIRECT
+TRANSFORM
+LOOKUP
+REBUILD
 GENERATED
 RECREATE
-DEFAULT
 REFERENCE_ONLY
-REBUILD
-NOT_REQUIRED_BY_SCOPE
+TARGET_OWNED
+ARCHIVE
+IGNORE
 ```
 
-Required result:
+## Table mapping gate
 
 ```text
-Target-only tables discovered         = 100%
-Target-only tables classified         = 100%
-Unresolved target-only tables         = 0
-TABLE MAPPING                         = PASS
+Distinct source tables accounted        = 100%
+Missing source table decisions          = 0
+Ambiguous source table decisions        = 0
+Invalid final decisions                 = 0
+Target-only tables discovered           = 100%
+Target-only tables classified           = 100%
+Unresolved required target tables       = 0
+Unverifiable mappings                   = 0
 ```
 
-Field mapping must not begin until this gate passes.
+### Step 4 PASS
+
+```text
+TABLE MAPPING = PASS
+```
+
+The generated file now becomes a required dependency for field mapping.
 
 ---
 
 # Step 5 — Generate the Field Mapping
 
-Use:
+## Goal
 
-- [`migration-field-mapping-generation-plan.md`](./migration-field-mapping-generation-plan.md)
-- [`../templates/database-migration-field-mapping-template.md`](../templates/database-migration-field-mapping-template.md)
+Generate the field-level mapping file used to populate or validate the **migration inventory** and **migration mapping database**.
 
-Recommended output:
+## Input
+
+Primary inputs requested by this workflow:
+
+```text
+Source migration-field inventory
+Target migration-field inventory
+Migration contract
+```
+
+Mandatory dependency from Step 4:
+
+```text
+Table mapping = PASS
+```
+
+The table mapping is mandatory because field mapping must not guess the target table independently.
+
+## Use this plan
+
+[`migration-field-mapping-generation-plan.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/tutorial/migration-field-mapping-generation-plan.md)
+
+## Use this template
+
+[`database-migration-field-mapping-template.md`](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/templates/database-migration-field-mapping-template.md)
+
+## Required output filename
+
+The generated mapping file **must use the migration scope as a prefix**:
 
 ```text
 <scope>-field-mapping-migration.md
 ```
 
-Inputs:
+Examples:
 
 ```text
-source group manifest PASS
-source field inventory PASS
-target group manifest PASS
-target field inventory PASS
-table mapping PASS
-migration contract skeleton
-optional platform/application mapping profile
-explicit overrides/evidence
+hikashop-field-mapping-migration.md
+acymailing-field-mapping-migration.md
+joomla-core-field-mapping-migration.md
 ```
 
-## Do not use `mapping rows = source field count` as the generic 100% rule
+Do not use an unscoped generic filename when multiple migrations may exist:
 
-A reusable migration must support:
+```text
+field-mapping-migration.md
+```
+
+## Reference example
+
+- [Joomla core field mapping](https://github.com/duyduyly/php-notebook/blob/joomla/docs/joomla/learning/database/migration-plan/field-mapping-migration.md)
+
+The Joomla core example predates the scope-prefix convention; new generated files should use the scoped filename rule.
+
+## 100% source coverage rule
+
+For a reusable migration framework, do not define coverage only as:
+
+```text
+mapping row count = source field count
+```
+
+The mapper must support:
 
 ```text
 ONE_TO_ONE
@@ -482,63 +608,39 @@ Unmapped source fields                     = 0
 Silent source-field drops                  = 0
 ```
 
-The mapping action count may be larger than the number of source fields.
+## Required field mapping information
 
-## Recommended mapping record
-
-```text
-row_kind
-source_version
-source_table
-source_field
-target_version
-target_table
-target_field
-mapping_group_key
-mapping_cardinality
-mapping_type
-identity_strategy
-reference_type
-reference_domain
-parser_rule
-transform_rule
-verification_rule
-rule_origin
-evidence
-reason
-execution_order
-status
-```
-
-Physical schema facts stay in the field inventory and are joined into the mapping view.
-
-## Required field information
-
-Every mapping must be able to resolve:
+Every mapping must be able to resolve or validate:
 
 ```text
+source table / field
 source DATA_TYPE / COLUMN_TYPE
-source nullable/default
-source PK/COMPOSITE_PK/UNIQUE/INDEX role
-source reference metadata
+source null/default
+source PK / COMPOSITE_PK / UNIQUE / INDEX role
+source identity/reference semantics
 
+target table / field
 target DATA_TYPE / COLUMN_TYPE
-target nullable/default
-target PK/COMPOSITE_PK/UNIQUE/INDEX role
-target reference metadata
+target null/default
+target PK / COMPOSITE_PK / UNIQUE / INDEX role
+target identity/reference semantics
 
+mapping cardinality
 mapping decision
 identity strategy
-reference type/domain
-structured parser/transform rule
+reference type
+reference domain
+parser / structured rule
+transform rule
 verification rule
+reason / evidence
 ```
 
-## Required reference types
+## Reference classifications
 
 Do not use only `FK = YES/NO`.
 
-Use:
+Use explicit reference types:
 
 ```text
 PHYSICAL_FK
@@ -549,31 +651,6 @@ SEMANTIC_REFERENCE
 NONE
 ```
 
-## Required special cases
-
-The field mapping process must cover:
-
-```text
-same-name fields with changed semantics
-renamed fields
-source-only fields
-target-only fields
-type narrowing/widening
-signed/unsigned changes
-precision/scale changes
-NULL/default changes
-legacy/invalid dates
-enum/state changes
-sentinel values
-PK/composite PK/unique collisions
-logical references
-polymorphic references
-structured JSON/XML/serialized/HTML/URL/query/path data
-generated values
-rebuilt values
-archive/ignore/reference-only values
-```
-
 ## Source-only anti-join
 
 ```text
@@ -581,17 +658,25 @@ SOURCE FIELD UNIVERSE
 -
 SOURCE FIELDS WITH ACTIVE TARGET REPRESENTATION
 =
-SOURCE-ONLY FIELD SET
+SOURCE-ONLY FIELDS
 ```
 
-Every source-only field must have an explicit final outcome.
-
-Required result:
+Required:
 
 ```text
-Source-only fields discovered          = 100%
-Source-only fields resolved            = 100%
-Silent source-only drops               = 0
+Source-only fields discovered = 100%
+Source-only fields resolved   = 100%
+Silent source-only drops      = 0
+```
+
+Every source-only field must explicitly resolve to an approved outcome such as:
+
+```text
+TRANSFORM elsewhere
+ARCHIVE
+IGNORE
+REFERENCE_ONLY
+REBUILD
 ```
 
 ## Target-only anti-join
@@ -601,10 +686,10 @@ TARGET FIELD UNIVERSE
 -
 TARGET FIELDS POPULATED/RESOLVED FROM SOURCE
 =
-TARGET-ONLY FIELD SET
+TARGET-ONLY FIELDS
 ```
 
-Every required target-only field must resolve to one strategy such as:
+Every required target-only field must have an explicit strategy such as:
 
 ```text
 DEFAULT
@@ -616,483 +701,146 @@ REBUILD
 NOT_REQUIRED_BY_SCOPE
 ```
 
-Required result:
+## Field mapping gate
 
 ```text
-Target-only fields discovered          = 100%
-Target-only fields classified          = 100%
+Distinct source fields accounted       = 100%
+Unmapped source fields                 = 0
+Silent source-field drops              = 0
+
 Required target fields resolved        = 100%
 Unresolved required target fields      = 0
 Unknown target strategy                = 0
-FIELD MAPPING                          = PASS
+
+Unsafe DIRECT mappings                 = 0
+Missing required reference domains     = 0
+Invalid mapping cardinality/groups     = 0
+Unresolved PK/UNIQUE collisions        = 0
+Structured mappings missing rules      = 0
+Unverifiable final mappings            = 0
+```
+
+### Step 5 PASS
+
+```text
+FIELD MAPPING = PASS
 ```
 
 ---
 
-# Step 6 — Finalize ID, Value, Structured, and Dependency Rules
+# Required Naming Convention
 
-Use the mapping artifacts and the remaining sections of:
+The migration scope name must prefix both generated mapping files.
 
-- [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
+| Migration scope | Table mapping | Field mapping |
+|---|---|---|
+| HikaShop | `hikashop-table-mapping-migration.md` | `hikashop-field-mapping-migration.md` |
+| AcyMailing | `acymailing-table-mapping-migration.md` | `acymailing-field-mapping-migration.md` |
+| Joomla Core | `joomla-core-table-mapping-migration.md` | `joomla-core-field-mapping-migration.md` |
+| Custom component `cars` | `cars-table-mapping-migration.md` | `cars-field-mapping-migration.md` |
 
-Define all runtime/design-time mapping domains required by table and field mappings.
-
-## ID / identity mapping
-
-Never assume source numeric IDs equal target numeric IDs.
-
-Allowed strategies include:
+Recommended filename normalization:
 
 ```text
-ID_MAP
-SEMANTIC_LOOKUP
-NATURAL_KEY_LOOKUP
-GENERATED_ID
-PRESERVE_ID_WITH_COLLISION_GATE
-NONE
+lowercase
+kebab-case
+no spaces
+stable scope name
 ```
 
-Required gate:
+Pattern:
 
 ```text
-Required identity domains defined     = 100%
-Missing required identity mappings    = 0
-Ambiguous identity matches            = 0
-PK/UNIQUE collisions                  = 0
-```
-
-## Value mapping
-
-Define deterministic translations for fields such as:
-
-```text
-state/status
-enum values
-language keys
-type aliases
-legacy constants
-sentinel semantics
-application-specific code values
-```
-
-Required gate:
-
-```text
-Required value domains defined        = 100%
-Missing required value rules          = 0
-Ambiguous value mappings              = 0
-```
-
-## Structured rules
-
-Every structured field must define:
-
-```text
-format
-parser
-embedded references
-transform rule
-serializer
-reparse validation
-failure policy
-```
-
-Required gate:
-
-```text
-Structured fields classified          = 100%
-Structured parser/rules defined       = 100%
-Unresolved embedded references        = 0
-Invalid structured values             = 0
-```
-
-## Dependencies
-
-Inventory both physical and logical dependencies.
-
-Possible types:
-
-```text
-PHYSICAL_FK
-LOGICAL_REFERENCE
-LOOKUP_REFERENCE
-STRUCTURED_REFERENCE
-FILE_REFERENCE
-EXTENSION_REFERENCE
-APPLICATION_ORDER
-TARGET_PREREQUISITE
-```
-
-Required gate:
-
-```text
-Required dependencies resolved        = 100%
-Unresolved hard dependencies          = 0
-Forbidden orphans                     = 0
-Unresolved hard cycles                = 0
-Execution order derivable             = YES
-```
-
----
-
-# Step 7 — Finalize the Migration Contract
-
-Return to:
-
-- [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
-- [`../templates/database-migration-contract-template.md`](../templates/database-migration-contract-template.md)
-
-Replace the Step 3 skeleton with the actual mapping evidence from Steps 4–6.
-
-The final contract must reference the real generated artifacts:
-
-```text
-source group manifest
-target group manifest
-source field inventory
-target field inventory
-table mapping
-field mapping
-identity/value mapping rules
-structured rules
-dependency rules
-record accounting rules
-verification rules
-backup/recovery strategy
-```
-
-## Definition-level contract gate
-
-```text
-Source table coverage                 = 100%
-Source field coverage                 = 100%
-Required target table resolution      = 100%
-Required target field resolution      = 100%
-Unknown final decisions               = 0
-Ambiguous final decisions             = 0
-Missing identity/reference domains    = 0
-Unresolved structured rules           = 0
-Unresolved dependencies               = 0
-Unverifiable mappings                 = 0
-MIGRATION CONTRACT                    = PASS (definition-level)
-```
-
-Do not claim production PASS yet.
-
----
-
-# Step 8 — Materialize the Mapping Database
-
-Recommended logical separation:
-
-```text
-migration_inventory.table_list
-migration_inventory.field_inventory
-migration_inventory.table_dependency
-
-migration_mapping.table_mapping
-migration_mapping.field_mapping
-migration_mapping.value_mapping
-```
-
-Recommended responsibility:
-
-| Structure | Responsibility |
-|---|---|
-| `table_list` | Physical table inventory and ownership/scope facts. |
-| `field_inventory` | Physical source/target schema facts. |
-| `table_dependency` | Dependency graph. |
-| `table_mapping` | Static source-table → target-table decisions. |
-| `field_mapping` | Static field-level mapping/resolution decisions. |
-| `value_mapping` | Runtime/design-time source value/ID → target value/ID translations. |
-
-Do not duplicate authoritative DDL into mapping tables when it can be joined from inventory.
-
-## Materialization rules
-
-```text
-seed process must be deterministic
-seed process must be idempotent
-mapping versions must be explicit
-source and target versions must be explicit
-mapping groups/cardinality must be preserved
-rule origin/evidence must be preserved
-errors must never be auto-converted to IGNORE
-```
-
-## Database gate
-
-```text
-Source tables materialized            = 100%
-Source fields materialized            = 100%
-Required target resolutions           = 100%
-Duplicate logical mappings            = 0
-Missing mapping decisions             = 0
-Invalid mapping enums                 = 0
-Missing required reference domains    = 0
-Conflicting mapping groups            = 0
-```
-
----
-
-# Step 9 — Definition-Level Final Mapping Gate
-
-The mapping package may be declared ready for implementation only when all of the following pass.
-
-```text
-INVENTORY
---------------------------------------------------
-Source group manifest                       = PASS
-Target group manifest                       = PASS
-Source field inventory                      = PASS
-Target field inventory                      = PASS
-Unknown schema objects                      = 0
-Unclassified schema deviations              = 0
-
-TABLE MAPPING
---------------------------------------------------
-Distinct source tables accounted            = 100%
-Source table decisions                      = 100%
-Target-only tables classified               = 100%
-Unresolved target tables                    = 0
-Unknown/ambiguous table decisions            = 0
-
-FIELD MAPPING
---------------------------------------------------
-Distinct source fields accounted            = 100%
-Unmapped source fields                      = 0
-Silent source-field drops                   = 0
-Source-only fields resolved                 = 100%
-Target-only fields classified               = 100%
-Required target fields resolved             = 100%
-Unresolved required target fields           = 0
-Unknown target strategy                     = 0
-
-SCHEMA / CONSTRAINTS
---------------------------------------------------
-Required schema metadata resolved           = 100%
-Unsafe DIRECT mappings                      = 0
-Unresolved narrowing/truncation             = 0
-Unresolved NULL/default changes             = 0
-PK collisions                               = 0
-UNIQUE collisions                           = 0
-Constraint violations                       = 0
-
-IDENTITY / REFERENCES
---------------------------------------------------
-Required identity strategies defined        = 100%
-Required reference classifications          = 100%
-Missing required reference domains          = 0
-Ambiguous identity matches                  = 0
-Broken required references                  = 0
-
-STRUCTURED / DEPENDENCY
---------------------------------------------------
-Structured fields classified                = 100%
-Structured fields with parser/rule          = 100%
-Unresolved embedded references              = 0
-Required dependencies resolved              = 100%
-Unresolved hard dependencies                = 0
-
-QUALITY
---------------------------------------------------
-UNKNOWN                                     = 0
-PENDING                                     = 0
-REVIEW                                      = 0
-UNMAPPED                                    = 0
-AMBIGUOUS                                   = 0
-Unverifiable final mappings                 = 0
-
-DATABASE MATERIALIZATION
---------------------------------------------------
-Table mapping materialized                  = 100%
-Field mapping materialized                  = 100%
-Duplicate logical mappings                  = 0
-Conflicting mapping groups                  = 0
-
-==================================================
-MIGRATION MAPPING PACKAGE                   = PASS
-==================================================
-```
-
----
-
-# Step 10 — Production Boundary
-
-A definition-level mapping PASS does **not** prove that production data has migrated successfully.
-
-Before claiming production migration PASS, additionally require:
-
-```text
-actual source schema reconciliation      = PASS
-actual target schema reconciliation      = PASS
-runtime ID/value mapping                 = PASS
-source record accounting                 = 100%
-unaccounted source records               = 0
-migration execution errors               = 0
-missing expected records                 = 0
-unexpected records                       = 0
-field value mismatches                   = 0
-broken required relationships            = 0
-structured verification errors           = 0
-rerun/idempotency checks                 = PASS
-backup/restore evidence                  = PASS
-```
-
-Only after those checks pass may the wider migration process claim that all in-scope database data has been accounted for and verified.
-
----
-
-# Reusable Output Package
-
-A complete migration mapping package should contain at least:
-
-```text
-<scope>-migration-groups-source.md
-<scope>-migration-groups-target.md
-
-<scope>-migration-fields-source.md
-<scope>-migration-fields-target.md
-
 <scope>-table-mapping-migration.md
 <scope>-field-mapping-migration.md
+```
+
+This prevents collisions when several extension/core migration mappings are stored in the same folder or loaded into the same mapping database.
+
+---
+
+# Final Artifact Set
+
+After all five steps, a complete migration mapping package should contain at least:
+
+```text
+<scope>-migration-groups-<source-version>.md
+<scope>-migration-groups-<target-version>.md
+
+<scope>-migration-fields-<source-version>.md
+<scope>-migration-fields-<target-version>.md
 
 <scope>-migration-contract.md
 
-optional:
-<scope>-field-mapping-profile.md
-<scope>-mapping-overrides.md
-<scope>-mapping-evidence.md
+<scope>-table-mapping-migration.md
+<scope>-field-mapping-migration.md
 ```
 
-Recommended dependency order:
+Example for HikaShop:
 
 ```text
-Groups
-  ↓
-Fields
-  ↓
-Contract skeleton
-  ↓
-Table mapping
-  ↓
-Field mapping
-  ↓
-ID / value / structured / dependency rules
-  ↓
-Final migration contract
-  ↓
-Mapping database materialization
-  ↓
-Definition-level PASS
-  ↓
-Production execution + verification
+hikashop-migration-groups-source.md
+hikashop-migration-groups-target.md
+
+hikashop-migration-fields-source.md
+hikashop-migration-fields-target.md
+
+hikashop-migration-contract.md
+
+hikashop-table-mapping-migration.md
+hikashop-field-mapping-migration.md
 ```
 
----
-
-# Master Checklist
-
-## Scope
-
-- [ ] Migration scope frozen
-- [ ] Source version frozen
-- [ ] Target version frozen
-- [ ] Schema authorities documented
-
-## Step 1 — Groups
-
-- [ ] Source group file generated with `migration-group-generation-plan.md`
-- [ ] Source group file uses `database-migration-groups-template.md`
-- [ ] Target group file generated with the same plan/template
-- [ ] Source table coverage = 100%
-- [ ] Target table coverage = 100%
-- [ ] Unknown ownership = 0
-
-## Step 2 — Fields
-
-- [ ] Source field inventory generated with `migration-field-generation-plan.md`
-- [ ] Source field inventory uses `database-migration-field-inventory-template.md`
-- [ ] Target field inventory generated with the same plan/template
-- [ ] Source physical field coverage = 100%
-- [ ] Target physical field coverage = 100%
-- [ ] Duplicate/missing fields = 0
-
-## Step 3 — Contract Skeleton
-
-- [ ] Contract skeleton generated with `migration-contract-generation-plan.md`
-- [ ] Contract uses `database-migration-contract-template.md`
-- [ ] Canonical final decisions frozen
-- [ ] Invalid final decisions forbidden
-- [ ] Contract is not prematurely marked PASS
-
-## Step 4 — Table Mapping
-
-- [ ] Every source table accounted
-- [ ] Source table decisions = 100%
-- [ ] Target-only table anti-join complete
-- [ ] Target-only tables classified = 100%
-- [ ] Unknown/ambiguous table mapping = 0
-- [ ] Table mapping PASS
-
-## Step 5 — Field Mapping
-
-- [ ] Generated with `migration-field-mapping-generation-plan.md`
-- [ ] Uses `database-migration-field-mapping-template.md`
-- [ ] Distinct source field coverage = 100%
-- [ ] Source-only anti-join complete
-- [ ] Target-only anti-join complete
-- [ ] Required target field resolution = 100%
-- [ ] Mapping cardinality handled
-- [ ] Datatype/key/reference metadata resolved
-- [ ] Unknown/ambiguous field mapping = 0
-- [ ] Field mapping PASS
-
-## Step 6 — Mapping Semantics
-
-- [ ] Identity domains defined
-- [ ] Value domains defined
-- [ ] Structured parsers/rules defined
-- [ ] Dependencies defined
-- [ ] Missing lookup domains = 0
-- [ ] Unresolved embedded references = 0
-- [ ] Unresolved hard dependencies = 0
-
-## Step 7 — Final Contract
-
-- [ ] Actual table mapping referenced
-- [ ] Actual field mapping referenced
-- [ ] ID/value/structured/dependency rules referenced
-- [ ] Record accounting contract defined
-- [ ] Verification contract defined
-- [ ] Recovery/rollback contract defined
-- [ ] Definition-level contract PASS
-
-## Step 8 — Database
-
-- [ ] Inventory materialized
-- [ ] Table mapping materialized
-- [ ] Field mapping materialized
-- [ ] Value mapping strategy ready
-- [ ] Seed idempotency verified
-- [ ] Duplicate logical mappings = 0
-
-## Final
-
-- [ ] Source table coverage = 100%
-- [ ] Source field coverage = 100%
-- [ ] Required target table resolution = 100%
-- [ ] Required target field resolution = 100%
-- [ ] UNKNOWN = 0
-- [ ] PENDING = 0
-- [ ] REVIEW = 0
-- [ ] UNMAPPED = 0
-- [ ] AMBIGUOUS = 0
-- [ ] Unverifiable mapping = 0
-- [ ] `MIGRATION MAPPING PACKAGE = PASS`
+The two mapping files are the primary static specifications used to materialize or validate the migration mapping database. Runtime ID/value translations are still produced during migration and belong in `value_mapping` or the equivalent runtime mapping store.
 
 ---
 
-## Final Rule
+# Final Mapping Gate
 
-> **Never advance to the next mapping stage because a document merely looks complete. Advance only when the previous stage proves its denominator, reaches 100% coverage of that denominator, and has zero unresolved/unknown objects.**
+Do not declare the mapping package complete until all of the following are true:
+
+```text
+GROUP INVENTORY
+--------------------------------------------------
+Source tables inventoried/classified       = 100%
+Target tables inventoried/classified       = 100%
+Missing/unknown tables                     = 0
+
+FIELD INVENTORY
+--------------------------------------------------
+Source physical fields inventoried         = 100%
+Target physical fields inventoried         = 100%
+Missing/duplicate field inventory rows     = 0
+
+MIGRATION CONTRACT
+--------------------------------------------------
+Canonical decisions defined                = YES
+Unknown/pending/ambiguous final states      = 0
+ID/value/reference rules defined           = 100%
+Verification gates defined                 = YES
+
+TABLE MAPPING
+--------------------------------------------------
+Distinct source tables accounted           = 100%
+Target-only tables resolved                = 100%
+Missing/ambiguous/unverifiable mappings     = 0
+
+FIELD MAPPING
+--------------------------------------------------
+Distinct source fields accounted           = 100%
+Source-only fields resolved                = 100%
+Required target fields resolved            = 100%
+Target-only required fields resolved       = 100%
+Silent field drops                         = 0
+Unsafe DIRECT                              = 0
+Missing reference domains                  = 0
+Invalid mapping groups/cardinality         = 0
+Unresolved constraint collisions           = 0
+Unverifiable field mappings                = 0
+
+==================================================
+MIGRATION MAPPING PACKAGE                  = PASS
+==================================================
+```
+
+> **Definition-level PASS means the complete declared source and target schema scope is explicitly inventoried and mapped. Production migration success still requires actual database reconciliation, runtime `value_mapping`, record accounting, execution, and post-migration verification.**
