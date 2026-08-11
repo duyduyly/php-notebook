@@ -989,3 +989,363 @@ unsafe direct/truncation/collision/dependency allowed=0
 ```
 
 > Production PASS requires actual-schema reconciliation, real mapping materialization, runtime `value_mapping`, row accounting and zero migration/verification errors.
+
+---
+
+# Schema metadata overlay — data type, keys, and references
+
+The 711 mapping rows above remain the canonical **migration decision** layer. Exact SQL metadata is not duplicated manually into those rows because the two canonical field inventories already preserve exact DDL for all J3/J6 fields. The migration database must materialize or join that metadata so every mapping row is queryable with both migration semantics and physical schema facts.
+
+## Required schema metadata per mapping row
+
+| Metadata | Required | Source of truth |
+|---|---|---|
+| `source_data_type` | YES | J3 `information_schema.COLUMNS.DATA_TYPE` / V3 manifest |
+| `source_column_type` | YES | J3 `COLUMN_TYPE` including length, precision and unsigned |
+| `source_nullable` | YES | J3 `IS_NULLABLE` |
+| `source_default` | YES | J3 `COLUMN_DEFAULT` |
+| `source_key_role` | YES | J3 `information_schema.STATISTICS` |
+| `target_data_type` | YES when target field exists | J6 `information_schema.COLUMNS.DATA_TYPE` / V6 manifest |
+| `target_column_type` | YES when target field exists | J6 `COLUMN_TYPE` |
+| `target_nullable` | YES when target field exists | J6 `IS_NULLABLE` |
+| `target_default` | YES when target field exists | J6 `COLUMN_DEFAULT` |
+| `target_key_role` | YES when target field exists | J6 `information_schema.STATISTICS` |
+| `physical_fk_target` | YES if declared | `information_schema.KEY_COLUMN_USAGE` |
+| `reference_type` | YES | mapping semantics + physical FK metadata |
+| `reference_domain` | YES for reference mappings | `X` / migration contract |
+
+### Canonical key roles
+
+```text
+PK
+COMPOSITE_PK
+UNIQUE
+INDEX
+NONE
+```
+
+A field can participate in more than one secondary index, but the mapping view records the strongest role using this precedence:
+
+```text
+COMPOSITE_PK / PK > UNIQUE > INDEX > NONE
+```
+
+`COMPOSITE_PK` means the field is one member of a multi-column primary key. Composite identity must be verified as a tuple after ID remapping.
+
+### Canonical reference types
+
+```text
+PHYSICAL_FK
+LOGICAL_FK
+POLYMORPHIC
+EMBEDDED_REFERENCE
+SEMANTIC_REFERENCE
+NONE
+```
+
+Do **not** reduce Joomla references to a boolean `FK = YES/NO`.
+
+Rules:
+
+- declared SQL `FOREIGN KEY (...) REFERENCES ...` → `PHYSICAL_FK`;
+- numeric/string field referencing another Joomla identity without a declared SQL FK → `LOGICAL_FK`;
+- identity resolved by `context`, `type_alias`, field type, extension, or another discriminator → `POLYMORPHIC`;
+- IDs/references inside JSON, Registry, ACL, URL/query, HTML, media or other structured payload → `EMBEDDED_REFERENCE`;
+- stable identity metadata such as extension/type/template identity → `SEMANTIC_REFERENCE`;
+- no reference semantics → `NONE`.
+
+The official J3/J6 baseline DDL contains relationship comments and indexes but no declared `FOREIGN KEY (...) REFERENCES ...` constraints. Therefore production physical FKs must still be discovered from `information_schema.KEY_COLUMN_USAGE`; logical/polymorphic/embedded references remain mandatory even when `physical_fk_target` is NULL.
+
+## Reference classification from the mapping layer
+
+Use these default classifications unless an explicit field rule overrides them:
+
+| Mapping pattern | `reference_type` |
+|---|---|
+| `M=L`, fixed entity domain such as `USER`, `CATEGORY`, `TAG`, `MENU`, `MODULE`, `VIEWLEVEL`, `ASSET` | `LOGICAL_FK` |
+| `M=L`, context-dependent domain such as `ENTITY_BY_TYPE_ALIAS`, `ENTITY_BY_FIELD_CONTEXT`, `ENTITY_BY_ASSOCIATION_CONTEXT` | `POLYMORPHIC` |
+| `M=S` and payload can contain IDs/references | `EMBEDDED_REFERENCE` |
+| `M=R` and source is used to resolve a target-owned semantic identity | `SEMANTIC_REFERENCE` |
+| primary identity field mapped through `value_mapping` | `NONE` + its `reference_domain` identifies the entity |
+| `M=D/T/G/B/A/I` with no reference semantics | `NONE` |
+
+Examples:
+
+| Source | Source type | S.Key | Target | Target type | T.Key | Ref | M | Domain/rule |
+|---|---|---|---|---|---|---|:-:|---|
+| `#__content.id` | `int unsigned` | PK | `#__content.id` | `int unsigned` | PK | `NONE` | L | `CONTENT` identity map |
+| `#__content.catid` | `int unsigned` | INDEX | `#__content.catid` | `int unsigned` | INDEX | `LOGICAL_FK` | L | `CATEGORY` |
+| `#__content.images` | `text` | NONE | `#__content.images` | `text` | NONE | `EMBEDDED_REFERENCE` | S | `MEDIA_URL_JSON` |
+| `#__content.xreference` | `varchar(50)` | INDEX | — | — | — | `NONE` | A | source-only archive |
+| `#__fields_values.item_id` | `varchar(255)` | INDEX | `#__fields_values.item_id` | `varchar(255)` | INDEX | `POLYMORPHIC` | L | `ENTITY_BY_FIELD_CONTEXT` |
+| `#__menu.link` | `varchar(1024)` | NONE | `#__menu.link` | `varchar(1024)` | NONE | `EMBEDDED_REFERENCE` | S | query-string IDs |
+| `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `LOGICAL_FK` | L | `0=all`, negative=exclude, positive=`MENU` |
+
+## Physical schema inventory queries
+
+### 1. Data type / nullability / default
+
+Run for both source and target databases:
+
+```sql
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME,
+    COLUMN_NAME,
+    ORDINAL_POSITION,
+    DATA_TYPE,
+    COLUMN_TYPE,
+    IS_NULLABLE,
+    COLUMN_DEFAULT,
+    CHARACTER_MAXIMUM_LENGTH,
+    NUMERIC_PRECISION,
+    NUMERIC_SCALE,
+    CHARACTER_SET_NAME,
+    COLLATION_NAME,
+    COLUMN_KEY,
+    EXTRA
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = :database_name
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+```
+
+`DATA_TYPE` alone is insufficient. `COLUMN_TYPE` is mandatory because it preserves details such as `unsigned`, length and precision.
+
+### 2. Key-role inventory
+
+```sql
+SELECT
+    s.TABLE_SCHEMA,
+    s.TABLE_NAME,
+    s.COLUMN_NAME,
+    CASE
+        WHEN SUM(CASE WHEN s.INDEX_NAME = 'PRIMARY' THEN 1 ELSE 0 END) > 0
+             AND COALESCE(pk.pk_cols, 0) > 1
+            THEN 'COMPOSITE_PK'
+        WHEN SUM(CASE WHEN s.INDEX_NAME = 'PRIMARY' THEN 1 ELSE 0 END) > 0
+            THEN 'PK'
+        WHEN SUM(CASE WHEN s.NON_UNIQUE = 0 THEN 1 ELSE 0 END) > 0
+            THEN 'UNIQUE'
+        WHEN COUNT(*) > 0
+            THEN 'INDEX'
+        ELSE 'NONE'
+    END AS key_role
+FROM information_schema.STATISTICS AS s
+LEFT JOIN (
+    SELECT TABLE_SCHEMA, TABLE_NAME, COUNT(*) AS pk_cols
+    FROM information_schema.STATISTICS
+    WHERE INDEX_NAME = 'PRIMARY'
+    GROUP BY TABLE_SCHEMA, TABLE_NAME
+) AS pk
+  ON pk.TABLE_SCHEMA = s.TABLE_SCHEMA
+ AND pk.TABLE_NAME = s.TABLE_NAME
+WHERE s.TABLE_SCHEMA = :database_name
+GROUP BY s.TABLE_SCHEMA, s.TABLE_NAME, s.COLUMN_NAME, pk.pk_cols
+ORDER BY s.TABLE_NAME, s.COLUMN_NAME;
+```
+
+Fields absent from `information_schema.STATISTICS` are classified as `NONE` by the final mapping query.
+
+### 3. Declared physical-FK inventory
+
+```sql
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME,
+    COLUMN_NAME,
+    CONSTRAINT_NAME,
+    REFERENCED_TABLE_SCHEMA,
+    REFERENCED_TABLE_NAME,
+    REFERENCED_COLUMN_NAME
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA = :database_name
+  AND REFERENCED_TABLE_NAME IS NOT NULL
+ORDER BY TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME;
+```
+
+A NULL result here does **not** mean the field has no Joomla dependency. It only means no physical FK was declared.
+
+## Enriched field-mapping SELECT contract
+
+The recommended database design keeps schema facts in `field_inventory` and migration decisions in `field_mapping`; query them together instead of manually duplicating DDL into the mapping table.
+
+Expected logical result shape:
+
+```text
+source_table
+source_field
+source_data_type
+source_column_type
+source_nullable
+source_default
+source_key_role
+source_physical_fk_target
+
+target_table
+target_field
+target_data_type
+target_column_type
+target_nullable
+target_default
+target_key_role
+target_physical_fk_target
+
+mapping_type
+reference_type
+reference_domain
+transform_rule
+verification_rule
+```
+
+If `field_inventory` stores both source and target inventories, the core query is:
+
+```sql
+SELECT
+    fm.source_table,
+    fm.source_field,
+    sf.data_type        AS source_data_type,
+    sf.column_type      AS source_column_type,
+    sf.is_nullable      AS source_nullable,
+    sf.column_default   AS source_default,
+    sf.key_role         AS source_key_role,
+    sf.physical_fk_target AS source_physical_fk_target,
+
+    fm.target_table,
+    fm.target_field,
+    tf.data_type        AS target_data_type,
+    tf.column_type      AS target_column_type,
+    tf.is_nullable      AS target_nullable,
+    tf.column_default   AS target_default,
+    tf.key_role         AS target_key_role,
+    tf.physical_fk_target AS target_physical_fk_target,
+
+    fm.mapping_type,
+    fm.reference_type,
+    fm.reference_domain,
+    fm.transform_rule,
+    fm.verification_rule
+FROM migration_mapping.field_mapping AS fm
+JOIN migration_inventory.field_inventory AS sf
+  ON sf.database_role = 'SOURCE'
+ AND sf.table_name = fm.source_table
+ AND sf.field_name = fm.source_field
+LEFT JOIN migration_inventory.field_inventory AS tf
+  ON tf.database_role = 'TARGET'
+ AND tf.table_name = fm.target_table
+ AND tf.field_name = fm.target_field
+WHERE fm.source_version = '3.10.12'
+ORDER BY fm.source_table, sf.ordinal_position;
+```
+
+If the physical `field_inventory` column names differ, adapt only the SQL aliases; preserve this output contract.
+
+## Schema compatibility checks required before `DIRECT`
+
+A `D` mapping may execute only when all applicable checks pass:
+
+```text
+source / target semantic meaning compatible
+source value fits target COLUMN_TYPE
+signedness compatible
+length / precision / scale safe
+NULL source values valid for target
+zero-date conversion resolved
+source default is not incorrectly substituted for data
+collation/case changes do not create identity collisions
+PK/UNIQUE constraints do not collide after ID/value remapping
+```
+
+Any failure changes the field from `DIRECT` to an explicit `TRANSFORM`, `LOOKUP`, `ARCHIVE`, or blocks migration. Silent truncation and implicit coercion are forbidden.
+
+# Schema metadata checklist
+
+## Data type
+
+- [x] Source `DATA_TYPE` required for 711/711 mappings
+- [x] Source full `COLUMN_TYPE` required for 711/711 mappings
+- [x] Target type metadata required for every mapped target field
+- [x] Signed/unsigned differences included
+- [x] Length/precision/scale included
+- [x] Charset/collation available for compatibility checks
+- [x] Type narrowing must not silently truncate
+
+## Key role
+
+- [x] PK classified
+- [x] Composite PK classified
+- [x] UNIQUE classified
+- [x] secondary INDEX classified
+- [x] non-key fields classified as `NONE`
+- [x] source and target key roles both checked
+- [x] composite-key collisions after remapping must equal 0
+
+## References / FK
+
+- [x] Declared physical FK inventory defined
+- [x] Logical FK classification defined
+- [x] Polymorphic reference classification defined
+- [x] Embedded reference classification defined
+- [x] Semantic reference classification defined
+- [x] `FK YES/NO` explicitly rejected as insufficient
+- [x] Missing required reference domain = hard failure
+- [x] Physical-FK absence never suppresses logical dependency checks
+
+## Null/default/schema compatibility
+
+- [x] Source/target nullability captured
+- [x] Source/target defaults captured
+- [x] Joomla 3 zero-date handling checked
+- [x] target `NOT NULL` fields require valid source/default/generated value
+- [x] unsafe default substitution forbidden
+- [x] collation/case collision check required
+
+## Database/select readiness
+
+- [x] `field_mapping` remains decision data
+- [x] `field_inventory` remains physical schema source of truth
+- [x] `value_mapping` remains runtime ID/value mapping store
+- [x] no extra contract table required
+- [x] enriched SELECT output contract defined
+- [x] production physical FK scan defined
+
+# Extended QA gate
+
+```text
+SOURCE SCHEMA METADATA
+---------------------------------------------
+J3 mapping rows                       = 711 / 711
+Source DATA_TYPE resolvable           = 711 / 711
+Source COLUMN_TYPE resolvable         = 711 / 711
+Source null/default metadata          = 711 / 711
+Source key role classified            = 711 / 711
+
+TARGET SCHEMA METADATA
+---------------------------------------------
+J6 baseline fields                    = 832 / 832
+Mapped target type metadata resolved  = 100%
+Mapped target key roles resolved      = 100%
+Target-only field strategy resolved   = 100%
+
+REFERENCE METADATA
+---------------------------------------------
+Declared physical FKs inventoried     = 100%
+Logical references classified         = 100%
+Polymorphic references classified     = 100%
+Embedded references classified        = 100%
+Semantic references classified        = 100%
+Missing required reference domain     = 0
+
+SCHEMA COMPATIBILITY
+---------------------------------------------
+Unsafe DIRECT type mismatch           = 0
+Unresolved nullable/default changes   = 0
+Unresolved narrowing/truncation       = 0
+Unresolved PK/UNIQUE collisions       = 0
+Unresolved collation collisions       = 0
+
+================================================
+FIELD SCHEMA METADATA CONTRACT        = PASS
+================================================
+```
+
+> The definition-level metadata contract is complete. Production PASS requires populating `field_inventory` from the actual J3/J6 databases and proving every runtime count above with zero unresolved differences.
