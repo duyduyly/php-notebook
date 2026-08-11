@@ -1,6 +1,6 @@
 # End-to-End Database Migration Workflow Tutorial
 
-> Build a controlled migration from an **old/source database** to a **new/target database** by first creating inventory and mapping artifacts, then materializing those artifacts into migration metadata databases, validating them, executing migration scripts, and finally proving that every in-scope table, field, record, dependency, and mapping decision is accounted for.
+> Build a controlled migration from an **old/source database** to a **new/target database** by first creating inventory and mapping artifacts, then materialize those artifacts into migration metadata databases, validate them, execute migration scripts, and finally prove that every in-scope table, field, record, dependency, and mapping decision is accounted for.
 
 ---
 
@@ -8,6 +8,7 @@
 
 - [Migration Model](#migration-model)
 - [Core Databases](#core-databases)
+- [Migration Control Database ERDs](#migration-control-database-erds)
 - [End-to-End Flow](#end-to-end-flow)
 - [Step 1 — Create Inventory and Mapping Markdown Artifacts](#step-1--create-inventory-and-mapping-markdown-artifacts)
 - [Step 2 — Define and Create the Inventory and Mapping Databases](#step-2--define-and-create-the-inventory-and-mapping-databases)
@@ -82,6 +83,293 @@ migration_mapping
 ```
 
 Do not duplicate the entire source or target application data into `migration_mapping`.
+
+---
+
+# Migration Control Database ERDs
+
+These two logical ERDs show how the migration metadata is stored and connected. They are the database form of the inventory, mapping, execution, and verification workflow.
+
+## `migration_inventory` ERD
+
+```mermaid
+erDiagram
+
+    DATABASE_LIST ||--o{ TABLE_LIST : contains
+
+    TABLE_LIST ||--o{ FIELD_INVENTORY : contains
+    TABLE_LIST ||--o{ RECORD_INVENTORY : snapshots
+    TABLE_LIST ||--o{ TABLE_DEPENDENCY : dependencies
+
+    MIGRATION_EXECUTE ||--o{ RECORD_INVENTORY : captures
+    MIGRATION_EXECUTE ||--o{ MIGRATION_RESULT : produces
+    MIGRATION_EXECUTE ||--o{ VALIDATION_RESULT : verifies
+    MIGRATION_EXECUTE ||--o{ MIGRATION_ERROR : logs
+
+    TABLE_LIST ||--o{ MIGRATION_RESULT : migrates
+    TABLE_LIST ||--o{ VALIDATION_RESULT : validates
+    TABLE_LIST ||--o{ MIGRATION_ERROR : errors
+
+    DATABASE_LIST {
+        bigint id PK
+        varchar database_name
+        varchar database_role
+        varchar joomla_version
+        varchar database_version
+        datetime captured_at
+    }
+
+    TABLE_LIST {
+        bigint id PK
+        bigint database_id FK
+
+        varchar table_name
+        varchar ownership_type
+        varchar extension_name
+
+        int field_count
+        bigint record_count
+
+        varchar coverage_status
+        varchar status
+    }
+
+    FIELD_INVENTORY {
+        bigint id PK
+        bigint table_id FK
+
+        varchar column_name
+        int ordinal_position
+
+        varchar data_type
+        varchar column_type
+
+        varchar nullable
+        text default_value
+
+        varchar column_key
+        varchar extra
+
+        varchar charset_name
+        varchar collation_name
+
+        varchar structured_format
+        varchar coverage_status
+    }
+
+    RECORD_INVENTORY {
+        bigint id PK
+        bigint migration_execute_id FK
+        bigint table_id FK
+
+        varchar snapshot_type
+
+        bigint source_count
+        bigint expected_count
+        bigint target_count
+
+        bigint missing_count
+        bigint unexpected_count
+        bigint duplicate_count
+
+        bigint checked_record_count
+        bigint matched_record_count
+        bigint mismatched_record_count
+
+        varchar min_primary_key
+        varchar max_primary_key
+        varchar data_checksum
+
+        datetime captured_at
+    }
+
+    TABLE_DEPENDENCY {
+        bigint id PK
+
+        bigint table_id FK
+        bigint referenced_table_id FK
+
+        bigint source_field_id FK
+        bigint referenced_field_id FK
+
+        varchar dependency_type
+
+        text reference_path
+        varchar coverage_status
+        varchar status
+    }
+
+    MIGRATION_EXECUTE {
+        bigint id PK
+
+        varchar run_code
+
+        bigint source_database_id FK
+        bigint target_database_id FK
+
+        varchar mapping_version
+
+        varchar status
+
+        datetime started_at
+        datetime completed_at
+    }
+
+    MIGRATION_RESULT {
+        bigint id PK
+
+        bigint migration_execute_id FK
+
+        bigint source_table_id FK
+        bigint target_table_id FK
+
+        int expected_fields
+        int migrated_fields
+
+        bigint expected_records
+        bigint migrated_records
+        bigint skipped_records
+        bigint failed_records
+
+        varchar status
+    }
+
+    VALIDATION_RESULT {
+        bigint id PK
+
+        bigint migration_execute_id FK
+        bigint table_id FK
+
+        bigint field_mapping_id
+
+        varchar phase
+        varchar check_type
+
+        bigint checked_count
+        bigint matched_count
+        bigint mismatch_count
+
+        varchar expected_value
+        varchar actual_value
+
+        varchar status
+        text details
+    }
+
+    MIGRATION_ERROR {
+        bigint id PK
+
+        bigint migration_execute_id FK
+        bigint table_id FK
+
+        bigint field_mapping_id
+
+        varchar source_record_id
+
+        varchar error_type
+
+        text expected_value
+        text actual_value
+        text details
+
+        datetime created_at
+    }
+```
+
+### What this ERD proves
+
+`migration_inventory` is the audit and evidence database:
+
+```text
+what exists
++ what was captured
++ what was executed
++ what was validated
++ what failed
+```
+
+It does not define how a source table or field should transform. That belongs to `migration_mapping`.
+
+## `migration_mapping` ERD
+
+```mermaid
+erDiagram
+
+    TABLE_MAPPING ||--o{ FIELD_MAPPING : contains
+    FIELD_MAPPING ||--o{ VALUE_MAPPING : uses
+
+    TABLE_MAPPING {
+        bigint id PK
+
+        bigint source_table_id
+        bigint target_table_id
+
+        varchar mapping_type
+
+        int migration_order
+
+        varchar mapping_version
+
+        varchar coverage_status
+        varchar status
+    }
+
+    FIELD_MAPPING {
+        bigint id PK
+
+        bigint table_mapping_id FK
+
+        bigint source_field_id
+        bigint target_field_id
+
+        varchar mapping_type
+
+        text source_expression
+        text migration_expression
+        text verification_expression
+
+        varchar structured_format
+        text structured_rule
+
+        int mapping_order
+
+        varchar coverage_status
+        varchar status
+    }
+
+    VALUE_MAPPING {
+        bigint id PK
+
+        bigint field_mapping_id FK
+
+        varchar mapping_key
+
+        text source_value
+        text target_value
+
+        varchar mapping_type
+
+        varchar coverage_status
+        varchar status
+    }
+```
+
+### What this ERD proves
+
+`migration_mapping` is the executable mapping contract:
+
+```text
+table_mapping
+    = source table -> target table decision
+
+field_mapping
+    = source field -> target field transformation rule
+
+value_mapping
+    = source identity/value -> target identity/value resolution
+```
+
+The migration runner reads these mappings only after the inventory and mapping coverage gates pass.
 
 ---
 
@@ -911,7 +1199,7 @@ migration-plan/
 │   ├── migration-contract-generation-plan.md
 │   ├── migration-field-mapping-generation-plan.md
 │   ├── migration-mapping-plan-tutorial.md
-│   └── migration-end-to-end-workflow-tutorial.md
+│   └── migration-workflow.md
 │
 ├── sql/
 │   ├── create-migration-inventory.sql
