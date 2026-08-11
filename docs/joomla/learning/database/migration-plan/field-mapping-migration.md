@@ -323,7 +323,7 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |---|:-:|---|
 |type_alias|L|CONTENT_TYPE_ALIAS|
 |core_content_id|B|UCM|
-|content_item_id|L|TAG|
+|content_item_id|L|ENTITY_BY_TYPE_ALIAS|
 |tag_id|L|TAG|
 |tag_date|T|DT|
 |type_id|L|CONTENT_TYPE|
@@ -331,12 +331,12 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |Source|M|X|
 |---|:-:|---|
 |field_id|L|FIELD|
-|item_id|L|FI|
-|value|S|FV|
+|item_id|L|ENTITY_BY_FIELD_CONTEXT|
+|value|S|FIELD_PLUGIN|
 ### #__associations
 |Source|M|X|
 |---|:-:|---|
-|id|L|AI|
+|id|L|ENTITY_BY_ASSOCIATION_CONTEXT|
 |context|L|CONTENT_CONTEXT|
 |key|T|AK|
 ### #__ucm_base
@@ -388,11 +388,11 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |ucm_item_id|T|HID|
 |ucm_type_id|T|HID|
 |version_note|D||
-|save_date|T||
+|save_date|T|DT|
 |editor_user_id|L|USER|
 |character_count|D||
 |sha1_hash|D||
-|version_data|S|HSN|
+|version_data|S|HISTORY_SNAPSHOT|
 |keep_forever|D||
 ## G5
 ### #__template_styles
@@ -424,7 +424,7 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |alias|D||
 |note|D||
 |path|G|TREE|
-|link|S|ML|
+|link|S|QUERY_STRING_WITH_IDS|
 |type|D||
 |published|D||
 |parent_id|L|MENU|
@@ -468,7 +468,7 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |Source|M|X|
 |---|:-:|---|
 |moduleid|L|MODULE|
-|menuid|L|MS|
+|menuid|L|MENU_SENTINEL|
 ## G7
 ### #__contact_details
 |Source|M|X|
@@ -967,7 +967,7 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 
 `QA against joomla-core-migration-fields-v6.md: 76/76 target tables and 832/832 target fields resolved; unknown strategy=0; unresolved required target=0.`
 
-Target field differs from source only for explicit schema transitions (source-only removals and `ucm_history -> history`); otherwise target field is same-name within the table destination. Added/synthesized target cases include extension/update metadata, `fields.only_use_in_subform`, frontpage dates, UCM relation, history identity/state, menu ordering/publish dates, and `finder_terms_common.custom`. Target-only/recreated cases include TUF, workflows, schemaorg, template overrides, mail templates, scheduler, MFA/WebAuthn, scheduler/finder logs, and guided tours; their table strategy comes from `table-mapping-migration.md`.
+Target field is same-name within the destination table except: `extensions.system_data→-`; `users.otpKey/otep→-`; `content.xreference→-`; `ucm_content.core_xreference→-`; `ucm_history.ucm_item_id→history.item_id`; `ucm_history.ucm_type_id→history.item_id`; `contact_details.xreference→-`; `newsfeeds.xreference→-`; `finder_taxonomy.ordering→-`; `finder_tokens_aggregate.map_suffix→-`. Added/synthesized target fields and target-only/recreated structures are resolved by the J6 anti-join strategy from the canonical V6 field manifest and `table-mapping-migration.md`.
 
 # Case / seed gate
 
