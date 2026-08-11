@@ -5,41 +5,25 @@
 > **Inventory = YES**  
 > **Mapping decision = YES**
 
-Every Joomla 6 core table must be inventoried and assigned a mapping decision before migration starts.
+Every Joomla 6 core table must be inventoried and assigned exactly one migration-group decision before migration starts.
 
-This document uses the **official Joomla 6.1.2 MySQL installation schema** as the core-table baseline:
+This manifest is rebuilt from the **official Joomla CMS 6.1.2 MySQL fresh-install DDL**, not from ERD/table documentation:
 
-- `installation/sql/mysql/base.sql`
-- `installation/sql/mysql/extensions.sql`
-- `installation/sql/mysql/supports.sql`
-
-**Verified baseline:** `76 physical core tables`
-
-Allowed mapping decisions:
-
-- `MIGRATE`
-- `TRANSFORM`
-- `LOOKUP`
-- `REBUILD`
-- `REFERENCE_ONLY`
-- `ARCHIVE`
-- `IGNORE`
-- `TARGET_OWNED`
-- `RECREATE`
-
-**Target rules:**
+- `installation/sql/mysql/base.sql` — **28 tables**
+- `installation/sql/mysql/extensions.sql` — **33 tables**
+- `installation/sql/mysql/supports.sql` — **15 tables**
 
 ```text
-Core tables in official baseline = 76
-Tables explicitly classified     = 76
-Duplicate classifications        = 0
-Unclassified tables              = 0
-Wildcard table groups            = 0
+Official physical core tables = 76
+Tables classified G0-G8       = 76
+Duplicate classifications     = 0
+Missing tables                = 0
+Extra tables                  = 0
+Wildcard classifications      = 0
+Baseline table coverage       = 100%
 ```
 
-For a real target database, inventory must still compare the actual Joomla 6 schema against this baseline. Any local customization, extension-owned table, later Joomla 6.x schema change, or unexpected table must be reported separately.
-
----
+> `#__scheduler_logs` is the canonical Joomla 6.1.2 table name. Older project documentation that says `#__scheduler_log` is not used as the schema authority.
 
 ## Table of Contents
 
@@ -52,293 +36,226 @@ For a real target database, inventory must still compare the actual Joomla 6 sch
 - [G6 — Modules](#g6--modules)
 - [G7 — Supporting Core Components](#g7--supporting-core-components)
 - [G8 — Runtime, Generated, and Target-Owned Data](#g8--runtime-generated-and-target-owned-data)
-- [Recommended Migration Order](#recommended-migration-order)
-- [Coverage Manifest](#coverage-manifest)
-- [Field Coverage Gate](#field-coverage-gate)
-- [Completion Criteria](#completion-criteria)
+- [Official Schema Coverage](#official-schema-coverage)
+- [Migration Order](#migration-order)
+- [Completion Gate](#completion-gate)
 
 ---
 
 ## G0 — System Reference
 
-Used mainly as target reference data. Do not blindly overwrite Joomla 6 installation-owned system rows.
+**Tables:** 6 · **Physical fields:** 55
 
-**Tables: 6**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__extensions` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
+| `#__schemas` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
+| `#__update_sites` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
+| `#__update_sites_extensions` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
+| `#__updates` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
+| `#__tuf_metadata` | `base.sql` | `REFERENCE_ONLY / TARGET_OWNED` |
 
-- `#__extensions`
-- `#__schemas`
-- `#__update_sites`
-- `#__update_sites_extensions`
-- `#__updates`
-- `#__tuf_metadata`
-
-Typical decisions: `REFERENCE_ONLY`, `TARGET_OWNED`, `REBUILD`, or `IGNORE`.
-
-Important:
-
-- Map extensions by stable identity such as `type + element + folder + client_id`.
-- Do not assume Joomla 3 and Joomla 6 `extension_id` values are identical.
-- Keep Joomla 6 update, schema, and TUF metadata owned by the target installation.
+**Rule:** Use target installation identities for system/update metadata. Never assume Joomla 3 and Joomla 6 IDs are equal.
 
 ---
 
 ## G1 — Users and Access Foundation
 
-Prepare identity, user groups, view levels, profiles, and languages before migrating content that depends on them.
+**Tables:** 6 · **Physical fields:** 46
 
-**Tables: 6**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__languages` | `base.sql` | `MIGRATE / MAP` |
+| `#__usergroups` | `base.sql` | `MIGRATE / MAP` |
+| `#__users` | `base.sql` | `MIGRATE / MAP` |
+| `#__user_usergroup_map` | `base.sql` | `MIGRATE / MAP` |
+| `#__viewlevels` | `base.sql` | `MIGRATE / MAP` |
+| `#__user_profiles` | `base.sql` | `MIGRATE / MAP` |
 
-- `#__languages`
-- `#__usergroups`
-- `#__users`
-- `#__user_usergroup_map`
-- `#__viewlevels`
-- `#__user_profiles`
-
-Important:
-
-- Map groups before user-group assignments.
-- Remap group IDs stored inside `#__viewlevels.rules`.
-- Validate password compatibility before migrating users.
+**Rule:** Foundational identity/access data. Group IDs embedded in `#__viewlevels.rules` require mapping.
 
 ---
 
 ## G2 — Taxonomy and Shared Definitions
 
-Prepare categories, tags, custom fields, ACL structures, and Joomla 6 workflow definitions required by content.
+**Tables:** 10 · **Physical fields:** 154
 
-**Tables: 10**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__assets` | `base.sql` | `REBUILD / RECONCILE` |
+| `#__categories` | `supports.sql` | `MIGRATE / MAP` |
+| `#__tags` | `base.sql` | `MIGRATE / MAP` |
+| `#__content_types` | `supports.sql` | `REFERENCE_ONLY / MAP` |
+| `#__fields_groups` | `supports.sql` | `MIGRATE / MAP` |
+| `#__fields` | `supports.sql` | `MIGRATE / MAP` |
+| `#__fields_categories` | `supports.sql` | `MIGRATE / MAP` |
+| `#__workflows` | `base.sql` | `RECREATE / MAP` |
+| `#__workflow_stages` | `base.sql` | `RECREATE / MAP` |
+| `#__workflow_transitions` | `base.sql` | `RECREATE / MAP` |
 
-- `#__assets` — special handling; rebuild/reconcile instead of blind copy
-- `#__categories`
-- `#__tags`
-- `#__content_types`
-- `#__fields_groups`
-- `#__fields`
-- `#__fields_categories`
-- `#__workflows`
-- `#__workflow_stages`
-- `#__workflow_transitions`
-
-Important:
-
-- Validate nested-set trees for assets, categories, and tags.
-- Use target Joomla 6 workflow/stage/transition IDs.
-- Workflow definitions must exist before workflow associations are created.
+**Rule:** Prepare taxonomy, ACL definitions, custom-field definitions, and Joomla 6 workflow definitions before main content.
 
 ---
 
 ## G3 — Main Content
 
-Migrate primary article data after users, view levels, categories, languages, and workflow definitions are ready.
+**Tables:** 3 · **Physical fields:** 38
 
-**Tables: 3**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__content` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__content_frontpage` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__content_rating` | `extensions.sql` | `MIGRATE / MAP` |
 
-- `#__content`
-- `#__content_frontpage`
-- `#__content_rating`
-
-Main dependencies include:
-
-- `#__categories`
-- `#__users`
-- `#__viewlevels`
-- `#__assets`
-- `#__languages`
+**Rule:** Main article data. Requires stable users, categories, view levels, languages, and asset/workflow strategy.
 
 ---
 
 ## G4 — Content Relations
 
-Migrate content relationships only after the main target content IDs are stable.
+**Tables:** 8 · **Physical fields:** 66
 
-**Tables: 8**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__contentitem_tag_map` | `supports.sql` | `MIGRATE / MAP` |
+| `#__fields_values` | `supports.sql` | `MIGRATE / MAP` |
+| `#__associations` | `supports.sql` | `MIGRATE / MAP` |
+| `#__ucm_base` | `supports.sql` | `REBUILD / VALIDATE` |
+| `#__ucm_content` | `supports.sql` | `REBUILD / VALIDATE` |
+| `#__history` | `supports.sql` | `ARCHIVE / OPTIONAL_MIGRATE` |
+| `#__workflow_associations` | `base.sql` | `GENERATE / MAP` |
+| `#__schemaorg` | `extensions.sql` | `MIGRATE / MAP` |
 
-- `#__contentitem_tag_map`
-- `#__fields_values`
-- `#__associations`
-- `#__ucm_base`
-- `#__ucm_content`
-- `#__history`
-- `#__workflow_associations`
-- `#__schemaorg`
-
-Important:
-
-- `#__fields_values.item_id` is context-dependent.
-- Remap tag IDs and content item IDs.
-- Treat `#__history` as optional historical data unless explicitly required.
-- `#__workflow_associations.item_id` must reference the migrated Joomla 6 content ID.
-- `#__workflow_associations.stage_id` must reference a valid Joomla 6 workflow stage.
-- Review Schema.org data because it is context/item-ID dependent.
+**Rule:** Run after target content IDs are stable. Includes content relations, UCM/history strategy, workflow associations, and Schema.org item data.
 
 ---
 
 ## G5 — Menu and Presentation
 
-Menu and presentation data depends on content, extension mapping, access levels, and valid Joomla 6 template styles.
+**Tables:** 4 · **Physical fields:** 50
 
-**Tables: 4**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__template_styles` | `base.sql` | `TRANSFORM / RECREATE` |
+| `#__template_overrides` | `base.sql` | `REBUILD / REVIEW` |
+| `#__menu_types` | `base.sql` | `MIGRATE / MAP` |
+| `#__menu` | `base.sql` | `MIGRATE / MAP` |
 
-- `#__template_styles`
-- `#__template_overrides`
-- `#__menu_types`
-- `#__menu`
-
-Important:
-
-- Map `component_id` using target `#__extensions`.
-- Map or recreate `template_style_id`.
-- Rewrite article/category IDs embedded in menu `link`.
-- Inspect JSON `params` for embedded IDs.
-- Validate menu tree values: `parent_id`, `lft`, `rgt`, `level`, and `path`.
-- Treat template override state as target/template-specific data.
+**Rule:** Presentation/menu layer. Rewrite embedded IDs in links/params and recreate target-template-specific state where required.
 
 ---
 
 ## G6 — Modules
 
-Migrate module instances after menu IDs and required Joomla 6 extension code are ready.
+**Tables:** 2 · **Physical fields:** 20
 
-**Tables: 2**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__modules` | `base.sql` | `MIGRATE / MAP` |
+| `#__modules_menu` | `base.sql` | `MIGRATE / MAP` |
 
-- `#__modules`
-- `#__modules_menu`
-
-Important:
-
-- Compatible module code must exist before migrating module instances.
-- Map module IDs and menu IDs.
-- Validate target template positions.
-- `#__modules_menu.menuid` must reference the mapped Joomla 6 menu ID.
+**Rule:** Module code must exist on Joomla 6 before module instances and menu assignments are migrated.
 
 ---
 
 ## G7 — Supporting Core Components
 
-Migrate or recreate remaining Joomla 6 core business/configuration data as separate sub-batches.
+**Tables:** 16 · **Physical fields:** 217
 
-**Tables: 16**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__contact_details` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__newsfeeds` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__banners` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__banner_clients` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__banner_tracks` | `extensions.sql` | `ARCHIVE / OPTIONAL_MIGRATE` |
+| `#__redirect_links` | `extensions.sql` | `MIGRATE / MAP` |
+| `#__messages` | `extensions.sql` | `MIGRATE / OPTIONAL` |
+| `#__messages_cfg` | `extensions.sql` | `MIGRATE / OPTIONAL` |
+| `#__user_notes` | `base.sql` | `MIGRATE / MAP` |
+| `#__privacy_requests` | `extensions.sql` | `MIGRATE / ARCHIVE` |
+| `#__privacy_consents` | `extensions.sql` | `MIGRATE / ARCHIVE` |
+| `#__mail_templates` | `supports.sql` | `MERGE / RECREATE` |
+| `#__scheduler_tasks` | `extensions.sql` | `RECREATE / SELECTIVE` |
+| `#__action_logs_extensions` | `extensions.sql` | `TARGET_OWNED / MERGE` |
+| `#__action_log_config` | `extensions.sql` | `TARGET_OWNED / MERGE` |
+| `#__action_logs_users` | `extensions.sql` | `MIGRATE / REVIEW` |
 
-### G7.1 Contacts
-
-- `#__contact_details`
-
-### G7.2 Newsfeeds
-
-- `#__newsfeeds`
-
-### G7.3 Banners
-
-- `#__banners`
-- `#__banner_clients`
-- `#__banner_tracks`
-
-### G7.4 Redirects
-
-- `#__redirect_links`
-
-### G7.5 Messages
-
-- `#__messages`
-- `#__messages_cfg`
-
-### G7.6 User Notes
-
-- `#__user_notes`
-
-### G7.7 Privacy
-
-- `#__privacy_requests`
-- `#__privacy_consents`
-
-Typical decision: `MIGRATE`, `ARCHIVE`, or `TARGET_OWNED` depending on business/compliance requirements.
-
-### G7.8 Mail
-
-- `#__mail_templates`
-
-Typical decision: preserve Joomla 6 defaults and merge only required customizations.
-
-### G7.9 Scheduler Configuration
-
-- `#__scheduler_tasks`
-
-Typical decision: `RECREATE` or selectively configure only when the required Joomla 6 task plugin exists.
-
-### G7.10 Action Log Configuration
-
-- `#__action_logs_extensions`
-- `#__action_log_config`
-- `#__action_logs_users`
-
-Typical decision: keep Joomla 6 defaults or selectively recreate required configuration/user preferences.
+**Rule:** Business/supporting core components. Some records are optional or target-owned and require explicit scope decisions.
 
 ---
 
 ## G8 — Runtime, Generated, and Target-Owned Data
 
-These tables must still appear in inventory and mapping, but normally should not be copied directly from Joomla 3.
+**Tables:** 21 · **Physical fields:** 186
 
-**Tables: 21**
+| Table | Official DDL | Mapping decision |
+|---|---|---|
+| `#__session` | `base.sql` | `IGNORE` |
+| `#__user_keys` | `base.sql` | `IGNORE` |
+| `#__user_mfa` | `base.sql` | `RECREATE / RE-ENROL` |
+| `#__webauthn_credentials` | `supports.sql` | `RECREATE / RE-ENROL` |
+| `#__scheduler_logs` | `extensions.sql` | `IGNORE / ARCHIVE` |
+| `#__action_logs` | `extensions.sql` | `IGNORE / ARCHIVE` |
+| `#__finder_filters` | `extensions.sql` | `MIGRATE / RECREATE / REVIEW` |
+| `#__finder_links` | `extensions.sql` | `REBUILD` |
+| `#__finder_links_terms` | `extensions.sql` | `REBUILD` |
+| `#__finder_logging` | `extensions.sql` | `IGNORE / ARCHIVE` |
+| `#__finder_taxonomy` | `extensions.sql` | `REBUILD` |
+| `#__finder_taxonomy_map` | `extensions.sql` | `REBUILD` |
+| `#__finder_terms` | `extensions.sql` | `REBUILD` |
+| `#__finder_terms_common` | `extensions.sql` | `TARGET_OWNED / REVIEW` |
+| `#__finder_tokens` | `extensions.sql` | `REBUILD` |
+| `#__finder_tokens_aggregate` | `extensions.sql` | `REBUILD` |
+| `#__finder_types` | `extensions.sql` | `REBUILD` |
+| `#__postinstall_messages` | `supports.sql` | `TARGET_OWNED` |
+| `#__overrider` | `supports.sql` | `MIGRATE / RECREATE / REVIEW` |
+| `#__guidedtours` | `extensions.sql` | `TARGET_OWNED` |
+| `#__guidedtour_steps` | `extensions.sql` | `TARGET_OWNED` |
 
-### G8.1 Authentication and Runtime
-
-- `#__session`
-- `#__user_keys`
-- `#__user_mfa`
-- `#__webauthn_credentials`
-
-Typical decisions:
-
-- `#__session` → `IGNORE`
-- `#__user_keys` → `IGNORE`
-- `#__user_mfa` → `RECREATE` / user re-enrolment
-- `#__webauthn_credentials` → `RECREATE` / user re-enrolment
-
-### G8.2 Scheduler and Audit Runtime
-
-- `#__scheduler_logs`
-- `#__action_logs`
-
-Typical decisions:
-
-- `#__scheduler_logs` → `IGNORE` / `ARCHIVE`
-- `#__action_logs` → `IGNORE` / `ARCHIVE`
-
-### G8.3 Smart Search / Finder Generated Data
-
-- `#__finder_filters`
-- `#__finder_links`
-- `#__finder_links_terms`
-- `#__finder_logging`
-- `#__finder_taxonomy`
-- `#__finder_taxonomy_map`
-- `#__finder_terms`
-- `#__finder_terms_common`
-- `#__finder_tokens`
-- `#__finder_tokens_aggregate`
-- `#__finder_types`
-
-Typical decision: `REBUILD` for generated index data. Review `#__finder_filters` separately if saved search filters are business-required.
-
-### G8.4 Installation and Target-Owned UI/System Data
-
-- `#__postinstall_messages`
-- `#__overrider`
-- `#__guidedtours`
-- `#__guidedtour_steps`
-
-Typical decisions:
-
-- `#__postinstall_messages` → `TARGET_OWNED`
-- `#__overrider` → `REBUILD` / selectively migrate language overrides
-- `#__guidedtours` → `TARGET_OWNED`
-- `#__guidedtour_steps` → `TARGET_OWNED`
+**Rule:** All tables are inventoried, but runtime/security/generated/target-owned data must not be blindly copied. `finder_filters` and `overrider` require review because they can contain user configuration.
 
 ---
 
-## Recommended Migration Order
+## Official Schema Coverage
+
+| Official schema file | Tables | Fields |
+|---|---:|---:|
+| `base.sql` | 28 | 388 |
+| `extensions.sql` | 33 | 344 |
+| `supports.sql` | 15 | 100 |
+| **Total** | **76** | **832** |
+
+### Group coverage
+
+| Group | Tables | Fields |
+|---|---:|---:|
+| G0 — System Reference | 6 | 55 |
+| G1 — Users and Access Foundation | 6 | 46 |
+| G2 — Taxonomy and Shared Definitions | 10 | 154 |
+| G3 — Main Content | 3 | 38 |
+| G4 — Content Relations | 8 | 66 |
+| G5 — Menu and Presentation | 4 | 50 |
+| G6 — Modules | 2 | 20 |
+| G7 — Supporting Core Components | 16 | 217 |
+| G8 — Runtime, Generated, and Target-Owned Data | 21 | 186 |
+| **Total** | **76** | **832** |
+
+Coverage contract:
+
+```text
+Official tables                  = 76
+Explicit group decisions         = 76
+Official physical fields         = 832
+Duplicate table assignments      = 0
+Unclassified official tables     = 0
+Wildcard groups                  = 0
+Baseline table coverage          = 100%
+```
+
+---
+
+## Migration Order
 
 ```text
 G0 System Reference
@@ -362,87 +279,22 @@ G8 Runtime / Generated / Target-Owned
 
 ---
 
-## Coverage Manifest
+## Completion Gate
 
-The official Joomla 6.1.2 MySQL fresh-install schema contains **76 physical core tables** across `base.sql`, `extensions.sql`, and `supports.sql`.
-
-| Group | Table Count |
-|---|---:|
-| G0 — System Reference | 6 |
-| G1 — Users and Access Foundation | 6 |
-| G2 — Taxonomy and Shared Definitions | 10 |
-| G3 — Main Content | 3 |
-| G4 — Content Relations | 8 |
-| G5 — Menu and Presentation | 4 |
-| G6 — Modules | 2 |
-| G7 — Supporting Core Components | 16 |
-| G8 — Runtime, Generated, and Target-Owned Data | 21 |
-| **Total** | **76** |
-
-Coverage contract:
+Before this manifest can be used as a migration contract:
 
 ```text
-Official Joomla 6.1.2 core tables = 76
-Explicitly listed tables          = 76
-Duplicate classifications         = 0
-Wildcard classifications          = 0
-Unclassified tables               = 0
+Official Joomla 6.1.2 tables discovered = 76 / 76
+Tables assigned to exactly one group     = 76 / 76
+Missing official tables                  = 0
+Extra manifest tables                    = 0
+Duplicate group assignments              = 0
+Wildcard table entries                   = 0
+Unclassified tables                      = 0
 
-Baseline table coverage           = 100%
+TABLE MANIFEST                            = PASS
 ```
 
----
+The companion [`joomla-core-migration-fields-v6.md`](./joomla-core-migration-fields-v6.md) must independently reconcile every official `(table, field)` pair before field coverage can be marked PASS.
 
-## Field Coverage Gate
-
-This group manifest proves table classification coverage. It intentionally does not hard-code every column as the final authority.
-
-For the actual Joomla 6 target, scan `information_schema.COLUMNS` and populate `field_inventory` directly from the real database.
-
-Required gate:
-
-```text
-Actual target fields discovered   = 100%
-Fields inserted into inventory    = 100%
-Required target fields resolved   = 100%
-
-Missing fields                    = 0
-Duplicate inventory fields        = 0
-Unclassified fields               = 0
-Unresolved required target fields = 0
-```
-
-Recommended reconciliation query concept:
-
-```sql
-SELECT
-    COUNT(*) AS actual_target_fields
-FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = '<JOOMLA6_DATABASE>';
-```
-
-The inventory count for the same database must match this count exactly before the mapping gate can pass.
-
----
-
-## Completion Criteria
-
-Before Joomla 6 core migration is considered ready:
-
-```text
-Actual target core tables inventoried = 100%
-Actual target core fields inventoried = 100%
-Core tables classified                = 100%
-Mapping decisions completed           = 100%
-Required target fields resolved       = 100%
-
-Unclassified tables                   = 0
-Unmapped required fields              = 0
-Unresolved dependencies               = 0
-Unresolved workflow mappings          = 0
-Unexplained target tables              = 0
-```
-
-Only after the mapping gate passes should migration scripts execute.
-
-> The `76/76` table coverage applies to the official Joomla 6.1.2 fresh-install MySQL schema baseline. The migration inventory must still scan the real target database and flag any additional, missing, customized, third-party, or extension-owned tables before migration.
+> The 76-table / 832-field numbers are the official Joomla 6.1.2 fresh-install baseline. A real target database must still be reconciled against `information_schema.TABLES` and `information_schema.COLUMNS` to detect customization, extension-owned objects, or later Joomla 6.x changes.
