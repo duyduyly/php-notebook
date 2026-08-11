@@ -9,6 +9,7 @@
 - [Migration Model](#migration-model)
 - [Core Databases](#core-databases)
 - [Migration Control Database ERDs](#migration-control-database-erds)
+- [MySQL DDL for Migration Control Databases](#mysql-ddl-for-migration-control-databases)
 - [End-to-End Flow](#end-to-end-flow)
 - [Step 1 — Create Inventory and Mapping Markdown Artifacts](#step-1--create-inventory-and-mapping-markdown-artifacts)
 - [Step 2 — Define and Create the Inventory and Mapping Databases](#step-2--define-and-create-the-inventory-and-mapping-databases)
@@ -370,6 +371,611 @@ value_mapping
 ```
 
 The migration runner reads these mappings only after the inventory and mapping coverage gates pass.
+
+---
+
+# MySQL DDL for Migration Control Databases
+
+The following DDL materializes the two ERDs into MySQL tables.
+
+### Compatibility assumptions
+
+```text
+MySQL                  = 8.0+
+Storage engine         = InnoDB
+Character set          = utf8mb4
+Collation              = utf8mb4_0900_ai_ci
+Control databases      = same MySQL server
+```
+
+The DDL deliberately creates the schemas in dependency order:
+
+```text
+1. migration_inventory core identity/schema tables
+2. migration_inventory execution/result tables that do not depend on mapping
+3. migration_mapping tables
+4. migration_inventory validation/error tables that reference field_mapping
+```
+
+Cross-database foreign keys are used between `migration_mapping` and `migration_inventory` because the two control databases are expected to live on the same MySQL server. If they are deployed on separate MySQL servers, remove only those cross-database FK constraints, keep the indexes, and enforce the same relationship checks in Step 3A and Step 5.
+
+## Create the two databases
+
+```sql
+CREATE DATABASE IF NOT EXISTS `migration_inventory`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_0900_ai_ci;
+
+CREATE DATABASE IF NOT EXISTS `migration_mapping`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_0900_ai_ci;
+```
+
+## Create `migration_inventory` core tables
+
+```sql
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`database_list` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `database_name` VARCHAR(255) NOT NULL,
+    `database_role` VARCHAR(32) NOT NULL,
+    `joomla_version` VARCHAR(64) NOT NULL DEFAULT '',
+    `database_version` VARCHAR(64) NOT NULL DEFAULT '',
+    `captured_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_database_list_identity` (
+        `database_name`,
+        `database_role`,
+        `joomla_version`,
+        `database_version`
+    ),
+    KEY `ix_database_list_role` (`database_role`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`table_list` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `database_id` BIGINT UNSIGNED NOT NULL,
+
+    `table_name` VARCHAR(255) NOT NULL,
+    `ownership_type` VARCHAR(64) NOT NULL,
+    `extension_name` VARCHAR(255) NULL,
+
+    `field_count` INT UNSIGNED NOT NULL DEFAULT 0,
+    `record_count` BIGINT UNSIGNED NULL,
+
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_table_list_database_table` (`database_id`, `table_name`),
+    KEY `ix_table_list_status` (`status`),
+    KEY `ix_table_list_coverage` (`coverage_status`),
+    KEY `ix_table_list_owner` (`ownership_type`, `extension_name`),
+
+    CONSTRAINT `fk_table_list_database`
+        FOREIGN KEY (`database_id`)
+        REFERENCES `migration_inventory`.`database_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`field_inventory` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `table_id` BIGINT UNSIGNED NOT NULL,
+
+    `column_name` VARCHAR(255) NOT NULL,
+    `ordinal_position` INT UNSIGNED NOT NULL,
+
+    `data_type` VARCHAR(64) NOT NULL,
+    `column_type` VARCHAR(255) NOT NULL,
+
+    `nullable` VARCHAR(3) NOT NULL,
+    `default_value` TEXT NULL,
+
+    `column_key` VARCHAR(32) NULL,
+    `extra` VARCHAR(255) NULL,
+
+    `charset_name` VARCHAR(64) NULL,
+    `collation_name` VARCHAR(64) NULL,
+
+    `structured_format` VARCHAR(64) NULL,
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_field_inventory_table_column` (`table_id`, `column_name`),
+    UNIQUE KEY `uk_field_inventory_table_ordinal` (`table_id`, `ordinal_position`),
+    KEY `ix_field_inventory_key` (`column_key`),
+    KEY `ix_field_inventory_coverage` (`coverage_status`),
+
+    CONSTRAINT `fk_field_inventory_table`
+        FOREIGN KEY (`table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`migration_execute` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `run_code` VARCHAR(128) NOT NULL,
+
+    `source_database_id` BIGINT UNSIGNED NOT NULL,
+    `target_database_id` BIGINT UNSIGNED NOT NULL,
+
+    `mapping_version` VARCHAR(64) NOT NULL,
+    `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+
+    `started_at` DATETIME(6) NULL,
+    `completed_at` DATETIME(6) NULL,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_migration_execute_run_code` (`run_code`),
+    KEY `ix_migration_execute_mapping_version` (`mapping_version`),
+    KEY `ix_migration_execute_status` (`status`),
+    KEY `ix_migration_execute_source_target` (`source_database_id`, `target_database_id`),
+
+    CONSTRAINT `fk_migration_execute_source_database`
+        FOREIGN KEY (`source_database_id`)
+        REFERENCES `migration_inventory`.`database_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_migration_execute_target_database`
+        FOREIGN KEY (`target_database_id`)
+        REFERENCES `migration_inventory`.`database_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`table_dependency` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `table_id` BIGINT UNSIGNED NOT NULL,
+    `referenced_table_id` BIGINT UNSIGNED NOT NULL,
+
+    `source_field_id` BIGINT UNSIGNED NULL,
+    `referenced_field_id` BIGINT UNSIGNED NULL,
+
+    `dependency_type` VARCHAR(64) NOT NULL,
+
+    `reference_path` TEXT NULL,
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+
+    PRIMARY KEY (`id`),
+    KEY `ix_table_dependency_source` (`table_id`),
+    KEY `ix_table_dependency_target` (`referenced_table_id`),
+    KEY `ix_table_dependency_source_field` (`source_field_id`),
+    KEY `ix_table_dependency_target_field` (`referenced_field_id`),
+    KEY `ix_table_dependency_type` (`dependency_type`),
+    KEY `ix_table_dependency_status` (`status`, `coverage_status`),
+
+    CONSTRAINT `fk_table_dependency_table`
+        FOREIGN KEY (`table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT `fk_table_dependency_referenced_table`
+        FOREIGN KEY (`referenced_table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT `fk_table_dependency_source_field`
+        FOREIGN KEY (`source_field_id`)
+        REFERENCES `migration_inventory`.`field_inventory` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT `fk_table_dependency_referenced_field`
+        FOREIGN KEY (`referenced_field_id`)
+        REFERENCES `migration_inventory`.`field_inventory` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`record_inventory` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `migration_execute_id` BIGINT UNSIGNED NULL,
+    `table_id` BIGINT UNSIGNED NOT NULL,
+
+    `snapshot_type` VARCHAR(32) NOT NULL,
+
+    `source_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `expected_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `target_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
+    `missing_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `unexpected_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `duplicate_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
+    `checked_record_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `matched_record_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `mismatched_record_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
+    `min_primary_key` VARCHAR(512) NULL,
+    `max_primary_key` VARCHAR(512) NULL,
+    `data_checksum` VARCHAR(128) NULL,
+
+    `captured_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    PRIMARY KEY (`id`),
+    KEY `ix_record_inventory_run_table` (`migration_execute_id`, `table_id`),
+    KEY `ix_record_inventory_table_snapshot` (`table_id`, `snapshot_type`),
+    KEY `ix_record_inventory_captured_at` (`captured_at`),
+
+    CONSTRAINT `fk_record_inventory_execute`
+        FOREIGN KEY (`migration_execute_id`)
+        REFERENCES `migration_inventory`.`migration_execute` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_record_inventory_table`
+        FOREIGN KEY (`table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`migration_result` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `migration_execute_id` BIGINT UNSIGNED NOT NULL,
+
+    `source_table_id` BIGINT UNSIGNED NOT NULL,
+    `target_table_id` BIGINT UNSIGNED NULL,
+
+    `expected_fields` INT UNSIGNED NOT NULL DEFAULT 0,
+    `migrated_fields` INT UNSIGNED NOT NULL DEFAULT 0,
+
+    `expected_records` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `migrated_records` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `skipped_records` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `failed_records` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
+    `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_migration_result_run_source` (`migration_execute_id`, `source_table_id`),
+    KEY `ix_migration_result_target` (`target_table_id`),
+    KEY `ix_migration_result_status` (`status`),
+
+    CONSTRAINT `fk_migration_result_execute`
+        FOREIGN KEY (`migration_execute_id`)
+        REFERENCES `migration_inventory`.`migration_execute` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_migration_result_source_table`
+        FOREIGN KEY (`source_table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_migration_result_target_table`
+        FOREIGN KEY (`target_table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+```
+
+## Create `migration_mapping`
+
+The source and target table/field IDs below reference the inventory database so that mappings always point to inventoried schema objects.
+
+```sql
+CREATE TABLE IF NOT EXISTS `migration_mapping`.`table_mapping` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `source_table_id` BIGINT UNSIGNED NOT NULL,
+    `target_table_id` BIGINT UNSIGNED NULL,
+
+    `mapping_type` VARCHAR(32) NOT NULL,
+    `migration_order` INT UNSIGNED NOT NULL DEFAULT 0,
+
+    `mapping_version` VARCHAR(64) NOT NULL,
+
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_table_mapping_source_version` (`source_table_id`, `mapping_version`),
+    KEY `ix_table_mapping_target` (`target_table_id`),
+    KEY `ix_table_mapping_order` (`mapping_version`, `migration_order`),
+    KEY `ix_table_mapping_status` (`status`, `coverage_status`),
+    KEY `ix_table_mapping_type` (`mapping_type`),
+
+    CONSTRAINT `fk_table_mapping_source_table`
+        FOREIGN KEY (`source_table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_table_mapping_target_table`
+        FOREIGN KEY (`target_table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_mapping`.`field_mapping` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `table_mapping_id` BIGINT UNSIGNED NOT NULL,
+
+    `source_field_id` BIGINT UNSIGNED NULL,
+    `target_field_id` BIGINT UNSIGNED NULL,
+
+    `mapping_type` VARCHAR(32) NOT NULL,
+
+    `source_expression` LONGTEXT NULL,
+    `migration_expression` LONGTEXT NULL,
+    `verification_expression` LONGTEXT NULL,
+
+    `structured_format` VARCHAR(64) NULL,
+    `structured_rule` LONGTEXT NULL,
+
+    `mapping_order` INT UNSIGNED NOT NULL DEFAULT 0,
+
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+
+    PRIMARY KEY (`id`),
+    KEY `ix_field_mapping_table_order` (`table_mapping_id`, `mapping_order`),
+    KEY `ix_field_mapping_source_field` (`source_field_id`),
+    KEY `ix_field_mapping_target_field` (`target_field_id`),
+    KEY `ix_field_mapping_type` (`mapping_type`),
+    KEY `ix_field_mapping_status` (`status`, `coverage_status`),
+
+    CONSTRAINT `chk_field_mapping_has_side`
+        CHECK (`source_field_id` IS NOT NULL OR `target_field_id` IS NOT NULL),
+
+    CONSTRAINT `fk_field_mapping_table_mapping`
+        FOREIGN KEY (`table_mapping_id`)
+        REFERENCES `migration_mapping`.`table_mapping` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT `fk_field_mapping_source_field`
+        FOREIGN KEY (`source_field_id`)
+        REFERENCES `migration_inventory`.`field_inventory` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_field_mapping_target_field`
+        FOREIGN KEY (`target_field_id`)
+        REFERENCES `migration_inventory`.`field_inventory` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_mapping`.`value_mapping` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `field_mapping_id` BIGINT UNSIGNED NOT NULL,
+
+    `mapping_key` VARCHAR(255) NOT NULL,
+
+    `source_value` LONGTEXT NULL,
+    `target_value` LONGTEXT NULL,
+
+    `mapping_type` VARCHAR(32) NOT NULL,
+
+    `coverage_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_value_mapping_field_key` (`field_mapping_id`, `mapping_key`),
+    KEY `ix_value_mapping_type` (`mapping_type`),
+    KEY `ix_value_mapping_status` (`status`, `coverage_status`),
+
+    CONSTRAINT `fk_value_mapping_field_mapping`
+        FOREIGN KEY (`field_mapping_id`)
+        REFERENCES `migration_mapping`.`field_mapping` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+```
+
+## Create `migration_inventory` validation and error tables
+
+These tables are created after `migration_mapping.field_mapping` so that `field_mapping_id` can be a real cross-database FK instead of an unverified numeric reference.
+
+```sql
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`validation_result` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `migration_execute_id` BIGINT UNSIGNED NOT NULL,
+    `table_id` BIGINT UNSIGNED NULL,
+    `field_mapping_id` BIGINT UNSIGNED NULL,
+
+    `phase` VARCHAR(32) NOT NULL,
+    `check_type` VARCHAR(64) NOT NULL,
+
+    `checked_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `matched_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `mismatch_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
+    `expected_value` VARCHAR(2048) NULL,
+    `actual_value` VARCHAR(2048) NULL,
+
+    `status` VARCHAR(32) NOT NULL,
+    `details` LONGTEXT NULL,
+
+    PRIMARY KEY (`id`),
+    KEY `ix_validation_result_run` (`migration_execute_id`),
+    KEY `ix_validation_result_table` (`table_id`),
+    KEY `ix_validation_result_field_mapping` (`field_mapping_id`),
+    KEY `ix_validation_result_phase_type` (`phase`, `check_type`),
+    KEY `ix_validation_result_status` (`status`),
+
+    CONSTRAINT `fk_validation_result_execute`
+        FOREIGN KEY (`migration_execute_id`)
+        REFERENCES `migration_inventory`.`migration_execute` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_validation_result_table`
+        FOREIGN KEY (`table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_validation_result_field_mapping`
+        FOREIGN KEY (`field_mapping_id`)
+        REFERENCES `migration_mapping`.`field_mapping` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE IF NOT EXISTS `migration_inventory`.`migration_error` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+    `migration_execute_id` BIGINT UNSIGNED NOT NULL,
+    `table_id` BIGINT UNSIGNED NULL,
+    `field_mapping_id` BIGINT UNSIGNED NULL,
+
+    `source_record_id` VARCHAR(512) NULL,
+
+    `error_type` VARCHAR(64) NOT NULL,
+
+    `expected_value` LONGTEXT NULL,
+    `actual_value` LONGTEXT NULL,
+    `details` LONGTEXT NULL,
+
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    PRIMARY KEY (`id`),
+    KEY `ix_migration_error_run` (`migration_execute_id`),
+    KEY `ix_migration_error_table` (`table_id`),
+    KEY `ix_migration_error_field_mapping` (`field_mapping_id`),
+    KEY `ix_migration_error_type` (`error_type`),
+    KEY `ix_migration_error_source_record` (`source_record_id`),
+    KEY `ix_migration_error_created_at` (`created_at`),
+
+    CONSTRAINT `fk_migration_error_execute`
+        FOREIGN KEY (`migration_execute_id`)
+        REFERENCES `migration_inventory`.`migration_execute` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_migration_error_table`
+        FOREIGN KEY (`table_id`)
+        REFERENCES `migration_inventory`.`table_list` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT `fk_migration_error_field_mapping`
+        FOREIGN KEY (`field_mapping_id`)
+        REFERENCES `migration_mapping`.`field_mapping` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+```
+
+## Post-DDL verification
+
+The first schema check should prove that all ERD tables exist:
+
+```sql
+SELECT
+    table_schema,
+    COUNT(*) AS physical_table_count
+FROM information_schema.tables
+WHERE table_type = 'BASE TABLE'
+  AND table_schema IN ('migration_inventory', 'migration_mapping')
+GROUP BY table_schema
+ORDER BY table_schema;
+```
+
+Expected:
+
+```text
+migration_inventory = 9 tables
+migration_mapping   = 3 tables
+```
+
+Check the exact table set:
+
+```sql
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE table_type = 'BASE TABLE'
+  AND table_schema IN ('migration_inventory', 'migration_mapping')
+ORDER BY table_schema, table_name;
+```
+
+Check all physical FK definitions:
+
+```sql
+SELECT
+    kcu.constraint_schema,
+    kcu.table_name,
+    kcu.column_name,
+    kcu.referenced_table_schema,
+    kcu.referenced_table_name,
+    kcu.referenced_column_name,
+    kcu.constraint_name
+FROM information_schema.key_column_usage kcu
+WHERE kcu.constraint_schema IN ('migration_inventory', 'migration_mapping')
+  AND kcu.referenced_table_name IS NOT NULL
+ORDER BY
+    kcu.constraint_schema,
+    kcu.table_name,
+    kcu.constraint_name,
+    kcu.ordinal_position;
+```
+
+The DDL creation gate is:
+
+```text
+migration_inventory tables              = 9 / 9
+migration_mapping tables                = 3 / 3
+Missing tables                          = 0
+Missing PKs                             = 0
+Missing required unique keys            = 0
+Missing declared FK relationships       = 0
+Unexpected DDL errors                   = 0
+
+CONTROL DATABASE DDL                    = PASS
+```
+
+> Creating the schemas only proves the physical control-database structure exists. Step 3 still has to seed inventory/mapping data, and Step 3A must prove the seeded data has 100% required coverage before any migration script executes.
 
 ---
 
