@@ -1,6 +1,6 @@
 # End-to-End Database Migration Workflow Tutorial
 
-> Controlled top-down database migration using preserved inventory detail, mapping definitions, one row per workflow step, centralized execution history, one-time migration-script execution, and validation evidence.
+> Controlled top-down database migration using preserved inventory detail, mapping definitions, one row per workflow step, attempt-aware execution history, rollback-before-retry, migration script logging, and validation evidence.
 
 ---
 
@@ -11,17 +11,18 @@
 3. [Hard-Coded Workflow Enum](#3-hard-coded-workflow-enum)
 4. [Workflow](#4-workflow)
 5. [Workflow Step](#5-workflow-step)
-6. [Workflow Execution History](#6-workflow-execution-history)
-7. [Inventory Detail Tables](#7-inventory-detail-tables)
-8. [Mapping Tables](#8-mapping-tables)
-9. [Execution and Validation Detail](#9-execution-and-validation-detail)
-10. [Top-Down Step Gate](#10-top-down-step-gate)
-11. [Insert / Update Flow](#11-insert--update-flow)
-12. [JOOMLA_CORE Seed Example](#12-joomla_core-seed-example)
-13. [ERD](#13-erd)
-14. [Recommended MySQL DDL](#14-recommended-mysql-ddl)
-15. [Codex Prompts Per Workflow Step](#15-codex-prompts-per-workflow-step)
-16. [Final Verification Rules](#16-final-verification-rules)
+6. [Workflow Execution History and Attempts](#6-workflow-execution-history-and-attempts)
+7. [Rollback and Retry Contract](#7-rollback-and-retry-contract)
+8. [Inventory Detail Tables](#8-inventory-detail-tables)
+9. [Mapping Tables](#9-mapping-tables)
+10. [Execution and Validation Detail](#10-execution-and-validation-detail)
+11. [Top-Down Step Gate](#11-top-down-step-gate)
+12. [Insert / Update Flow](#12-insert--update-flow)
+13. [JOOMLA_CORE Seed Example](#13-joomla_core-seed-example)
+14. [ERD](#14-erd)
+15. [Recommended MySQL DDL](#15-recommended-mysql-ddl)
+16. [Codex Prompts Per Workflow Step](#16-codex-prompts-per-workflow-step)
+17. [Final Verification Rules](#17-final-verification-rules)
 
 ---
 
@@ -29,7 +30,7 @@
 
 The workflow is one strict top-down flow.
 
-`INVENTORY` and `MAPPING` are intentionally combined into one preparation step because both are produced before execution. They are still verified independently by two following verification steps.
+`INVENTORY` and `MAPPING` are combined into one preparation step. Inventory and mapping are still verified independently by the next two steps.
 
 ```text
 workflow_enum                       hard-coded step definition/order
@@ -38,7 +39,7 @@ workflow                            one named migration flow, e.g. JOOMLA_CORE
         ↓
 workflow_step                       one row for every step in that workflow
         ↓
-workflow_execution_history          one final evidence row for every workflow_step
+workflow_execution_history          one immutable result row per attempt
 ```
 
 Canonical workflow:
@@ -59,7 +60,39 @@ FINAL_VERIFY
 WORKFLOW PASS
 ```
 
-The first step writes both groups of definitions/details:
+Every step follows the same execution lifecycle:
+
+```text
+PRECHECK
+    ↓
+CREATE ATTEMPT N
+    ↓
+CAPTURE PRE-ATTEMPT BASELINE / ROLLBACK EVIDENCE
+    ↓
+EXECUTE CURRENT STEP
+    ↓
+VERIFY CURRENT ATTEMPT
+    ↓
+PASS?
+ ┌──┴──┐
+YES   NO
+ │     │
+ │     ↓
+ │   ROLLBACK ATTEMPT N
+ │     ↓
+ │   VERIFY ROLLBACK
+ │     ↓
+ │   rollback_status = PASS?
+ │     ├── NO  → BLOCK
+ │     └── YES → workflow_step = PENDING → RETRY AS ATTEMPT N+1
+ │
+ ↓
+workflow_step = PASS
+    ↓
+NEXT STEP ALLOWED
+```
+
+The complete preparation output remains:
 
 ```text
 INVENTORY_MAPPING
@@ -78,66 +111,14 @@ INVENTORY_MAPPING
     └── value_mapping
 ```
 
-Then the two independent verification gates run:
+The two independent verification gates remain:
 
 ```text
 INVENTORY_VERIFY
-    = verify discovered source/target inventory evidence
+    = verify actual source/target inventory evidence
 
 MAPPING_VERIFY
-    = verify mapping contract against the verified inventory
-```
-
-Execution detail remains available for drill-down:
-
-```text
-migration_script
-      ↓
-execute_log
-      ↓
-migration_step_result
-      ↓
-migration_error
-```
-
-Validation detail remains available for drill-down:
-
-```text
-validation_result
-      ↓
-validation_failure
-```
-
-Complete control flow:
-
-```mermaid
-flowchart TD
-    A[Create workflow: JOOMLA_CORE]
-    --> B[Create all workflow_step rows from hard-coded enum]
-    B --> C[Find first non-PASS workflow_step]
-    C --> D{Previous step exists?}
-    D -->|No - first step| E[Execute current step]
-    D -->|Yes| F{Previous workflow_execution_history = PASS?}
-    F -->|No| X[BLOCK]
-    F -->|Yes| E
-    E --> G[Write detail tables for current step]
-    G --> H[Insert workflow_execution_history]
-    H --> I{Current step PASS?}
-    I -->|No| X
-    I -->|Yes| J[Mark workflow_step PASS]
-    J --> K{Any required step not PASS?}
-    K -->|Yes| C
-    K -->|No| L[Mark workflow PASS]
-```
-
-Core rule:
-
-```text
-A step may run only when:
-1. it is the first non-PASS step by step_order;
-2. its previous workflow_step has PASS history, except the first step;
-3. the current workflow_step has no existing workflow_execution_history row;
-4. all step-specific preconditions pass.
+    = verify mapping contract against verified inventory
 ```
 
 ---
@@ -179,10 +160,13 @@ It answers:
 
 ```text
 WHAT EXISTS
-+ WHICH WORKFLOW/STEP IS RUNNING
++ WHICH WORKFLOW/STEP IS ACTIVE
++ WHICH ATTEMPT RAN
 + WHAT WAS EXECUTED
 + WHAT WAS VERIFIED
-+ WHAT PASSED/FAILED
++ WHAT FAILED
++ WHETHER FAILED WORK WAS ROLLED BACK
++ WHETHER RETRY IS SAFE
 ```
 
 ## `migration_mapping`
@@ -197,7 +181,7 @@ migration_mapping
 └── value_mapping
 ```
 
-Workflow-level history is centralized in:
+Workflow execution history remains centralized in:
 
 ```text
 migration_inventory.workflow_execution_history
@@ -207,7 +191,7 @@ migration_inventory.workflow_execution_history
 
 # 3. Hard-Coded Workflow Enum
 
-`workflow_enum` is hard-coded in source code. It is **not a database table**, therefore there is no SQL `INSERT` into an enum table.
+`workflow_enum` is hard-coded in source code. It is not a database table.
 
 Canonical order:
 
@@ -270,24 +254,13 @@ enum MigrationWorkflowStep: string
 }
 ```
 
-The enum answers only:
-
-```text
-What steps exist?
-What is their order?
-What is the previous step?
-What is the next step?
-```
-
-Runtime state is stored in `workflow_step`; execution proof is stored in `workflow_execution_history`.
+The enum defines only step identity/order. Runtime attempts and rollback state are stored in the control database.
 
 ---
 
 # 4. Workflow
 
 One `workflow` row represents one complete named migration flow.
-
-`workflow_name` identifies the migration scope.
 
 Examples:
 
@@ -305,7 +278,7 @@ Recommended fields:
 | Column | Type | Purpose |
 |---|---|---|
 | `id` | bigint UN AI PK | Workflow ID. |
-| `workflow_name` | varchar(128) | Scope/name such as `JOOMLA_CORE`. |
+| `workflow_name` | varchar(128) | Scope such as `JOOMLA_CORE`. |
 | `workflow_version` | varchar(64) | Workflow version. |
 | `source_snapshot_id` | bigint UN NULL | Filled by `INVENTORY_MAPPING`. |
 | `target_snapshot_id` | bigint UN NULL | Filled by `INVENTORY_MAPPING`. |
@@ -321,22 +294,13 @@ Recommended identity:
 UNIQUE (workflow_name, workflow_version)
 ```
 
-Example:
-
-```text
-id               = 1
-workflow_name    = JOOMLA_CORE
-workflow_version = V1
-status           = PENDING
-```
-
 ---
 
 # 5. Workflow Step
 
 Each enum step is a separate row in `workflow_step`.
 
-For `JOOMLA_CORE V1` there are six rows:
+For `JOOMLA_CORE V1`:
 
 | step_order | step_code | Initial status |
 |---:|---|---|
@@ -355,33 +319,34 @@ Recommended fields:
 | `workflow_id` | bigint UN | Parent workflow. |
 | `step_code` | varchar(64) | Hard-coded enum value. |
 | `step_order` | int UN | Hard-coded enum order. |
-| `status` | varchar(16) | `PENDING/RUNNING/PASS/FAIL/BLOCKED`. |
-| `started_at` | datetime(6) NULL | Start time. |
-| `completed_at` | datetime(6) NULL | Completion time. |
-| `updated_at` | datetime(6) | Last update time. |
+| `status` | varchar(16) | `PENDING/RUNNING/PASS/FAIL/ROLLING_BACK/BLOCKED`. |
+| `started_at` | datetime(6) NULL | Current attempt start. |
+| `completed_at` | datetime(6) NULL | PASS completion time. |
+| `updated_at` | datetime(6) | Last state update. |
 
-Recommended key:
+Recommended keys:
 
 ```text
 UNIQUE (workflow_id, step_code)
+UNIQUE (workflow_id, step_order)
 ```
 
-Current step is derived as:
+Current allowed step is derived as:
 
 ```text
-1. RUNNING step if one exists;
+1. RUNNING / FAIL / ROLLING_BACK step if one exists;
 2. otherwise the lowest step_order whose status is not PASS.
 ```
 
-No `previous_step`, `current_step`, or `next_step` columns are required because those values are derived from the enum and the six workflow-step rows.
+Retry does not create another `workflow_step`. It creates another `workflow_execution_history.attempt_no` for the same step.
 
 ---
 
-# 6. Workflow Execution History
+# 6. Workflow Execution History and Attempts
 
-`workflow_execution_history` is the centralized workflow-level result/evidence table.
+`workflow_execution_history` is append-only attempt history.
 
-Every `workflow_step` produces exactly one final history row.
+Relationship:
 
 ```text
 workflow
@@ -391,27 +356,28 @@ workflow
 workflow_step
    1
    │
-   0..1
+   N
 workflow_execution_history
 ```
 
-History references only:
+One step may therefore have:
 
 ```text
-workflow_step_id
+attempt 1 = FAIL, rollback PASS
+attempt 2 = FAIL, rollback PASS
+attempt 3 = PASS
 ```
 
-because `workflow_id`, `step_code`, and `step_order` are available through `workflow_step`.
+History references only `workflow_step_id`; workflow and step identity are available by join.
 
-Recommended uniqueness:
+Required attempt identity:
 
 ```text
-UNIQUE (workflow_step_id)
+attempt_no
+UNIQUE (workflow_step_id, attempt_no)
 ```
 
-## 6.1 Inventory and mapping evidence
-
-Retained from the original structure:
+## 6.1 Existing evidence retained
 
 ```text
 mapping_release_id
@@ -428,7 +394,6 @@ active_field_mapping_count
 source_record_baseline_total
 contract_verification
 data_migration_verification
-verified_at
 ```
 
 ## 6.2 Field accounting
@@ -470,7 +435,7 @@ successful_script_count
 failed_script_count
 ```
 
-## 6.6 Integrity/failure summary
+## 6.6 Failure summary
 
 ```text
 missing_record_count
@@ -481,67 +446,142 @@ migration_error_count
 validation_failure_count
 ```
 
-## 6.7 Canonical result
+## 6.7 Attempt and rollback result
 
 ```text
-status = PASS / FAIL
+attempt_no
+status
+rollback_status
+rollback_error_count
+started_at
+verified_at
+rollback_started_at
+rolled_back_at
 ```
 
-The next step gates on this field.
+Allowed result semantics:
 
-`contract_verification` and `data_migration_verification` remain step-specific supporting evidence.
+```text
+status = PASS
+    → rollback_status = NOT_REQUIRED
+    → step is complete
+    → no retry allowed
 
-Recommended columns:
+status = FAIL
+    → next step is blocked
+    → retry is blocked until rollback_status = PASS
 
-| Column | Type | Purpose |
-|---|---|---|
-| `id` | bigint UN AI PK | History ID. |
-| `workflow_step_id` | bigint UN | Exact workflow step. |
-| `mapping_release_id` | bigint UN NULL | Mapping release evidence. |
-| `source_snapshot_id` | bigint UN NULL | Source snapshot evidence. |
-| `target_snapshot_id` | bigint UN NULL | Target snapshot evidence. |
-| `mapping_version` | varchar(64) NULL | Mapping version. |
-| `contract_fingerprint` | char(64) NULL | Contract fingerprint. |
-| `source_table_count` | int UN | Source tables. |
-| `source_field_count` | int UN | Source fields. |
-| `target_table_count` | int UN | Target tables. |
-| `target_field_count` | int UN | Target fields. |
-| `active_table_mapping_count` | int UN | Active table mappings. |
-| `active_field_mapping_count` | int UN | Active field mappings. |
-| `ready_field_count` | int UN | READY fields. |
-| `skip_field_count` | int UN | SKIP fields. |
-| `missing_field_count` | int UN | MISSING fields. |
-| `processed_field_count` | int UN | Fields processed. |
-| `successful_field_count` | int UN | Successful fields. |
-| `failed_field_count` | int UN | Failed fields. |
-| `source_record_baseline_total` | bigint UN | Source baseline total. |
-| `processed_record_count` | bigint UN | Records processed. |
-| `successful_record_count` | bigint UN | Successfully accounted records. |
-| `skipped_record_count` | bigint UN | Explicit skips. |
-| `rebuilt_record_count` | bigint UN | Rebuilt records. |
-| `archived_record_count` | bigint UN | Archived records. |
-| `failed_record_count` | bigint UN | Failed records. |
-| `unaccounted_record_count` | bigint UN | Unaccounted records. |
-| `verification_checked_count` | bigint UN | Verification items checked. |
-| `verification_passed_count` | bigint UN | Verification PASS items. |
-| `verification_failed_count` | bigint UN | Verification FAIL items. |
-| `script_count` | int UN | Scripts expected/used. |
-| `successful_script_count` | int UN | Successful scripts. |
-| `failed_script_count` | int UN | Failed scripts. |
-| `missing_record_count` | bigint UN | Missing records. |
-| `unexpected_record_count` | bigint UN | Unexpected records. |
-| `duplicate_record_count` | bigint UN | Duplicates. |
-| `broken_reference_count` | bigint UN | Broken references. |
-| `migration_error_count` | bigint UN | Migration errors. |
-| `validation_failure_count` | bigint UN | Validation failures. |
-| `contract_verification` | varchar(16) NULL | Contract PASS/FAIL when applicable. |
-| `data_migration_verification` | varchar(16) NULL | Data migration PASS/FAIL when applicable. |
-| `status` | varchar(16) | Canonical `PASS/FAIL`. |
-| `verified_at` | datetime(6) | Finalized time. |
+status = FAIL + rollback_status = PASS
+    → failed attempt remains immutable evidence
+    → workflow_step returns to PENDING
+    → retry as attempt_no + 1 is allowed
+
+status = FAIL + rollback_status = FAIL/PENDING
+    → workflow_step remains blocked
+    → retry is forbidden
+```
 
 ---
 
-# 7. Inventory Detail Tables
+# 7. Rollback and Retry Contract
+
+Rollback is part of each step's generated SQL and plan. It is not a separate workflow step.
+
+## 7.1 Retry gate
+
+A new attempt is allowed only when:
+
+```text
+current workflow_step has no PASS attempt
+AND
+(
+    there is no previous attempt
+    OR latest attempt.status = FAIL
+       AND latest attempt.rollback_status = PASS
+)
+```
+
+Next attempt number:
+
+```sql
+SELECT COALESCE(MAX(attempt_no), 0) + 1 AS next_attempt_no
+FROM migration_inventory.workflow_execution_history
+WHERE workflow_step_id = :workflow_step_id;
+```
+
+## 7.2 PASS is final
+
+If any attempt has:
+
+```text
+status = PASS
+```
+
+then:
+
+```text
+workflow_step.status = PASS
+retry = BLOCKED
+next workflow step may become eligible
+```
+
+## 7.3 Failed attempt must be rolled back before retry
+
+A failed attempt is not reusable and cannot be ignored.
+
+Required flow:
+
+```text
+attempt N FAIL
+    ↓
+workflow_step = ROLLING_BACK
+    ↓
+execute attempt-N rollback
+    ↓
+verify target/control state returned to the recorded pre-attempt baseline
+    ↓
+rollback_status = PASS
+    ↓
+workflow_step = PENDING
+    ↓
+attempt N+1 allowed
+```
+
+## 7.4 Rollback strategy inside generated SQL
+
+Each Codex-generated SQL file must select the safest rollback strategy for the statements it actually generates:
+
+```text
+A. Transaction rollback
+   Use START TRANSACTION / COMMIT / ROLLBACK for transactional DML where the complete change set can safely remain inside one transaction.
+
+B. Explicit compensating rollback
+   For changes that cannot safely depend on transaction rollback, capture the required pre-attempt baseline/backup and generate explicit reverse/restore SQL.
+```
+
+The generated plan must state which strategy applies to every write block.
+
+Never claim rollback support without executable rollback SQL and a rollback-verification query.
+
+## 7.5 Rollback verification
+
+Rollback PASS requires evidence that the current attempt no longer leaves application/control changes that would contaminate the retry.
+
+At minimum verify applicable:
+
+```text
+row counts restored
+attempt-created rows removed/restored/invalidated as defined
+changed values restored
+runtime mappings from failed attempt removed/restored
+no unresolved migration_error caused by rollback
+no failed-attempt script is treated as successful for retry
+pre-attempt fingerprint/count checks match
+```
+
+---
+
+# 8. Inventory Detail Tables
 
 Keep all inventory evidence tables:
 
@@ -554,21 +594,13 @@ table_dependency
 record_inventory
 ```
 
-Responsibility:
+They remain the detailed evidence. `workflow_execution_history` stores only attempt-level summary and verification results.
 
-```text
-inventory detail
-= exact discovered facts
-
-workflow_execution_history
-= summarized step result and reusable checkpoint
-```
-
-The history table does not replace detailed inventory evidence.
+For failed `INVENTORY_MAPPING` attempts, the generated rollback must preserve historical evidence while ensuring the failed attempt's unfinished snapshot/release cannot be reused as an approved input for the retry.
 
 ---
 
-# 8. Mapping Tables
+# 9. Mapping Tables
 
 Keep mapping definitions:
 
@@ -590,311 +622,220 @@ SKIP
 MISSING
 ```
 
-`INVENTORY_MAPPING` writes these definitions.
-
-`MAPPING_VERIFY` verifies them and writes only its summary/evidence into `workflow_execution_history`.
+`INVENTORY_MAPPING` writes mapping definitions. `MAPPING_VERIFY` verifies them; it does not silently rewrite the contract.
 
 ---
 
-# 9. Execution and Validation Detail
+# 10. Execution and Validation Detail
 
 ## Migration execution
 
-Each migration script has a stable identity in:
+Each migration script has a stable identity in `migration_script`.
+
+Every execution is logged in `execute_log`.
+
+Because a failed attempt can be rolled back and retried, script uniqueness is scoped to the attempt:
 
 ```text
-migration_script
+UNIQUE (workflow_step_id, attempt_no, script_id)
 ```
 
-Each actual execution is logged in:
+Therefore:
 
 ```text
-execute_log
+same script twice in attempt N      → BLOCK
+same script in attempt N+1 after
+attempt N rollback PASS             → ALLOWED
+same step already has PASS attempt  → BLOCK ALL RETRIES
 ```
 
-A script may run only once for one migration workflow step:
+`execute_log` must store:
 
 ```text
-UNIQUE (workflow_step_id, script_id)
+workflow_step_id
+attempt_no
+script_id
+script_hash
+execution_status
+affected_rows
+affected_fields
+error_summary
+executed_at
 ```
 
-Before execution:
-
-```sql
-SELECT id
-FROM migration_inventory.execute_log
-WHERE workflow_step_id = :migration_step_id
-  AND script_id = :script_id
-LIMIT 1;
-```
-
-If any row exists:
-
-```text
-BLOCK
-SCRIPT_ALREADY_EXECUTED
-```
-
-Execution totals are stored in:
-
-```text
-migration_step_result
-```
-
-Runtime failures are stored in:
-
-```text
-migration_error
-```
+Execution totals remain in `migration_step_result`; runtime errors remain in `migration_error`.
 
 ## Data validation
 
-Aggregate/detail validation evidence is stored in:
+`validation_result` and `validation_failure` remain detailed validation evidence.
 
-```text
-validation_result
-```
+For retry isolation, validation detail must include the current `attempt_no` or otherwise be unambiguously linked to the current workflow attempt.
 
-Concrete failures are stored in:
-
-```text
-validation_failure
-```
-
-The workflow-level result is summarized into the `VALIDATION_DATA` history row.
+The workflow-level result is summarized into `workflow_execution_history`.
 
 ---
 
-# 10. Top-Down Step Gate
+# 11. Top-Down Step Gate
 
 For requested workflow step `X`:
 
 ```text
-1. Load the workflow.
-2. Load all workflow_step rows ordered by step_order.
-3. Determine the first non-PASS step.
-4. Requested workflow_step must equal that step.
-5. Resolve the previous step from workflow_enum.
-6. If a previous step exists, its workflow_execution_history.status must equal PASS.
-7. Current workflow_step must not already have workflow_execution_history.
-8. Execute only the current step.
-9. Write required detail tables.
-10. Insert one workflow_execution_history row.
-11. Set workflow_step.status = PASS only when history.status = PASS.
-12. Never execute the next step automatically.
+1. Load workflow and ordered workflow_step rows.
+2. Confirm every earlier required step has a PASS history attempt.
+3. Confirm no later step is being requested out of order.
+4. Confirm current step has no PASS attempt.
+5. Load latest current-step attempt.
+6. If latest attempt FAIL and rollback_status != PASS → BLOCK.
+7. Calculate next attempt_no = MAX(attempt_no) + 1.
+8. Capture pre-attempt rollback baseline/evidence.
+9. Execute only current step.
+10. Verify current attempt.
+11. If PASS: insert/finalize PASS history and mark workflow_step PASS.
+12. If FAIL: record FAIL, rollback the same attempt, verify rollback.
+13. Only after rollback PASS may workflow_step return to PENDING for retry.
+14. Never execute the next workflow step automatically.
 ```
 
-Previous-step check:
+Previous-step PASS query pattern:
 
 ```sql
-SELECT
-    previous_ws.id,
-    previous_ws.step_code,
-    previous_ws.status AS step_status,
-    previous_h.status AS history_status
+SELECT previous_ws.id
 FROM migration_inventory.workflow_step current_ws
 JOIN migration_inventory.workflow_step previous_ws
   ON previous_ws.workflow_id = current_ws.workflow_id
  AND previous_ws.step_order = :previous_step_order
-LEFT JOIN migration_inventory.workflow_execution_history previous_h
-  ON previous_h.workflow_step_id = previous_ws.id
-WHERE current_ws.id = :current_workflow_step_id;
+WHERE current_ws.id = :current_workflow_step_id
+  AND previous_ws.status = 'PASS'
+  AND EXISTS (
+      SELECT 1
+      FROM migration_inventory.workflow_execution_history h
+      WHERE h.workflow_step_id = previous_ws.id
+        AND h.status = 'PASS'
+  );
 ```
 
-Required before continuing:
-
-```text
-previous_ws.status = PASS
-previous_h.status  = PASS
-```
-
-Current-step duplicate guard:
+Current-step PASS guard:
 
 ```sql
 SELECT id
 FROM migration_inventory.workflow_execution_history
 WHERE workflow_step_id = :current_workflow_step_id
+  AND status = 'PASS'
 LIMIT 1;
 ```
 
-If a row exists:
+If found:
 
 ```text
 BLOCK
-STEP_ALREADY_EXECUTED
+STEP_ALREADY_PASSED
+```
+
+Latest-attempt retry guard:
+
+```sql
+SELECT attempt_no, status, rollback_status
+FROM migration_inventory.workflow_execution_history
+WHERE workflow_step_id = :current_workflow_step_id
+ORDER BY attempt_no DESC
+LIMIT 1;
+```
+
+Retry is allowed only when no row exists or the latest row is:
+
+```text
+status = FAIL
+rollback_status = PASS
 ```
 
 ---
 
-# 11. Insert / Update Flow
+# 12. Insert / Update Flow
 
 ## Step 1 — `INVENTORY_MAPPING`
 
-Check that this is the first allowed step.
+Prepare inventory detail and mapping definitions.
 
-Create/update inventory evidence:
-
-```text
-migration_inventory.database_list
-migration_inventory.inventory_snapshot
-migration_inventory.table_list
-migration_inventory.field_inventory
-migration_inventory.table_dependency
-migration_inventory.record_inventory
-```
-
-Create mapping definitions:
+If attempt fails:
 
 ```text
-migration_mapping.mapping_release
-migration_mapping.table_mapping
-migration_mapping.field_mapping
-migration_mapping.value_mapping
+- do not allow INVENTORY_VERIFY;
+- rollback/retire/restore artifacts created or modified by that attempt according to the generated plan;
+- verify rollback;
+- set failed history.rollback_status = PASS only after proof;
+- reset workflow_step to PENDING;
+- retry as a new attempt.
 ```
 
-Update the parent `workflow` with:
-
-```text
-source_snapshot_id
-target_snapshot_id
-mapping_release_id
-```
-
-Then insert exactly one:
-
-```text
-workflow_execution_history
-```
-
-for the `INVENTORY_MAPPING` workflow-step row.
-
-This history row records preparation counts and fingerprints, but **does not replace either verification step**.
+If PASS, mark step PASS.
 
 ## Step 2 — `INVENTORY_VERIFY`
 
-Require:
+Require a PASS attempt for `INVENTORY_MAPPING`.
 
-```text
-INVENTORY_MAPPING history = PASS
-```
+This step is verification-focused. If its execution fails, rollback only its attempt-specific control/validation artifacts; do not rewrite the underlying inventory merely to make verification pass.
 
-Verify actual source/target inventory against the captured inventory detail.
-
-Check at minimum:
-
-```text
-source tables
-source fields
-target tables
-target fields
-record baselines
-dependencies
-snapshot hashes
-missing inventory objects
-```
-
-Insert one `workflow_execution_history` row for `INVENTORY_VERIFY`.
-
-Do not modify mapping rules in this step.
+Retry only after rollback PASS.
 
 ## Step 3 — `MAPPING_VERIFY`
 
-Require:
+Require a PASS attempt for `INVENTORY_VERIFY`.
 
-```text
-INVENTORY_VERIFY history = PASS
-```
-
-Verify the mapping release against the verified snapshots.
-
-Check at minimum:
-
-```text
-active table mapping coverage
-active field mapping coverage
-READY / SKIP / MISSING classification
-unmapped definitions
-ambiguous definitions
-missing migration rules
-missing verification rules
-contract fingerprint
-```
-
-Insert one `workflow_execution_history` row for `MAPPING_VERIFY`.
-
-Do not migrate application data in this step.
+Do not change mapping decisions while verifying. Failed-attempt verification artifacts must be isolated/rolled back before retry.
 
 ## Step 4 — `MIGRATION`
 
-Require:
+Require a PASS attempt for `MAPPING_VERIFY`.
+
+For attempt N:
 
 ```text
-MAPPING_VERIFY history = PASS
-```
-
-For every migration script:
-
-```text
-migration_script
-      ↓
-precheck execute_log
-      ↓
-execute script once
-      ↓
-execute_log
-      ↓
+capture rollback baseline
+    ↓
+execute each required script once for attempt N
+    ↓
+execute_log(attempt_no=N)
+    ↓
 migration_step_result
-      ↓
-migration_error when required
+    ↓
+verify migration attempt
 ```
 
-After all required scripts are accounted, insert one `workflow_execution_history` row for `MIGRATION`.
+If any required migration gate fails:
+
+```text
+FAIL attempt N
+    ↓
+rollback all changes belonging to attempt N
+    ↓
+verify rollback baseline restored
+    ↓
+rollback_status = PASS
+    ↓
+retry as attempt N+1
+```
 
 ## Step 5 — `VALIDATION_DATA`
 
-Require:
+Require a PASS attempt for `MIGRATION`.
 
-```text
-MIGRATION history = PASS
-```
+Validation does not repair business data. A failed validation attempt records evidence and rolls back only attempt-specific validation/control writes before a retry of the validation step.
 
-Verify migrated target data and write:
-
-```text
-validation_result
-validation_failure
-```
-
-Then insert one `workflow_execution_history` row for `VALIDATION_DATA`.
-
-Do not change migrated data in this step.
+If validation proves the migrated data itself is wrong, do not mark rollback PASS for MIGRATION implicitly. The workflow remains blocked until the responsible migration state is handled explicitly.
 
 ## Step 6 — `FINAL_VERIFY`
 
-Require:
+Require a PASS attempt for `VALIDATION_DATA`.
 
-```text
-VALIDATION_DATA history = PASS
-```
+Read the authoritative PASS attempt for every previous step and confirm no unresolved failed attempt remains without rollback PASS.
 
-Read all previous workflow steps, history rows, execution details, and validation details.
-
-Confirm all required counts and failure counters are fully accounted.
-
-Insert one `workflow_execution_history` row for `FINAL_VERIFY`.
-
-If PASS:
-
-```text
-workflow.status = PASS
-workflow.completed_at = current time
-```
+Only then mark `FINAL_VERIFY` and the parent workflow PASS.
 
 ---
 
-# 12. JOOMLA_CORE Seed Example
+# 13. JOOMLA_CORE Seed Example
 
-Create the workflow:
+Create workflow:
 
 ```sql
 INSERT INTO migration_inventory.workflow (
@@ -910,7 +851,7 @@ INSERT INTO migration_inventory.workflow (
 SET @workflow_id = LAST_INSERT_ID();
 ```
 
-Materialize the hard-coded enum into six workflow-step rows:
+Materialize enum steps:
 
 ```sql
 INSERT INTO migration_inventory.workflow_step (
@@ -927,26 +868,28 @@ INSERT INTO migration_inventory.workflow_step (
     (@workflow_id, 'FINAL_VERIFY',      60, 'PENDING');
 ```
 
-Check current allowed step:
+Find current allowed step:
 
 ```sql
-SELECT id, workflow_id, step_code, step_order, status
-FROM migration_inventory.workflow_step
-WHERE workflow_id = @workflow_id
-  AND status <> 'PASS'
-ORDER BY step_order
+SELECT ws.*
+FROM migration_inventory.workflow_step ws
+WHERE ws.workflow_id = @workflow_id
+  AND ws.status <> 'PASS'
+ORDER BY ws.step_order
 LIMIT 1;
 ```
 
-Initially:
+For the selected step, calculate next attempt:
 
-```text
-CURRENT STEP = INVENTORY_MAPPING
+```sql
+SELECT COALESCE(MAX(h.attempt_no), 0) + 1 AS next_attempt_no
+FROM migration_inventory.workflow_execution_history h
+WHERE h.workflow_step_id = :workflow_step_id;
 ```
 
 ---
 
-# 13. ERD
+# 14. ERD
 
 ## `migration_inventory`
 
@@ -959,14 +902,14 @@ erDiagram
     TABLE_LIST ||--o{ RECORD_INVENTORY : records
 
     WORKFLOW ||--o{ WORKFLOW_STEP : contains
-    WORKFLOW_STEP ||--o| WORKFLOW_EXECUTION_HISTORY : final_history
+    WORKFLOW_STEP ||--o{ WORKFLOW_EXECUTION_HISTORY : attempts
 
-    WORKFLOW_STEP ||--o{ EXECUTE_LOG : migration_execution
+    WORKFLOW_STEP ||--o{ EXECUTE_LOG : execution_attempts
     MIGRATION_SCRIPT ||--o{ EXECUTE_LOG : logged_by
     EXECUTE_LOG ||--o| MIGRATION_STEP_RESULT : result
     EXECUTE_LOG ||--o{ MIGRATION_ERROR : errors
 
-    WORKFLOW_STEP ||--o{ VALIDATION_RESULT : validates
+    WORKFLOW_STEP ||--o{ VALIDATION_RESULT : validation_attempts
     VALIDATION_RESULT ||--o{ VALIDATION_FAILURE : details
 
     WORKFLOW {
@@ -996,6 +939,7 @@ erDiagram
     WORKFLOW_EXECUTION_HISTORY {
         bigint id PK
         bigint workflow_step_id FK
+        int attempt_no
         bigint mapping_release_id
         bigint source_snapshot_id FK
         bigint target_snapshot_id FK
@@ -1036,7 +980,12 @@ erDiagram
         varchar contract_verification
         varchar data_migration_verification
         varchar status
+        varchar rollback_status
+        int rollback_error_count
+        datetime started_at
         datetime verified_at
+        datetime rollback_started_at
+        datetime rolled_back_at
     }
 
     MIGRATION_SCRIPT {
@@ -1053,6 +1002,7 @@ erDiagram
     EXECUTE_LOG {
         bigint id PK
         bigint workflow_step_id FK
+        int attempt_no
         bigint script_id FK
         char script_hash
         varchar execution_status
@@ -1081,6 +1031,7 @@ erDiagram
     VALIDATION_RESULT {
         bigint id PK
         bigint workflow_step_id FK
+        int attempt_no
         bigint table_id FK
         bigint field_mapping_id
         varchar check_type
@@ -1102,63 +1053,9 @@ erDiagram
     }
 ```
 
-## `migration_mapping`
-
-```mermaid
-erDiagram
-    MAPPING_RELEASE ||--o{ TABLE_MAPPING : contains
-    TABLE_MAPPING ||--o{ FIELD_MAPPING : contains
-    FIELD_MAPPING ||--o{ VALUE_MAPPING : uses
-
-    MAPPING_RELEASE {
-        bigint id PK
-        varchar mapping_version
-        bigint source_snapshot_id
-        bigint target_snapshot_id
-        varchar content_hash
-        varchar status
-    }
-
-    TABLE_MAPPING {
-        bigint id PK
-        bigint mapping_release_id FK
-        bigint source_table_id
-        bigint target_table_id
-        varchar mapping_type
-        int migration_order
-        varchar status
-    }
-
-    FIELD_MAPPING {
-        bigint id PK
-        bigint table_mapping_id FK
-        bigint source_field_id
-        bigint target_field_id
-        varchar field_status
-        varchar mapping_type
-        text migration_expression
-        text verification_expression
-        varchar status
-    }
-
-    VALUE_MAPPING {
-        bigint id PK
-        bigint field_mapping_id FK
-        varchar mapping_scope
-        bigint workflow_id
-        varchar mapping_key
-        text source_value
-        text target_value
-        varchar mapping_type
-        varchar status
-    }
-```
-
 ---
 
-# 14. Recommended MySQL DDL
-
-The following DDL covers workflow-control structures. Existing inventory/mapping/detail DDL remains unchanged except where it references `workflow_step_id`.
+# 15. Recommended MySQL DDL
 
 ```sql
 CREATE TABLE migration_inventory.workflow (
@@ -1172,7 +1069,6 @@ CREATE TABLE migration_inventory.workflow (
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     started_at DATETIME(6) NULL,
     completed_at DATETIME(6) NULL,
-
     PRIMARY KEY (id),
     UNIQUE KEY uk_workflow_name_version (workflow_name, workflow_version),
     CHECK (status IN ('PENDING','RUNNING','PASS','FAIL','LOCKED'))
@@ -1188,16 +1084,16 @@ CREATE TABLE migration_inventory.workflow_step (
     completed_at DATETIME(6) NULL,
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
         ON UPDATE CURRENT_TIMESTAMP(6),
-
     PRIMARY KEY (id),
     UNIQUE KEY uk_workflow_step (workflow_id, step_code),
     UNIQUE KEY uk_workflow_step_order (workflow_id, step_order),
-    CHECK (status IN ('PENDING','RUNNING','PASS','FAIL','BLOCKED'))
+    CHECK (status IN ('PENDING','RUNNING','PASS','FAIL','ROLLING_BACK','BLOCKED'))
 );
 
 CREATE TABLE migration_inventory.workflow_execution_history (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     workflow_step_id BIGINT UNSIGNED NOT NULL,
+    attempt_no INT UNSIGNED NOT NULL,
 
     mapping_release_id BIGINT UNSIGNED NULL,
     source_snapshot_id BIGINT UNSIGNED NULL,
@@ -1246,260 +1142,279 @@ CREATE TABLE migration_inventory.workflow_execution_history (
     contract_verification VARCHAR(16) NULL,
     data_migration_verification VARCHAR(16) NULL,
     status VARCHAR(16) NOT NULL,
-    verified_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    rollback_status VARCHAR(16) NOT NULL DEFAULT 'NOT_REQUIRED',
+    rollback_error_count INT UNSIGNED NOT NULL DEFAULT 0,
+
+    started_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    verified_at DATETIME(6) NULL,
+    rollback_started_at DATETIME(6) NULL,
+    rolled_back_at DATETIME(6) NULL,
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_workflow_execution_history_step (workflow_step_id),
+    UNIQUE KEY uk_workflow_history_attempt (workflow_step_id, attempt_no),
+    KEY ix_workflow_history_result (workflow_step_id, status, rollback_status),
+
     CHECK (status IN ('PASS','FAIL')),
+    CHECK (rollback_status IN ('NOT_REQUIRED','PENDING','PASS','FAIL')),
     CHECK (contract_verification IS NULL OR contract_verification IN ('PASS','FAIL')),
-    CHECK (data_migration_verification IS NULL OR data_migration_verification IN ('PASS','FAIL'))
+    CHECK (data_migration_verification IS NULL OR data_migration_verification IN ('PASS','FAIL')),
+    CHECK (
+        (status = 'PASS' AND rollback_status = 'NOT_REQUIRED')
+        OR status = 'FAIL'
+    )
 );
 ```
 
-One-time migration-script rule:
+`execute_log` must include `attempt_no`, then enforce one script execution per attempt:
 
 ```sql
-CREATE UNIQUE INDEX uk_execute_log_step_script
-ON migration_inventory.execute_log (workflow_step_id, script_id);
+CREATE UNIQUE INDEX uk_execute_log_attempt_script
+ON migration_inventory.execute_log (workflow_step_id, attempt_no, script_id);
 ```
+
+`validation_result` should also include `attempt_no` so evidence from separate retries cannot be mixed.
 
 ---
 
-# 15. Codex Prompts Per Workflow Step
+# 16. Codex Prompts Per Workflow Step
 
 ## Required output convention for every step
 
-Every Codex prompt below must create **exactly two files** for the requested workflow step:
+Every prompt creates exactly two files:
 
 ```text
 1. <order>-<step-code>-plan.md
 2. <order>-<step-code>.sql
 ```
 
-Example:
+Every plan file must include:
 
 ```text
-10-inventory-mapping-plan.md
-10-inventory-mapping.sql
+- scope and evidence;
+- ordered implementation tasks;
+- 100%-scope checklist;
+- pre-attempt baseline/backup requirements;
+- rollback strategy for every write block;
+- rollback verification checklist;
+- retry gate;
+- PASS/FAIL criteria.
 ```
 
-The plan file must include a complete implementation/checklist for the step so Codex can account for **100% of the defined step scope** before generating the SQL file.
-
-The SQL file must:
+Every SQL file must be copy/paste runnable MySQL and contain numbered sections in this order:
 
 ```text
-- be runnable MySQL code;
-- be ordered exactly as it should be executed;
-- include SQL comments before every logical block;
-- include prechecks and blocking checks;
-- write required detail evidence;
-- write exactly one workflow_execution_history row for the current workflow_step;
-- mark the current workflow_step PASS only when all success criteria are satisfied;
-- never execute or mark the next workflow step.
+00. Resolve workflow/workflow_step and previous-step gate
+01. Check no PASS attempt already exists
+02. Check latest failed attempt was rollback PASS before retry
+03. Allocate current attempt_no
+04. Capture pre-attempt baseline / rollback evidence
+05. Execute current-step SQL only
+06. Write detail execution/validation evidence
+07. Verify the current attempt
+08. PASS path: record PASS + mark workflow_step PASS
+09. FAIL path: record FAIL + set workflow_step ROLLING_BACK
+10. Rollback current attempt
+11. Verify rollback
+12. Rollback PASS path: set rollback_status PASS + reset workflow_step PENDING
+13. Rollback FAIL path: set rollback_status FAIL + BLOCK
 ```
+
+Do not execute the next workflow step.
 
 ### Prompt — `INVENTORY_MAPPING`
 
 ```text
 # Goal
-Build the INVENTORY_MAPPING step for the selected migration workflow. Inventory 100% of the defined source/target schema scope and materialize the reviewed table/field/value mapping contract into migration_inventory and migration_mapping without migrating application data.
+Build the INVENTORY_MAPPING step for the selected workflow. Inventory 100% of the defined source/target schema scope and materialize the reviewed mapping contract into migration_inventory and migration_mapping, with a complete rollback path that allows a clean retry if this attempt fails.
 
 # Success criteria
-- Confirm the requested workflow_step is INVENTORY_MAPPING and is the first allowed non-PASS step.
-- Create/reuse the correct source and target inventory snapshots.
-- Account for every in-scope source/target table and physical field in the inventory detail tables.
-- Capture required record baselines and known dependencies.
-- Create one mapping_release bound to the exact source/target snapshots.
-- Materialize all reviewed table_mapping, field_mapping, and required STATIC value_mapping rows.
-- Preserve READY / SKIP / MISSING field classification exactly as defined by the mapping contract.
-- Update workflow.source_snapshot_id, target_snapshot_id, and mapping_release_id.
-- Produce one final workflow_execution_history row for this workflow_step with complete preparation counts/fingerprints.
-- No application migration data is written.
+- Confirm INVENTORY_MAPPING is the current allowed step and earlier-step requirements are satisfied.
+- Allocate a new attempt_no only when there is no PASS attempt and the latest failed attempt, if any, has rollback_status = PASS.
+- Account for every in-scope source/target table and physical field.
+- Capture record baselines and required dependencies.
+- Create the mapping_release bound to the exact snapshots and materialize all reviewed table/field/STATIC value mappings.
+- Preserve READY/SKIP/MISSING decisions exactly.
+- Update workflow snapshot/release references only for the successful current attempt.
+- Produce complete history counts/fingerprints.
+- If any gate fails, rollback/retire/restore all attempt-created control artifacts, verify the rollback, and leave the step retryable only when rollback_status = PASS.
 
 # Constraints
-- Do not invent tables, fields, dependencies, mapping rules, values, or counts.
-- Use actual database metadata and the approved migration documents as evidence.
-- Do not silently drop any in-scope source table or field.
-- Do not run INVENTORY_VERIFY, MAPPING_VERIFY, MIGRATION, VALIDATION_DATA, or FINAL_VERIFY.
-- Do not overwrite an existing workflow_execution_history row for this workflow_step.
-- Keep existing migration logic and mapping decisions unchanged.
-- SQL must stop/block when workflow order or required identity checks fail.
+- Do not invent schema objects, mappings, dependencies, values, or counts.
+- Do not silently drop in-scope source/target objects.
+- Do not run INVENTORY_VERIFY or later steps.
+- Preserve evidence from earlier attempts; never overwrite history.
+- Every write block must have an explicit rollback strategy and rollback verification query.
+- Use transaction rollback only where the generated statements are safely transactional; otherwise generate explicit compensating restore/reversal SQL from a captured pre-attempt baseline.
 
 # Output
 Create exactly two files:
-1. `10-inventory-mapping-plan.md` — implementation plan, source/evidence list, ordered tasks, 100%-scope checklist, expected counts, failure/blocking conditions, and completion checklist.
-2. `10-inventory-mapping.sql` — copy/paste runnable MySQL with numbered step-by-step comments, workflow prechecks, inventory inserts, mapping inserts, workflow updates, accounting queries, PASS/FAIL decision, history insert, and current workflow_step update.
-Do not create files for later workflow steps.
+1. `10-inventory-mapping-plan.md` — ordered plan and 100%-scope checklist, including pre-attempt baseline, per-write rollback strategy, rollback verification, retry criteria, and PASS/FAIL gates.
+2. `10-inventory-mapping.sql` — copy/paste runnable MySQL with numbered PRECHECK, ATTEMPT, BASELINE, EXECUTE, VERIFY, PASS, FAIL, ROLLBACK, ROLLBACK_VERIFY, and RETRY-READY sections.
 ```
 
 ### Prompt — `INVENTORY_VERIFY`
 
 ```text
 # Goal
-Build the INVENTORY_VERIFY step that independently proves the inventory created by INVENTORY_MAPPING matches the actual selected source and target databases and is complete enough for mapping verification.
+Build INVENTORY_VERIFY to independently prove the inventory from INVENTORY_MAPPING matches the actual source/target databases, while preserving failed-attempt evidence and supporting rollback/retry of this verification attempt.
 
 # Success criteria
-- Confirm INVENTORY_MAPPING has workflow_execution_history.status = PASS.
-- Confirm the requested workflow_step is the current first non-PASS step and equals INVENTORY_VERIFY.
-- Re-check source/target snapshot identity and schema evidence.
-- Verify all in-scope tables and physical fields are represented in inventory detail.
-- Verify record baselines and required dependency inventory are accounted.
-- Produce explicit missing/duplicate/unresolved counts.
-- PASS only when the inventory success criteria have zero unresolved failures.
-- Insert exactly one workflow_execution_history row for INVENTORY_VERIFY with verification counts.
+- Require a PASS attempt for INVENTORY_MAPPING.
+- Confirm INVENTORY_VERIFY is the current allowed step.
+- Isolate the new attempt_no from previous attempts.
+- Verify source/target tables, fields, record baselines, dependencies, snapshot identity, and missing/duplicate evidence.
+- PASS only with zero unresolved inventory failures.
+- If this verification attempt fails, rollback only attempt-specific control/verification writes, verify rollback, and allow retry only after rollback_status = PASS.
 
 # Constraints
-- Read inventory detail; do not change mapping definitions or migrate application data.
-- Do not fabricate expected counts.
-- Do not treat summary history as a replacement for table_list/field_inventory/table_dependency/record_inventory evidence.
-- Do not run MAPPING_VERIFY or any later step.
-- Do not overwrite existing history.
-- SQL must block if the previous step is not proven PASS.
+- Do not change inventory facts merely to make verification pass.
+- Do not modify mapping definitions or business data.
+- Do not run MAPPING_VERIFY or later steps.
+- Never overwrite previous history.
+- Every attempt-specific write must have executable rollback and rollback verification.
 
 # Output
 Create exactly two files:
-1. `20-inventory-verify-plan.md` — verification plan, evidence matrix, ordered checks, 100%-scope checklist, PASS/FAIL rules, and expected zero-failure conditions.
-2. `20-inventory-verify.sql` — copy/paste runnable MySQL with numbered comments, previous-step gate, inventory reconciliation queries, failure counters, PASS/FAIL decision, history insert, and workflow_step update.
-Do not create files for later workflow steps.
+1. `20-inventory-verify-plan.md` — evidence matrix, ordered checks, 100%-scope checklist, rollback plan, rollback verification, retry gate, PASS/FAIL criteria.
+2. `20-inventory-verify.sql` — copy/paste runnable MySQL with numbered workflow gate, attempt allocation, verification queries, result accounting, FAIL rollback, rollback verification, retry-ready state, and PASS state.
 ```
 
 ### Prompt — `MAPPING_VERIFY`
 
 ```text
 # Goal
-Build the MAPPING_VERIFY step that proves the mapping_release produced by INVENTORY_MAPPING completely and unambiguously covers the inventory already proven by INVENTORY_VERIFY.
+Build MAPPING_VERIFY to prove the mapping release completely and unambiguously covers the inventory already proven by INVENTORY_VERIFY, with attempt isolation and rollback/retry for verification-control writes.
 
 # Success criteria
-- Confirm INVENTORY_VERIFY history = PASS.
-- Confirm MAPPING_VERIFY is the current first non-PASS workflow step.
-- Verify the mapping_release references the expected source/target snapshots.
-- Verify all required table mappings are explicit and unique.
-- Verify all required field mappings are explicit and unique.
-- Verify READY / SKIP / MISSING classifications are valid.
-- Verify required migration and verification expressions/rules exist.
-- Verify unmapped, ambiguous, duplicate, and missing-rule counts are zero.
-- Recompute/confirm contract_fingerprint or approved content hash.
-- Insert exactly one workflow_execution_history row with mapping verification evidence and contract_verification = PASS/FAIL.
+- Require a PASS attempt for INVENTORY_VERIFY.
+- Confirm MAPPING_VERIFY is the current allowed step.
+- Allocate a valid new attempt_no.
+- Verify release/snapshot identity, table mapping coverage, field mapping coverage, READY/SKIP/MISSING classification, required migration/verification rules, ambiguity/duplicate/unmapped counts, and contract fingerprint.
+- PASS only when all required contract failures are zero.
+- On FAIL, rollback attempt-specific verification/control writes and allow retry only after rollback_status = PASS.
 
 # Constraints
 - Do not alter mapping decisions to make verification pass.
-- Do not migrate application data.
-- Do not run MIGRATION or any later step.
-- Do not overwrite current-step history.
-- Use inventory and mapping tables as evidence; do not infer missing mappings silently.
-- SQL must block when previous-step history is not PASS.
+- Do not migrate business data.
+- Do not run MIGRATION or later steps.
+- Never overwrite prior attempts.
+- Every attempt-specific write must have rollback SQL and rollback-verification evidence.
 
 # Output
 Create exactly two files:
-1. `30-mapping-verify-plan.md` — mapping verification plan, coverage formulas, ordered checks, 100%-scope checklist, zero-tolerance failure list, and PASS gate.
-2. `30-mapping-verify.sql` — copy/paste runnable MySQL with numbered comments, workflow gate, snapshot/release checks, table/field coverage checks, READY/SKIP/MISSING checks, fingerprint check, PASS/FAIL decision, history insert, and workflow_step update.
-Do not create files for later workflow steps.
+1. `30-mapping-verify-plan.md` — coverage formulas, evidence matrix, 100%-scope checklist, rollback/retry plan, zero-tolerance failures, PASS gate.
+2. `30-mapping-verify.sql` — copy/paste runnable MySQL with numbered gate, attempt allocation, contract checks, accounting, PASS path, FAIL path, rollback, rollback verification, and retry-ready update.
 ```
 
 ### Prompt — `MIGRATION`
 
 ```text
 # Goal
-Build the MIGRATION step that generates and executes the required MySQL migration scripts from the verified mapping contract exactly once per script, records execution evidence, and fully accounts for migrated fields and records.
+Build MIGRATION from the verified mapping contract. Execute all required migration scripts for the current attempt, fully account fields/records, and provide an executable rollback that restores the pre-attempt target state so a failed migration attempt can be safely retried.
 
 # Success criteria
-- Confirm MAPPING_VERIFY history = PASS.
-- Confirm MIGRATION is the current first non-PASS workflow step.
-- Determine all required migration scripts and their stable script_id, version/hash, execution_order, and dependencies.
-- Before each script, block if execute_log already contains the same workflow_step_id + script_id.
-- Every executed script writes execute_log.
-- Every script writes migration_step_result with field and record accounting.
-- Every runtime error writes migration_error.
-- All required scripts are accounted once.
-- failed_script_count = 0, failed_field_count = 0, failed_record_count = 0, unaccounted_record_count = 0, migration_error_count = 0 before PASS.
-- Insert exactly one workflow_execution_history row for MIGRATION with data_migration_verification = PASS/FAIL.
+- Require a PASS attempt for MAPPING_VERIFY.
+- Confirm MIGRATION is the current allowed step and has no PASS attempt.
+- If there is a prior failed migration attempt, require rollback_status = PASS before retry.
+- Allocate attempt_no and capture a sufficient pre-attempt target/control baseline before any migration write.
+- Determine every required script_id/hash/order/dependency.
+- Execute each script at most once within the current attempt using UNIQUE(workflow_step_id, attempt_no, script_id).
+- Write execute_log, migration_step_result, and migration_error evidence for the current attempt.
+- PASS only when required scripts are fully accounted and failed_script_count, failed_field_count, failed_record_count, unaccounted_record_count, and migration_error_count are zero.
+- On FAIL, rollback every application/control change belonging to the current attempt, verify restoration against the pre-attempt baseline, mark rollback_status = PASS only after proof, then leave the step PENDING for retry.
 
 # Constraints
-- Do not rerun a script once any execute_log row exists for the same workflow_step_id + script_id.
-- Do not change the verified mapping contract while executing migration.
-- Respect mapping order, dependencies, ID/value mappings, transforms, rebuild/archive/skip rules exactly as approved.
+- Never rerun the same script inside the same attempt.
+- Never retry the step after a PASS attempt.
+- Do not change the verified mapping contract during execution.
 - Do not run VALIDATION_DATA or FINAL_VERIFY.
-- Do not overwrite existing history or execution logs.
-- SQL must be deterministic and must expose all failure conditions instead of silently continuing.
+- Preserve all prior failed-attempt history/logs.
+- Do not assume a plain ROLLBACK reverses every generated statement. Use transaction rollback for safely transactional DML; generate explicit compensating restore/reversal SQL when required.
+- A rollback that is not verified must leave the workflow BLOCKED.
 
 # Output
 Create exactly two files:
-1. `40-migration-plan.md` — complete script inventory, dependency/order plan, per-script checklist, accounting formulas, one-time execution guards, rollback/error notes where already required by existing logic, and 100%-scope completion checklist.
-2. `40-migration.sql` — copy/paste runnable MySQL with numbered comments, previous-step gate, current-step duplicate guard, per-script one-time execute_log checks, migration SQL blocks in dependency order, migration_step_result/error logging, aggregate accounting, history insert, and workflow_step update.
-Do not create files for later workflow steps.
+1. `40-migration-plan.md` — script inventory/order/dependencies, 100%-scope checklist, pre-attempt backup/baseline, rollback strategy per write block/script, rollback verification, retry gate, accounting formulas, PASS/FAIL criteria.
+2. `40-migration.sql` — copy/paste runnable MySQL with numbered PRECHECK, ATTEMPT, BASELINE/BACKUP, FORWARD MIGRATION, EXECUTION LOGGING, VERIFY, PASS, FAIL, ROLLBACK, ROLLBACK_VERIFY, and RETRY-READY sections with comments explaining exactly how to run each block.
 ```
 
 ### Prompt — `VALIDATION_DATA`
 
 ```text
 # Goal
-Build the VALIDATION_DATA step that verifies the actual migrated target data against the verified inventory/mapping contract and migration evidence without changing migrated business data.
+Build VALIDATION_DATA to verify migrated target data against the verified inventory/mapping/migration evidence, with attempt isolation and rollback/retry for validation-control writes only.
 
 # Success criteria
-- Confirm MIGRATION history = PASS.
-- Confirm VALIDATION_DATA is the current first non-PASS workflow step.
-- Verify required record counts and identity/accounting expectations.
-- Verify required mapped field values and structured transformations.
-- Verify runtime ID/value mapping outcomes where applicable.
-- Verify missing, unexpected, duplicate, and broken-reference counts.
-- Write validation_result for every required validation check and validation_failure for every concrete mismatch.
-- PASS only when verification_failed_count = 0, missing_record_count = 0, unexpected_record_count = 0, duplicate_record_count = 0, broken_reference_count = 0, and validation_failure_count = 0.
-- Insert exactly one workflow_execution_history row for VALIDATION_DATA.
+- Require a PASS attempt for MIGRATION.
+- Confirm VALIDATION_DATA is the current allowed step.
+- Allocate a valid attempt_no.
+- Verify required record identity/counts, mapped fields, structured transformations, runtime mappings, missing/unexpected/duplicate records, and broken references.
+- Write validation_result and concrete validation_failure rows scoped to the current attempt.
+- PASS only when all required validation failure counters are zero.
+- If the validation attempt itself fails, rollback its attempt-specific control/validation writes and allow validation retry only after rollback_status = PASS.
 
 # Constraints
-- Verification only: do not repair or mutate application data in this step.
-- Do not reinterpret or change mapping rules.
+- Verification only: do not repair or mutate migrated business data.
+- Do not reinterpret mapping rules.
 - Do not run FINAL_VERIFY.
-- Do not hide mismatches inside free-text only; concrete failures must be queryable.
-- Do not overwrite existing history or validation evidence.
-- SQL must block when MIGRATION is not proven PASS.
+- Preserve previous validation attempts.
+- If validation proves MIGRATION data is wrong, report/block it; do not silently roll back or rewrite the earlier MIGRATION step from this validation step.
 
 # Output
 Create exactly two files:
-1. `50-validation-data-plan.md` — validation matrix, ordered checks, table/field/record/reference coverage checklist, PASS/FAIL formulas, and 100%-scope completion checklist.
-2. `50-validation-data.sql` — copy/paste runnable MySQL with numbered comments, previous-step gate, validation queries, validation_result/failure inserts, aggregate failure counters, PASS/FAIL decision, history insert, and workflow_step update.
-Do not create FINAL_VERIFY files.
+1. `50-validation-data-plan.md` — validation matrix, 100%-scope checklist, attempt isolation, rollback of validation-control writes, rollback verification, retry gate, PASS/FAIL formulas.
+2. `50-validation-data.sql` — copy/paste runnable MySQL with numbered gate, attempt allocation, validation queries, result/failure evidence, PASS path, FAIL path, validation-control rollback, rollback verification, and retry-ready state.
 ```
 
 ### Prompt — `FINAL_VERIFY`
 
 ```text
 # Goal
-Build the FINAL_VERIFY step that proves the complete workflow chain executed in order, all prior required steps are PASS, all required data is accounted, and no unresolved migration or validation failure remains before marking the workflow PASS.
+Build FINAL_VERIFY to prove the complete workflow chain is valid: each previous step has an authoritative PASS attempt, every failed earlier attempt was either successfully rolled back or superseded safely, all data is accounted, and no unresolved migration/validation failure remains.
 
 # Success criteria
-- Confirm VALIDATION_DATA history = PASS.
-- Confirm FINAL_VERIFY is the current first non-PASS workflow step.
-- Confirm exactly one PASS history row exists for every required previous workflow_step.
-- Confirm workflow source_snapshot_id, target_snapshot_id, and mapping_release_id match the evidence used by prior steps.
-- Confirm all required migration scripts have exactly one execute_log row for the MIGRATION workflow_step.
-- Confirm all aggregate field/record/script counts reconcile with detail evidence.
-- Confirm failed/unaccounted/missing/unexpected/duplicate/broken-reference/migration-error/validation-failure counts are zero where required.
-- Insert exactly one FINAL_VERIFY workflow_execution_history row.
-- Set FINAL_VERIFY workflow_step.status = PASS and workflow.status = PASS only when every gate passes.
+- Require a PASS attempt for VALIDATION_DATA.
+- Confirm FINAL_VERIFY is the current allowed step.
+- Allocate a valid attempt_no.
+- For each previous workflow_step, locate its PASS attempt and verify required detail evidence.
+- Confirm every earlier FAIL attempt that required rollback has rollback_status = PASS; unresolved rollback failures must block final PASS.
+- Confirm workflow snapshots/release match authoritative PASS evidence.
+- Reconcile script, field, record, error, validation, and reference counts with detail tables.
+- Insert a PASS FINAL_VERIFY attempt and mark workflow PASS only when all gates pass.
+- If FINAL_VERIFY attempt-specific control writes fail, rollback those writes, verify rollback, and permit retry only after rollback_status = PASS.
 
 # Constraints
 - Do not mutate migrated business data.
-- Do not repair earlier steps or alter their history.
-- Do not mark PASS based only on workflow_step.status; verify workflow_execution_history and detail evidence.
-- Do not create new migration/mapping behavior.
-- Do not overwrite any earlier evidence.
-- SQL must fail/block clearly if any previous gate or reconciliation fails.
+- Do not repair earlier steps from FINAL_VERIFY.
+- Do not mark PASS from workflow_step.status alone; use attempt history and detail evidence.
+- Preserve all prior attempt history.
+- Any unresolved rollback_status = FAIL/PENDING blocks workflow PASS.
 
 # Output
 Create exactly two files:
-1. `60-final-verify-plan.md` — end-to-end reconciliation plan, history-chain checklist, detail-to-summary reconciliation checklist, zero-failure gate, and final 100%-scope accounting checklist.
-2. `60-final-verify.sql` — copy/paste runnable MySQL with numbered comments, previous-step gate, complete workflow history checks, detail reconciliation, final zero-failure assertions, FINAL_VERIFY history insert, workflow_step PASS update, and workflow PASS update.
-Do not generate any additional workflow step.
+1. `60-final-verify-plan.md` — history-chain reconciliation, authoritative PASS-attempt selection, rollback audit checklist, 100%-scope final accounting checklist, PASS/FAIL and retry gates.
+2. `60-final-verify.sql` — copy/paste runnable MySQL with numbered gate, attempt allocation, history/rollback audit, detail reconciliation, final PASS path, FAIL path, attempt-specific rollback where applicable, rollback verification, and workflow PASS update only on success.
 ```
 
 ---
 
-# 16. Final Verification Rules
+# 17. Final Verification Rules
+
+## General retry rule
+
+```text
+PASS attempt exists
+    → step closed; no retry
+
+latest attempt FAIL + rollback_status PASS
+    → retry allowed
+
+latest attempt FAIL + rollback_status PENDING/FAIL
+    → retry blocked
+```
 
 ## `INVENTORY_VERIFY` PASS
-
-At minimum:
 
 ```text
 actual source tables accounted       = 100%
@@ -1509,11 +1424,10 @@ actual target fields accounted       = 100%
 required inventory dependencies      = accounted
 missing/duplicate inventory evidence = 0
 status                               = PASS
+rollback_status                      = NOT_REQUIRED
 ```
 
 ## `MAPPING_VERIFY` PASS
-
-At minimum:
 
 ```text
 required table mappings             = 100% explicit
@@ -1525,11 +1439,10 @@ missing migration rules             = 0
 missing verification rules          = 0
 contract_verification               = PASS
 status                              = PASS
+rollback_status                     = NOT_REQUIRED
 ```
 
 ## `MIGRATION` PASS
-
-At minimum:
 
 ```text
 failed_script_count              = 0
@@ -1539,11 +1452,10 @@ unaccounted_record_count         = 0
 migration_error_count            = 0
 data_migration_verification      = PASS
 status                           = PASS
+rollback_status                  = NOT_REQUIRED
 ```
 
 ## `VALIDATION_DATA` PASS
-
-At minimum:
 
 ```text
 verification_failed_count        = 0
@@ -1553,27 +1465,33 @@ duplicate_record_count           = 0
 broken_reference_count           = 0
 validation_failure_count         = 0
 status                           = PASS
+rollback_status                  = NOT_REQUIRED
 ```
 
 ## `FINAL_VERIFY` PASS
 
-Required previous history:
+Required authoritative PASS attempts:
 
 ```text
-INVENTORY_MAPPING.status = PASS
-INVENTORY_VERIFY.status  = PASS
-MAPPING_VERIFY.status    = PASS
-MIGRATION.status         = PASS
-VALIDATION_DATA.status   = PASS
+INVENTORY_MAPPING = PASS
+INVENTORY_VERIFY  = PASS
+MAPPING_VERIFY    = PASS
+MIGRATION         = PASS
+VALIDATION_DATA   = PASS
 ```
 
-Then reconcile history summaries with inventory, mapping, execute-log, migration-result, and validation detail evidence.
+Rollback audit:
+
+```text
+failed attempts requiring rollback with rollback_status != PASS = 0
+```
 
 Only then:
 
 ```text
-FINAL_VERIFY.status = PASS
-workflow.status     = PASS
+FINAL_VERIFY.status          = PASS
+FINAL_VERIFY.rollback_status = NOT_REQUIRED
+workflow.status              = PASS
 ```
 
 ---
@@ -1585,25 +1503,31 @@ workflow_enum
     = 6 hard-coded top-down steps
 
 workflow
-    = named migration flow, e.g. JOOMLA_CORE
+    = named migration flow such as JOOMLA_CORE
 
 workflow_step
-    = one immutable step identity row per enum step per workflow
+    = one step identity/state row per enum step per workflow
 
 workflow_execution_history
-    = exactly one final result/evidence row per workflow_step
+    = immutable 1:N attempt history per workflow_step
+
+rollback
+    = part of the current attempt, never a separate workflow step
+
+retry
+    = allowed only after the latest failed attempt has rollback_status = PASS
 
 inventory detail tables
-    = retained exactly for detailed source/target evidence
+    = retained for detailed source/target evidence
 
 mapping tables
-    = retained exactly for executable mapping definitions
+    = retained for executable mapping definitions
 
 execute_log / migration_step_result / migration_error
-    = retained for migration execution detail
+    = attempt-aware migration execution detail
 
 validation_result / validation_failure
-    = retained for data-validation detail
+    = attempt-aware data-validation detail
 ```
 
-No additional migration feature or mapping behavior is introduced by this revision. The change only combines preparation into `INVENTORY_MAPPING`, keeps two independent verification gates, renames `VALIDATION` to `VALIDATION_DATA`, and standardizes Codex artifact generation for every workflow step.
+The workflow order and migration/mapping semantics are unchanged. Rollback/retry only adds a safe recovery path for a failed attempt before the same workflow step is tried again.
