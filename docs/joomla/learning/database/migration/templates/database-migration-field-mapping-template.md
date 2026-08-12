@@ -65,6 +65,7 @@ Companion table mapping must use the same scope prefix:
 18. [QA Queries](#18-qa-queries)
 19. [100% Field Mapping Checklist](#19-100-field-mapping-checklist)
 20. [Final Field Mapping Gate](#20-final-field-mapping-gate)
+21. [Field Readiness Status](#21-field-readiness-status)
 
 ---
 
@@ -319,6 +320,7 @@ target_field
 mapping_group_key
 mapping_cardinality
 mapping_type
+field_status
 
 identity_strategy
 reference_type
@@ -334,6 +336,8 @@ reason
 execution_order
 status
 ```
+
+`field_status` is the readable physical/readiness classification defined in [Field Readiness Status](#21-field-readiness-status). It is separate from lifecycle `status` such as `DRAFT` / `FINAL`.
 
 Recommended `row_kind` values:
 
@@ -746,6 +750,7 @@ REBUILD
 Required metadata:
 
 ```text
+field_status = MISSING
 final decision
 reason
 destination/accounting rule
@@ -763,6 +768,7 @@ Gate:
 ```text
 Source-only fields discovered          = 100%
 Source-only fields resolved            = 100%
+Source-only fields marked MISSING      = 100%
 Silent source-only drops               = 0
 ```
 
@@ -794,11 +800,20 @@ NOT_REQUIRED_BY_SCOPE
 
 `NOT_REQUIRED_BY_SCOPE` requires an explicit reason and target/application evidence.
 
+Target-only rows must use:
+
+```text
+field_status = MISSING
+```
+
+because one physical side of the source/target pair is absent. `MISSING` does not automatically mean unresolved or invalid; the mapping decision still determines whether the row is correctly resolved.
+
 Gate:
 
 ```text
 Target-only fields discovered          = 100%
 Target-only fields classified          = 100%
+Target-only fields marked MISSING      = 100%
 Required target fields resolved        = 100%
 Unresolved required target fields      = 0
 Unknown target strategy                = 0
@@ -821,9 +836,9 @@ Repeat this section for every mapped source table or logical table-mapping group
 
 Recommended review table:
 
-| # | Source | S.Type | S.Null | S.Key | Target | T.Type | T.Null | T.Key | Card. | M | Ref | Domain / Parser | Rule | Verify |
-|---:|---|---|:---:|---|---|---|:---:|---|---|:---:|---|---|---|---|
-| 1 | `{{SOURCE_FIELD}}` | `{{SOURCE_COLUMN_TYPE}}` | `{{S_NULL}}` | `{{S_KEY}}` | `{{TARGET_FIELD}}` | `{{TARGET_COLUMN_TYPE}}` | `{{T_NULL}}` | `{{T_KEY}}` | `{{CARDINALITY}}` | `{{MAP}}` | `{{REFERENCE_TYPE}}` | `{{DOMAIN_OR_PARSER}}` | `{{RULE}}` | `{{VERIFY}}` |
+| # | Source | S.Type | S.Null | S.Key | Target | T.Type | T.Null | T.Key | Field Status | Card. | M | Ref | Domain / Parser | Rule | Verify |
+|---:|---|---|:---:|---|---|---|:---:|---|---|---|:---:|---|---|---|---|
+| 1 | `{{SOURCE_FIELD}}` | `{{SOURCE_COLUMN_TYPE}}` | `{{S_NULL}}` | `{{S_KEY}}` | `{{TARGET_FIELD}}` | `{{TARGET_COLUMN_TYPE}}` | `{{T_NULL}}` | `{{T_KEY}}` | `{{FIELD_STATUS}}` | `{{CARDINALITY}}` | `{{MAP}}` | `{{REFERENCE_TYPE}}` | `{{DOMAIN_OR_PARSER}}` | `{{RULE}}` | `{{VERIFY}}` |
 
 Additional machine-readable attributes may remain in the structured mapping dataset/database even if omitted from the readable Markdown table:
 
@@ -838,6 +853,7 @@ rule_origin
 evidence
 reason
 execution_order
+field_status
 status
 ```
 
@@ -845,6 +861,8 @@ Per-table gate:
 
 ```text
 Distinct source fields accounted       = 100%
+Field status classified                = 100%
+Invalid field status                   = 0
 Source-only fields resolved            = 100%
 Required target fields resolved        = 100%
 Unknown/ambiguous field decisions      = 0
@@ -889,6 +907,7 @@ target_field
 mapping_group_key
 mapping_cardinality
 mapping_type
+field_status
 identity_strategy
 reference_type
 reference_domain
@@ -933,6 +952,7 @@ target_default
 target_key_role
 target_physical_fk_target
 
+field_status
 mapping_cardinality
 mapping_type
 identity_strategy
@@ -1112,6 +1132,49 @@ GROUP BY s.TABLE_SCHEMA, s.TABLE_NAME, s.COLUMN_NAME, pk.pk_cols
 ORDER BY s.TABLE_NAME, s.COLUMN_NAME;
 ```
 
+## 18.9 Field readiness status QA
+
+```sql
+SELECT
+    field_status,
+    COUNT(*) AS mapping_rows
+FROM migration_mapping.field_mapping
+WHERE migration_run_id = :migration_run_id
+GROUP BY field_status
+ORDER BY field_status;
+```
+
+Allowed values:
+
+```text
+READY
+SKIP
+MISSING
+```
+
+Invalid/null status query:
+
+```sql
+SELECT *
+FROM migration_mapping.field_mapping
+WHERE migration_run_id = :migration_run_id
+  AND (
+      field_status IS NULL
+      OR field_status NOT IN ('READY', 'SKIP', 'MISSING')
+  );
+```
+
+Expected result: **0 rows**.
+
+Consistency checks:
+
+```text
+READY   + missing source/target physical side = INVALID
+MISSING + both physical sides present         = INVALID
+SKIP    + missing reason                      = INVALID
+both source and target absent                 = INVALID
+```
+
 ---
 
 # 19. 100% Field Mapping Checklist
@@ -1247,6 +1310,7 @@ ORDER BY s.TABLE_NAME, s.COLUMN_NAME;
 - [ ] `field_mapping` remains static decision source of truth
 - [ ] `value_mapping` remains runtime/design-time ID/value store
 - [ ] `row_kind` available
+- [ ] `field_status` available with READY / SKIP / MISSING only
 - [ ] mapping cardinality available
 - [ ] mapping group available
 - [ ] rule origin/evidence available
@@ -1276,6 +1340,18 @@ ORDER BY s.TABLE_NAME, s.COLUMN_NAME;
 - [ ] Production source remains immutable
 - [ ] Errors are never auto-converted to IGNORE
 - [ ] Rerun does not create conflicting mapping actions/value maps
+
+## O. Field readiness status
+
+- [ ] Every mapping row has exactly one `field_status`
+- [ ] Allowed values are only READY / SKIP / MISSING
+- [ ] READY rows have both physical sides present
+- [ ] READY rows have executable/final mapping rules
+- [ ] SKIP rows have an explicit skip reason
+- [ ] MISSING rows have exactly one physical side absent
+- [ ] MISSING rows have an explicit mapping/accounting outcome
+- [ ] MISSING is not treated automatically as a migration error
+- [ ] Invalid/null field status rows = 0
 
 ---
 
@@ -1312,6 +1388,14 @@ Target-only fields classified              = 100%
 Required target fields resolved            = 100%
 Unresolved required target fields          = 0
 Unknown target strategy                    = 0
+
+FIELD STATUS
+--------------------------------------------------
+Field status classified                    = 100%
+Invalid/null field status                  = 0
+READY with missing physical side           = 0
+MISSING with both physical sides present   = 0
+SKIP without explicit reason               = 0
 
 MAPPING QUALITY
 --------------------------------------------------
@@ -1362,7 +1446,7 @@ FIELD MAPPING CONTRACT                      = PASS
 
 Required definition-level success statement:
 
-> **100% of source physical fields in the declared migration scope are explicitly accounted for, and 100% of required target physical fields have an explicit resolution. No source field is silently dropped and no required target field remains unresolved.**
+> **100% of source physical fields in the declared migration scope are explicitly accounted for, and 100% of required target physical fields have an explicit resolution. Every mapping row is also classified as READY, SKIP, or MISSING; no source field is silently dropped and no required target field remains unresolved.**
 
 Production PASS additionally requires:
 
@@ -1377,3 +1461,89 @@ broken required relationships              = 0
 migration execution errors                 = 0
 rerun/idempotency checks                    = PASS
 ```
+
+---
+
+# 21. Field Readiness Status
+
+`field_status` is a compact human-readable classification that answers whether a source/target field pair is immediately mappable, intentionally skipped, or physically missing on one side.
+
+Allowed values are exactly:
+
+| Field Status | Meaning | Required rule |
+|---|---|---|
+| `READY` | Source and target physical fields both exist and the mapping rule is complete enough to execute. | Mapping decision/rules/verification must be final and valid. |
+| `SKIP` | The migration intentionally performs no active mapping/copy for this field. | Explicit reason is mandatory; normally paired with `IGNORE` or an explicitly not-required target resolution. |
+| `MISSING` | Exactly one physical side does not exist: source-only or target-only field. | Must still have an explicit mapping/accounting outcome and reason. |
+
+### Deterministic precedence
+
+Apply these rules in order:
+
+```text
+1. Exactly one physical side is absent
+   → MISSING
+
+2. Both physical sides exist, but the approved rule intentionally skips active mapping/copy
+   → SKIP
+
+3. Both physical sides exist and mapping + verification are complete
+   → READY
+
+4. Anything else
+   → CONTRACT ERROR (do not invent another field_status)
+```
+
+Important semantics:
+
+```text
+MISSING != automatically failed
+MISSING != automatically skipped
+SKIP    != silently dropped
+READY   != DIRECT only
+```
+
+Examples:
+
+| Source | Target | Field Status | Mapping Type | Meaning |
+|---|---|---|---|---|
+| `title` | `title` | `READY` | `DIRECT` | Both fields exist and can be copied after compatibility verification. |
+| `asset_id` | `asset_id` | `READY` | `LOOKUP` | Both fields exist but identity must be remapped. |
+| `legacy_token` | `legacy_token` | `SKIP` | `IGNORE` | Both fields may exist, but migration intentionally excludes the value. |
+| `otpKey` | `—` | `MISSING` | `ARCHIVE` | Source-only field; no active target field exists, but source value is accounted/archived. |
+| `—` | `created_at` | `MISSING` | `DEFAULT` | Target-only field; source field is absent and target default resolves it. |
+| `—` | `workflow_id` | `MISSING` | `GENERATED` | Target-only field generated from target-version semantics. |
+
+### Required consistency rules
+
+```text
+READY
+- source physical field exists
+- target physical field exists
+- lifecycle status is final/approved for execution
+- required transform/reference/parser/verification rules exist
+
+SKIP
+- skip is intentional
+- reason is explicit
+- accounting behavior is explicit
+- silent data loss is forbidden
+
+MISSING
+- exactly one physical side is absent
+- reason is explicit
+- source-only or target-only resolution is explicit
+- a valid MISSING row may still satisfy definition-level PASS
+```
+
+`field_status` must not replace:
+
+```text
+mapping_type
+row_kind
+mapping_cardinality
+lifecycle status (DRAFT / FINAL)
+coverage_status
+```
+
+It is an additional classification used for review, QA, database materialization, and generated documents such as Joomla core field mapping.
