@@ -1,10 +1,153 @@
 # Joomla Core Field Mapping — Joomla 3.10.12 → Joomla 6.1.2
 
-> 711/711 J3 fields are explicit; canonical V3/V6 field inventories remain the DDL/type source of truth. J6 target coverage is 76/76 tables and 832/832 fields.
+> **Source field accounting = 711/711 (100%)**  
+> **Target physical inventory = 76/76 tables and 832/832 fields (100%)**  
+> **Missing / ambiguous / silently dropped source fields = 0 required**  
+> **Production execution is blocked until actual-schema reconciliation and materialized mapping QA pass**
 
-**Codes:** M=D direct, T transform, L lookup, S structured, G generated, B rebuild, R reference-only, A archive, I ignore. X=lookup domain/parser/special rule: DT date/null, ASSET, TREE, PW password, 2FA, HID/HSN history, ML/MS menu, FI/FV fields, AI/AK associations, UCM, TAG, WF workflow, FT featured, FM Finder count, PT privacy. Row order is V3 ordinal. Target field is same-name in the target table from `table-mapping-migration.md` unless overridden below.
+This document is the Joomla Core specialization of [`templates/database-migration-field-mapping-template.md`](templates/database-migration-field-mapping-template.md). The canonical V3/V6 field inventories remain the physical DDL/type source of truth; this document remains the field-level migration-decision source of truth.
+
+**Codes:** M=D direct, T transform, L lookup, S structured, G generated, B rebuild, R reference-only, A archive, I ignore. X=lookup domain/parser/special rule: DT date/null, ASSET, TREE, PW password, 2FA, HID/HSN history, ML/MS menu, FI/FV fields, AI/AK associations, UCM, TAG, WF workflow, FT featured, FM Finder count, PT privacy. Row order is V3 ordinal. Target field is same-name in the mapped physical target table unless an explicit override below says otherwise.
 
 Verification follows M+X: D schema-safe equality; T semantic conversion; L target exists/no orphan; S parse→remap→reparse; G deterministic; B integrity; R semantic identity; A archive count; I accounted reason. Same-name alone never permits D. IDs use `value_mapping`; sentinels and polymorphic context are resolved before lookup. Unknown/review/pending/optional/ambiguous/unmapped are forbidden.
+
+---
+
+# Template Conformance Contract
+
+## Required inputs
+
+| Artifact | Status |
+|---|:---:|
+| `01-joomla-core-migration-groups-v3.md` | REQUIRED |
+| `03-joomla-core-migration-fields-v3.md` | REQUIRED |
+| `02-joomla-core-migration-groups-v6.md` | REQUIRED |
+| `04-joomla-core-migration-fields-v6.md` | REQUIRED |
+| `06-joomla-core-table-mapping-migration.md` | REQUIRED |
+| `05-joomla-core-j3-j6-migration-contract.md` | REQUIRED |
+
+Hard prerequisite:
+
+```text
+Source table inventory             = 100%
+Source field inventory             = 100%
+Target table inventory             = 100%
+Target field inventory             = 100%
+Table mapping                      = PASS
+Unknown schema objects             = 0
+Unclassified schema deviations     = 0
+```
+
+## Field readiness status
+
+`field_status` is **not** the migration action and must never be derived from `mapping_type` alone.
+
+Allowed values are exactly:
+
+| Field Status | Meaning |
+|---|---|
+| `READY` | Both physical sides exist and the final mapping/rebuild/reference rule plus verification are executable. |
+| `SKIP` | Both physical sides exist, but the approved decision intentionally performs no active source→target field mapping/copy. Explicit reason is mandatory. |
+| `MISSING` | Exactly one physical side is absent. The row still requires an explicit mapping/accounting decision and reason. |
+
+Deterministic precedence:
+
+```text
+1. Exactly one physical side absent
+   → MISSING
+
+2. Both physical sides exist + approved decision intentionally performs no active mapping/copy
+   → SKIP
+
+3. Both physical sides exist + mapping/rebuild/reference rule and verification are final
+   → READY
+
+4. Anything else
+   → CONTRACT ERROR
+```
+
+Important consequences:
+
+```text
+REBUILD does not automatically mean SKIP.
+REFERENCE_ONLY does not automatically mean SKIP.
+ARCHIVE does not automatically mean MISSING.
+IGNORE does not automatically mean MISSING.
+target_field = NULL must never be inferred only because the source decision is IGNORE/ARCHIVE/REFERENCE_ONLY.
+physical target existence must come from the Joomla 6 field inventory.
+```
+
+For this Joomla Core contract:
+
+```text
+DIRECT / TRANSFORM / LOOKUP / STRUCTURED / GENERATED
++ both physical sides + executable rule
+→ READY
+
+REBUILD / REFERENCE_ONLY
++ both physical sides + executable reconciliation/rebuild rule
+→ READY
+
+ARCHIVE / IGNORE
++ both physical sides but active copy intentionally suppressed
+→ SKIP
+
+Any decision
++ exactly one physical side absent
+→ MISSING
+```
+
+`mapping_type` remains the authoritative migration/accounting decision. `field_status` only describes physical/readiness state.
+
+## Canonical mapping record
+
+Materialization must expose at least:
+
+```text
+row_kind
+source_version
+source_table
+source_field
+target_version
+target_table
+target_field
+mapping_group_key
+mapping_cardinality
+mapping_type
+field_status
+identity_strategy
+reference_type
+reference_domain
+parser_rule
+transform_rule
+verification_rule
+rule_origin
+evidence
+reason
+execution_order
+status
+```
+
+Allowed `row_kind`:
+
+```text
+SOURCE_MAPPING
+TARGET_RESOLUTION
+```
+
+Default cardinality for the compact rows below is `ONE_TO_ONE` unless an explicit grouped rule overrides it. Do not enforce uniqueness on only `(source_version, source_table, source_field)` when doing so would prevent a legitimate one-to-many/grouped mapping. Source coverage is counted by distinct source-field identity.
+
+Known grouped rule:
+
+```text
+#__ucm_history.ucm_item_id
++ #__ucm_history.ucm_type_id
+→ #__history.item_id
+mapping_group_key = HISTORY_ITEM_ID
+mapping_cardinality = MANY_TO_ONE
+```
+
+---
 
 # Source rows — 711/711
 
@@ -963,38 +1106,278 @@ Verification follows M+X: D schema-safe equality; T semantic conversion; L targe
 |---|:-:|---|
 |converted|I||
 
-# Target anti-join
+---
 
-`QA against joomla-core-migration-fields-v6.md: 76/76 target tables and 832/832 target fields resolved; unknown strategy=0; unresolved required target=0.`
+# Physical Target Resolution and Field-Status Overrides
 
-Target field is same-name within the destination table except: `extensions.system_data→-`; `users.otpKey/otep→-`; `content.xreference→-`; `ucm_content.core_xreference→-`; `ucm_history.ucm_item_id→history.item_id`; `ucm_history.ucm_type_id→history.item_id`; `contact_details.xreference→-`; `newsfeeds.xreference→-`; `finder_taxonomy.ordering→-`; `finder_tokens_aggregate.map_suffix→-`. Added/synthesized target fields and target-only/recreated structures are resolved by the J6 anti-join strategy from the canonical V6 field manifest and `table-mapping-migration.md`.
+The target physical inventory is authoritative. The active table-level migration destination (`—`, migration archive, rebuild, target-owned) must **not** be confused with physical target-field existence.
 
-# Case / seed gate
+## Corrected explicit overrides
 
-Covers IDs via `value_mapping`; sentinel and polymorphic references; JSON/Registry/ACL/HTML/URL/query/media/path/field values; zero-date/null/default; trees; PK/composite/unique/collision/truncation/range/signedness/collation; session/user_keys/password/legacy 2FA; UCM/Finder rebuild; menus; custom fields; associations/tags; privacy; workflow generation. Raw string ID replacement and secret logging are forbidden. Source-only explicit outcomes: `extensions.system_data`, content/contact/newsfeeds `xreference`=A; `ucm_content.core_xreference`, `finder_tokens_aggregate.map_suffix`=B; `user_keys.invalid`=I.
+| Source | Physical target counterpart | `field_status` | Final decision | Reason |
+|---|---|---|---|---|
+| `#__extensions.system_data` | — | `MISSING` | `ARCHIVE` | Source-only legacy extension state. |
+| `#__users.otpKey` | `#__users.otpKey` | `SKIP` | `ARCHIVE` | Joomla 6 still has the physical column, but legacy Joomla 3 2FA secret state is not activated/migrated into the Joomla 6 MFA model. |
+| `#__users.otep` | `#__users.otep` | `SKIP` | `ARCHIVE` | Joomla 6 still has the physical column, but legacy Joomla 3 emergency 2FA state is not activated/migrated into the Joomla 6 MFA model. |
+| `#__content.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
+| `#__contact_details.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
+| `#__newsfeeds.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
+| `#__ucm_content.core_xreference` | — | `MISSING` | `REBUILD` | Source UCM derived state is rebuilt; this legacy physical field does not exist in the J6 target representation. |
+| `#__finder_taxonomy.ordering` | — | `MISSING` | `REBUILD` | J6 Finder taxonomy no longer has this physical field; Finder is rebuilt. |
+| `#__finder_tokens_aggregate.map_suffix` | — | `MISSING` | `REBUILD` | J6 aggregate token schema no longer has this field; Finder is rebuilt. |
+| `#__user_keys.invalid` | — | `MISSING` | `IGNORE` | J6 `#__user_keys` no longer has the legacy `invalid` field and remember-me tokens are not migrated. |
+| `#__core_log_searches.search_term` | — | `MISSING` | `ARCHIVE` | Legacy table is absent from J6 active schema; historical evidence is archived. |
+| `#__core_log_searches.hits` | — | `MISSING` | `ARCHIVE` | Legacy table is absent from J6 active schema; historical evidence is archived. |
+| `#__utf8_conversion.converted` | — | `MISSING` | `IGNORE` | Joomla 3 conversion-state table is absent from J6. |
 
-Seed `migration_mapping.field_mapping` using unique `(source_version,source_table,source_field)`; IDs/values stay in `value_mapping`; dependencies remain in existing inventory; no extra contract table.
+The previous shorthand `users.otpKey/otep → -` is invalid and must not be used by generators. Both fields physically exist in the declared Joomla 6.1.2 inventory.
 
-```sql
-SELECT COUNT(*) rows,COUNT(DISTINCT CONCAT(source_table,'.',source_field)) uniq FROM migration_mapping.field_mapping WHERE source_version='3.10.12';
-```
-Expected `711/711`.
+## Same-name physical counterpart despite no active copy
+
+When the J6 inventory contains the same physical field, materialization must retain the physical counterpart for readiness classification even when the migration action is `IGNORE` or `ARCHIVE`.
+
+Examples:
 
 ```text
-FIELD MAPPING CONTRACT = PASS (definition-level)
-J3 rows/unique=711/711; missing/duplicate=0/0; table join=711/711
-L missing domain/context=0; S missing parser=0; silent drops=0
-J6 tables/fields=76/76,832/832; unknown/unresolved target=0
-unsafe direct/truncation/collision/dependency allowed=0
+#__session.*
+    physical target exists
+    mapping_type = IGNORE
+    field_status = SKIP
+
+#__postinstall_messages.*
+    physical target exists
+    mapping_type = IGNORE
+    field_status = SKIP
+
+#__user_keys.id/user_id/token/series/time/uastring
+    physical target exists
+    mapping_type = IGNORE
+    field_status = SKIP
+
+#__banner_tracks.*
+    physical target exists
+    mapping_type = ARCHIVE
+    field_status = SKIP
+
+#__action_logs.*
+    physical target exists
+    mapping_type = ARCHIVE
+    field_status = SKIP
 ```
 
-> Production PASS requires actual-schema reconciliation, real mapping materialization, runtime `value_mapping`, row accounting and zero migration/verification errors.
+For `REBUILD` or `REFERENCE_ONLY`, a same-name physical counterpart plus a final executable rebuild/reconciliation rule is `READY`, not `SKIP`.
+
+Examples:
+
+```text
+#__assets.*                 → READY + REBUILD
+#__finder_links.*           → READY + REBUILD
+#__finder_terms.*           → READY + REBUILD
+#__extensions.extension_id → READY + REFERENCE_ONLY
+#__content_types.type_alias → READY + REFERENCE_ONLY
+```
 
 ---
 
-# Schema metadata overlay — data type, keys, and references
+# Target Anti-Join Contract
 
-The 711 mapping rows above remain the canonical **migration decision** layer. Exact SQL metadata is not duplicated manually into those rows because the two canonical field inventories already preserve exact DDL for all J3/J6 fields. The migration database must materialize or join that metadata so every mapping row is queryable with both migration semantics and physical schema facts.
+QA against `04-joomla-core-migration-fields-v6.md` must resolve 76/76 target tables and 832/832 target fields. Target-only fields must be materialized as `row_kind = TARGET_RESOLUTION`; do not invent fake source fields.
+
+Target-only rows use:
+
+```text
+field_status = MISSING
+mapping_type = DEFAULT / GENERATED / TARGET_OWNED / RECREATE / LOOKUP / REBUILD / explicit NOT_REQUIRED_BY_SCOPE equivalent
+reason       = mandatory
+verification_rule = mandatory
+```
+
+The generator must compute the target anti-join from the J6 field inventory after source mappings are materialized. A source mapping can never claim target coverage merely because the source side is 100%.
+
+Known source-field target exceptions are the explicit override table above. `#__ucm_history.ucm_item_id` and `#__ucm_history.ucm_type_id` jointly resolve `#__history.item_id` through the history identity rule.
+
+---
+
+# Case / Seed Gate
+
+Covers IDs via `value_mapping`; sentinel and polymorphic references; JSON/Registry/ACL/HTML/URL/query/media/path/field values; zero-date/null/default; trees; PK/composite/unique/collision/truncation/range/signedness/collation; session/user_keys/password/legacy 2FA; UCM/Finder rebuild; menus; custom fields; associations/tags; privacy; workflow generation. Raw string ID replacement and secret logging are forbidden.
+
+Source-only explicit outcomes include at minimum: `extensions.system_data`, content/contact/newsfeeds `xreference` = `ARCHIVE`; `ucm_content.core_xreference`, `finder_taxonomy.ordering`, `finder_tokens_aggregate.map_suffix` = `REBUILD`; `user_keys.invalid`, `utf8_conversion.converted` = `IGNORE`; `core_log_searches.*` = `ARCHIVE`.
+
+Seed `migration_mapping.field_mapping` deterministically from this contract and the two physical field inventories. Do **not** reduce mapping identity to only `(source_version, source_table, source_field)` if grouped/one-to-many mappings are present. Count source coverage by distinct source-field key.
+
+Required gates:
+
+```text
+J3 source fields accounted                     = 711 / 711
+J3 distinct source fields                      = 711 / 711
+Missing source mappings                        = 0
+Duplicate/conflicting source decisions         = 0
+Invalid mapping type                           = 0
+Invalid/null field_status                      = 0
+READY with a missing physical side             = 0
+MISSING with both physical sides present       = 0
+MISSING with both physical sides absent        = 0
+SKIP without explicit reason                   = 0
+SKIP + DIRECT                                  = 0
+DIRECT with missing target physical field      = 0
+L missing domain/context                       = 0
+S missing parser                               = 0
+Silent source drops                            = 0
+J6 target tables inventoried                   = 76 / 76
+J6 target fields inventoried                   = 832 / 832
+Target-only fields classified                  = 100%
+Unresolved required target fields              = 0
+Unsafe DIRECT/truncation/collision/dependency  = 0
+```
+
+Definition-level gate:
+
+```text
+FIELD MAPPING CONTRACT = PASS
+```
+
+Production PASS additionally requires actual-schema reconciliation, real mapping materialization, runtime `value_mapping`, row accounting, target-resolution materialization, and zero migration/verification errors.
+
+---
+
+# Materialization QA Queries
+
+Column names may be adapted to the physical schema, but the logical checks are mandatory.
+
+## 1. Source coverage
+
+```sql
+SELECT
+    COUNT(DISTINCT CONCAT(source_table, '.', source_field)) AS covered_source_fields
+FROM migration_mapping.field_mapping
+WHERE row_kind = 'SOURCE_MAPPING'
+  AND source_version = '3.10.12';
+```
+
+Expected: `711`.
+
+## 2. Allowed field status
+
+```sql
+SELECT *
+FROM migration_mapping.field_mapping
+WHERE field_status IS NULL
+   OR field_status NOT IN ('READY', 'SKIP', 'MISSING');
+```
+
+Expected: `0 rows`.
+
+## 3. READY requires both physical sides
+
+Use inventory joins, not `mapping_type`, as the physical-existence authority:
+
+```sql
+SELECT fm.*
+FROM migration_mapping.field_mapping AS fm
+LEFT JOIN migration_inventory.field_inventory AS sf
+  ON sf.database_role = 'SOURCE'
+ AND sf.table_name = fm.source_table
+ AND sf.field_name = fm.source_field
+LEFT JOIN migration_inventory.field_inventory AS tf
+  ON tf.database_role = 'TARGET'
+ AND tf.table_name = fm.target_table
+ AND tf.field_name = fm.target_field
+WHERE fm.row_kind = 'SOURCE_MAPPING'
+  AND fm.field_status = 'READY'
+  AND (sf.field_name IS NULL OR tf.field_name IS NULL);
+```
+
+Expected: `0 rows`.
+
+## 4. MISSING means exactly one physical side absent
+
+```sql
+SELECT fm.*
+FROM migration_mapping.field_mapping AS fm
+LEFT JOIN migration_inventory.field_inventory AS sf
+  ON sf.database_role = 'SOURCE'
+ AND sf.table_name = fm.source_table
+ AND sf.field_name = fm.source_field
+LEFT JOIN migration_inventory.field_inventory AS tf
+  ON tf.database_role = 'TARGET'
+ AND tf.table_name = fm.target_table
+ AND tf.field_name = fm.target_field
+WHERE fm.field_status = 'MISSING'
+  AND (
+       (sf.field_name IS NULL AND tf.field_name IS NULL)
+    OR (sf.field_name IS NOT NULL AND tf.field_name IS NOT NULL)
+  );
+```
+
+Expected: `0 rows`.
+
+## 5. SKIP must be intentional and documented
+
+```sql
+SELECT *
+FROM migration_mapping.field_mapping
+WHERE field_status = 'SKIP'
+  AND NULLIF(TRIM(reason), '') IS NULL;
+```
+
+Expected: `0 rows`.
+
+## 6. Impossible semantic combination: SKIP + DIRECT
+
+```sql
+SELECT *
+FROM migration_mapping.field_mapping
+WHERE field_status = 'SKIP'
+  AND mapping_type = 'DIRECT';
+```
+
+Expected: `0 rows`.
+
+## 7. DIRECT requires a physical target and final verification
+
+```sql
+SELECT fm.*
+FROM migration_mapping.field_mapping AS fm
+LEFT JOIN migration_inventory.field_inventory AS tf
+  ON tf.database_role = 'TARGET'
+ AND tf.table_name = fm.target_table
+ AND tf.field_name = fm.target_field
+WHERE fm.mapping_type = 'DIRECT'
+  AND (
+      tf.field_name IS NULL
+      OR NULLIF(TRIM(fm.verification_rule), '') IS NULL
+  );
+```
+
+Expected: `0 rows`.
+
+## 8. Canonical decision preservation
+
+The generator must preserve the explicit `M` decision in this file. It must not infer another `mapping_type` from field name, table policy, or `field_status`.
+
+Known hard assertions:
+
+```text
+#__extensions.system_data       = ARCHIVE
+#__users.otpKey                 = ARCHIVE
+#__users.otep                   = ARCHIVE
+#__content.xreference           = ARCHIVE
+#__contact_details.xreference   = ARCHIVE
+#__newsfeeds.xreference         = ARCHIVE
+#__ucm_content.core_xreference  = REBUILD
+#__finder_taxonomy.ordering     = REBUILD
+#__finder_tokens_aggregate.map_suffix = REBUILD
+#__user_keys.invalid            = IGNORE
+```
+
+Any materialized mismatch is a `SCRIPT_CONTRACT_GAP` and blocks `MAPPING_VERIFY`.
+
+---
+
+# Schema Metadata Overlay — Data Type, Keys, and References
+
+The 711 compact mapping rows remain the canonical migration-decision layer. Exact SQL metadata is not duplicated manually into those rows because the two canonical field inventories already preserve exact DDL for all J3/J6 fields. The migration database must join that metadata so every mapping row is queryable with migration semantics and physical schema facts.
 
 ## Required schema metadata per mapping row
 
@@ -1071,19 +1454,22 @@ Use these default classifications unless an explicit field rule overrides them:
 
 Examples:
 
-| Source | Source type | S.Key | Target | Target type | T.Key | Ref | M | Domain/rule |
-|---|---|---|---|---|---|---|:-:|---|
-| `#__content.id` | `int unsigned` | PK | `#__content.id` | `int unsigned` | PK | `NONE` | L | `CONTENT` identity map |
-| `#__content.catid` | `int unsigned` | INDEX | `#__content.catid` | `int unsigned` | INDEX | `LOGICAL_FK` | L | `CATEGORY` |
-| `#__content.images` | `text` | NONE | `#__content.images` | `text` | NONE | `EMBEDDED_REFERENCE` | S | `MEDIA_URL_JSON` |
-| `#__content.xreference` | `varchar(50)` | INDEX | — | — | — | `NONE` | A | source-only archive |
-| `#__fields_values.item_id` | `varchar(255)` | INDEX | `#__fields_values.item_id` | `varchar(255)` | INDEX | `POLYMORPHIC` | L | `ENTITY_BY_FIELD_CONTEXT` |
-| `#__menu.link` | `varchar(1024)` | NONE | `#__menu.link` | `varchar(1024)` | NONE | `EMBEDDED_REFERENCE` | S | query-string IDs |
-| `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `LOGICAL_FK` | L | `0=all`, negative=exclude, positive=`MENU` |
+| Source | Source type | S.Key | Target | Target type | T.Key | Field Status | Ref | M | Domain/rule |
+|---|---|---|---|---|---|---|---|:-:|---|
+| `#__content.id` | `int unsigned` | PK | `#__content.id` | `int unsigned` | PK | `READY` | `NONE` | L | `CONTENT` identity map |
+| `#__content.catid` | `int unsigned` | INDEX | `#__content.catid` | `int unsigned` | INDEX | `READY` | `LOGICAL_FK` | L | `CATEGORY` |
+| `#__content.images` | `text` | NONE | `#__content.images` | `text` | NONE | `READY` | `EMBEDDED_REFERENCE` | S | `MEDIA_URL_JSON` |
+| `#__content.xreference` | `varchar(50)` | INDEX | — | — | — | `MISSING` | `NONE` | A | source-only archive |
+| `#__users.otpKey` | `varchar(1000)` | NONE | `#__users.otpKey` | `varchar(1000)` | NONE | `SKIP` | `NONE` | A | legacy 2FA archived; active copy forbidden |
+| `#__fields_values.item_id` | `varchar(255)` | INDEX | `#__fields_values.item_id` | `varchar(255)` | INDEX | `READY` | `POLYMORPHIC` | L | `ENTITY_BY_FIELD_CONTEXT` |
+| `#__menu.link` | `varchar(1024)` | NONE | `#__menu.link` | `varchar(1024)` | NONE | `READY` | `EMBEDDED_REFERENCE` | S | query-string IDs |
+| `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `READY` | `LOGICAL_FK` | L | `0=all`, negative=exclude, positive=`MENU` |
 
-## Physical schema inventory queries
+---
 
-### 1. Data type / nullability / default
+# Physical Schema Inventory Queries
+
+## 1. Data type / nullability / default
 
 Run for both source and target databases:
 
@@ -1111,7 +1497,7 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION;
 
 `DATA_TYPE` alone is insufficient. `COLUMN_TYPE` is mandatory because it preserves details such as `unsigned`, length and precision.
 
-### 2. Key-role inventory
+## 2. Key-role inventory
 
 ```sql
 SELECT
@@ -1146,7 +1532,7 @@ ORDER BY s.TABLE_NAME, s.COLUMN_NAME;
 
 Fields absent from `information_schema.STATISTICS` are classified as `NONE` by the final mapping query.
 
-### 3. Declared physical-FK inventory
+## 3. Declared physical-FK inventory
 
 ```sql
 SELECT
@@ -1165,9 +1551,11 @@ ORDER BY TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME;
 
 A NULL result here does **not** mean the field has no Joomla dependency. It only means no physical FK was declared.
 
-## Enriched field-mapping SELECT contract
+---
 
-The recommended database design keeps schema facts in `field_inventory` and migration decisions in `field_mapping`; query them together instead of manually duplicating DDL into the mapping table.
+# Enriched Field-Mapping SELECT Contract
+
+`field_inventory` stores physical facts and `field_mapping` stores migration decisions. Query them together instead of manually duplicating DDL.
 
 Expected logical result shape:
 
@@ -1190,11 +1578,18 @@ target_default
 target_key_role
 target_physical_fk_target
 
+field_status
+mapping_cardinality
 mapping_type
+identity_strategy
 reference_type
 reference_domain
+parser_rule
 transform_rule
 verification_rule
+rule_origin
+evidence
+reason
 ```
 
 If `field_inventory` stores both source and target inventories, the core query is:
@@ -1203,29 +1598,36 @@ If `field_inventory` stores both source and target inventories, the core query i
 SELECT
     fm.source_table,
     fm.source_field,
-    sf.data_type        AS source_data_type,
-    sf.column_type      AS source_column_type,
-    sf.is_nullable      AS source_nullable,
-    sf.column_default   AS source_default,
-    sf.key_role         AS source_key_role,
+    sf.data_type          AS source_data_type,
+    sf.column_type        AS source_column_type,
+    sf.is_nullable        AS source_nullable,
+    sf.column_default     AS source_default,
+    sf.key_role           AS source_key_role,
     sf.physical_fk_target AS source_physical_fk_target,
 
     fm.target_table,
     fm.target_field,
-    tf.data_type        AS target_data_type,
-    tf.column_type      AS target_column_type,
-    tf.is_nullable      AS target_nullable,
-    tf.column_default   AS target_default,
-    tf.key_role         AS target_key_role,
+    tf.data_type          AS target_data_type,
+    tf.column_type        AS target_column_type,
+    tf.is_nullable        AS target_nullable,
+    tf.column_default     AS target_default,
+    tf.key_role           AS target_key_role,
     tf.physical_fk_target AS target_physical_fk_target,
 
+    fm.field_status,
+    fm.mapping_cardinality,
     fm.mapping_type,
+    fm.identity_strategy,
     fm.reference_type,
     fm.reference_domain,
+    fm.parser_rule,
     fm.transform_rule,
-    fm.verification_rule
+    fm.verification_rule,
+    fm.rule_origin,
+    fm.evidence,
+    fm.reason
 FROM migration_mapping.field_mapping AS fm
-JOIN migration_inventory.field_inventory AS sf
+LEFT JOIN migration_inventory.field_inventory AS sf
   ON sf.database_role = 'SOURCE'
  AND sf.table_name = fm.source_table
  AND sf.field_name = fm.source_field
@@ -1233,13 +1635,14 @@ LEFT JOIN migration_inventory.field_inventory AS tf
   ON tf.database_role = 'TARGET'
  AND tf.table_name = fm.target_table
  AND tf.field_name = fm.target_field
-WHERE fm.source_version = '3.10.12'
-ORDER BY fm.source_table, sf.ordinal_position;
+ORDER BY fm.row_kind, fm.source_table, sf.ordinal_position, fm.target_table, fm.target_field;
 ```
 
-If the physical `field_inventory` column names differ, adapt only the SQL aliases; preserve this output contract.
+If the physical `field_inventory` column names differ, adapt only aliases/join column names; preserve the logical contract.
 
-## Schema compatibility checks required before `DIRECT`
+---
+
+# Schema Compatibility Checks Required Before `DIRECT`
 
 A `D` mapping may execute only when all applicable checks pass:
 
@@ -1257,95 +1660,147 @@ PK/UNIQUE constraints do not collide after ID/value remapping
 
 Any failure changes the field from `DIRECT` to an explicit `TRANSFORM`, `LOOKUP`, `ARCHIVE`, or blocks migration. Silent truncation and implicit coercion are forbidden.
 
-# Schema metadata checklist
+---
 
-## Data type
+# 100% Field Mapping Checklist
 
-- [x] Source `DATA_TYPE` required for 711/711 mappings
-- [x] Source full `COLUMN_TYPE` required for 711/711 mappings
-- [x] Target type metadata required for every mapped target field
-- [x] Signed/unsigned differences included
-- [x] Length/precision/scale included
-- [x] Charset/collation available for compatibility checks
-- [x] Type narrowing must not silently truncate
+## A. Baseline and inventory
 
-## Key role
+- [x] Scope = Joomla Core
+- [x] Source = Joomla 3.10.12
+- [x] Target = Joomla 6.1.2
+- [x] Source table inventory = 100%
+- [x] Source field inventory = 711/711
+- [x] Target table inventory = 76/76
+- [x] Target field inventory = 832/832
+- [x] Table mapping document identified
+- [ ] Actual production source/target schemas reconciled before production execution
 
-- [x] PK classified
-- [x] Composite PK classified
-- [x] UNIQUE classified
-- [x] secondary INDEX classified
-- [x] non-key fields classified as `NONE`
-- [x] source and target key roles both checked
-- [x] composite-key collisions after remapping must equal 0
+## B. Source coverage
 
-## References / FK
+- [x] Every declared J3 physical field has an explicit decision
+- [x] Distinct source field coverage = 711/711
+- [x] Unmapped source fields = 0 at definition level
+- [x] Silent source drops forbidden
+- [x] Source-only outcome rule explicit
+- [ ] Materialized DB source coverage = 711/711 verified against actual inventory
 
-- [x] Declared physical FK inventory defined
-- [x] Logical FK classification defined
-- [x] Polymorphic reference classification defined
-- [x] Embedded reference classification defined
-- [x] Semantic reference classification defined
-- [x] `FK YES/NO` explicitly rejected as insufficient
-- [x] Missing required reference domain = hard failure
-- [x] Physical-FK absence never suppresses logical dependency checks
+## C. Target resolution
 
-## Null/default/schema compatibility
+- [x] Target physical inventory = 832/832
+- [x] Target anti-join rule defined
+- [x] `TARGET_RESOLUTION` row kind required
+- [x] `MISSING` required for exactly-one-side-absent target/source rows
+- [x] `otpKey/otep` physical target existence corrected
+- [ ] All target-only rows materialized and verified in `migration_mapping.field_mapping`
+- [ ] Unresolved required target fields = 0 proven in the actual mapping DB
 
-- [x] Source/target nullability captured
-- [x] Source/target defaults captured
-- [x] Joomla 3 zero-date handling checked
-- [x] target `NOT NULL` fields require valid source/default/generated value
-- [x] unsafe default substitution forbidden
-- [x] collation/case collision check required
+## D. Mapping decision quality
 
-## Database/select readiness
+- [x] Allowed final `M` decisions only
+- [x] Explicit decision overrides preserved
+- [x] `field_status` separated from `mapping_type`
+- [x] `SKIP + DIRECT` forbidden
+- [x] Source-only explicit outcomes enumerated
+- [x] Mapping cardinality/group semantics defined
+- [ ] Materialized mapping-type mismatch count = 0
 
-- [x] `field_mapping` remains decision data
+## E. Field readiness
+
+- [x] Allowed field status = READY / SKIP / MISSING only
+- [x] READY requires both physical sides + executable rule
+- [x] SKIP requires intentional no-active-copy + explicit reason
+- [x] MISSING requires exactly one physical side absent
+- [x] REBUILD is not automatically SKIP
+- [x] REFERENCE_ONLY is not automatically SKIP
+- [x] IGNORE/ARCHIVE do not imply physical target absence
+- [ ] Invalid/null materialized field-status rows = 0
+
+## F. Schema/type compatibility
+
+- [x] Source/target raw and full types required
+- [x] Length/precision/scale/signedness checks required
+- [x] NULL/default rules required
+- [x] Charset/collation checks required
+- [x] Unsafe DIRECT forbidden
+- [ ] Actual-data narrowing/truncation checks PASS
+
+## G. Keys, identity, and references
+
+- [x] PK/composite/unique/index roles defined
+- [x] Runtime ID/value mapping stays in `value_mapping`
+- [x] Logical/polymorphic/embedded/semantic references defined
+- [x] Missing physical FK never suppresses logical dependency checking
+- [ ] Actual production reference-domain/orphan checks PASS
+
+## H. Structured and special values
+
+- [x] Structured parser/remap/reparse contract retained
+- [x] Raw string ID replacement forbidden
+- [x] Legacy date/null/default/sentinel handling retained
+- [x] Legacy 2FA values explicitly archived, not silently copied
+- [ ] Actual structured payload validation PASS
+
+## I. Database materialization
+
 - [x] `field_inventory` remains physical schema source of truth
-- [x] `value_mapping` remains runtime ID/value mapping store
-- [x] no extra contract table required
-- [x] enriched SELECT output contract defined
-- [x] production physical FK scan defined
+- [x] `field_mapping` remains static decision source of truth
+- [x] `value_mapping` remains runtime/design-time translation store
+- [x] `row_kind` requirement added
+- [x] `mapping_cardinality` / `mapping_group_key` requirement added
+- [x] One-column source uniqueness no longer treated as universally sufficient
+- [ ] Materialized generator rerun/idempotency PASS
 
-# Extended QA gate
+## J. Verification readiness
+
+- [x] DIRECT verification rule defined
+- [x] TRANSFORM verification rule defined
+- [x] LOOKUP orphan/ambiguity verification defined
+- [x] STRUCTURED parse/remap/reparse verification defined
+- [x] GENERATED/REBUILD integrity verification defined
+- [x] ARCHIVE accounting verification defined
+- [x] IGNORE reason/accounting verification defined
+- [x] Field-status hard-fail QA queries defined
+- [ ] Materialized mapping QA returns zero failures
+
+---
+
+# Final Field Mapping Gate
+
+Definition-level status after this document update:
 
 ```text
-SOURCE SCHEMA METADATA
----------------------------------------------
-J3 mapping rows                       = 711 / 711
-Source DATA_TYPE resolvable           = 711 / 711
-Source COLUMN_TYPE resolvable         = 711 / 711
-Source null/default metadata          = 711 / 711
-Source key role classified            = 711 / 711
+SOURCE COVERAGE
+----------------------------------------------
+J3 physical fields accounted          = 711 / 711
+Unmapped source decisions             = 0
+Silent source drops                   = 0
 
-TARGET SCHEMA METADATA
----------------------------------------------
-J6 baseline fields                    = 832 / 832
-Mapped target type metadata resolved  = 100%
-Mapped target key roles resolved      = 100%
-Target-only field strategy resolved   = 100%
+TARGET BASELINE
+----------------------------------------------
+J6 physical tables inventoried        = 76 / 76
+J6 physical fields inventoried        = 832 / 832
+Known otpKey/otep target-existence
+metadata inconsistency                = CORRECTED
 
-REFERENCE METADATA
----------------------------------------------
-Declared physical FKs inventoried     = 100%
-Logical references classified         = 100%
-Polymorphic references classified     = 100%
-Embedded references classified        = 100%
-Semantic references classified        = 100%
-Missing required reference domain     = 0
+FIELD STATUS CONTRACT
+----------------------------------------------
+Allowed statuses                      = READY / SKIP / MISSING
+Physical-existence precedence         = DEFINED
+SKIP + DIRECT                         = FORBIDDEN
+REBUILD auto-SKIP                     = FORBIDDEN
+REFERENCE_ONLY auto-SKIP              = FORBIDDEN
+mapping_type-driven target NULL       = FORBIDDEN
 
-SCHEMA COMPATIBILITY
----------------------------------------------
-Unsafe DIRECT type mismatch           = 0
-Unresolved nullable/default changes   = 0
-Unresolved narrowing/truncation       = 0
-Unresolved PK/UNIQUE collisions       = 0
-Unresolved collation collisions       = 0
-
-================================================
-FIELD SCHEMA METADATA CONTRACT        = PASS
-================================================
+MATERIALIZATION / PRODUCTION
+----------------------------------------------
+Actual schema reconciliation          = REQUIRED
+Materialized 711 source coverage      = REQUIRED
+Materialized target resolution        = REQUIRED
+Invalid field status                  = MUST BE 0
+Canonical-decision mismatches         = MUST BE 0
+Runtime ID/value mapping              = REQUIRED
+Record/value verification             = REQUIRED
 ```
 
-> The definition-level metadata contract is complete. Production PASS requires populating `field_inventory` from the actual J3/J6 databases and proving every runtime count above with zero unresolved differences.
+> **Definition-level field mapping coverage is 100% (711/711 source physical fields and 832/832 declared target physical fields accounted by the source/target inventory contract). Production correctness must not be reported as 100% until the actual J3/J6 schemas, materialized `field_mapping`, runtime value mappings, and migrated data all pass their zero-failure gates.**
