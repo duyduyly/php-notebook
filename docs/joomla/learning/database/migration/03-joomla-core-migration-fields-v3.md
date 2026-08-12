@@ -1,5 +1,31 @@
 # Joomla Core Migration Field Inventory — Joomla 3
 
+## Mapping-report synchronization — 2026-08-12
+
+This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
+
+| Measure | Result |
+|---|---:|
+| Joomla 3 physical inventory | 78 tables / 711 fields |
+| Joomla 6 physical inventory | 76 tables / 832 fields |
+| Source-field accounting | 711 / 711 = 100.00% |
+| Resolved field decisions | 711 / 711 = 100.00% |
+| Resolved relationships | 168 / 168 = 100.00% |
+| Field-count migration/rebuild proxy | 691 / 711 = 97.19% |
+| Field-count preservation proxy | 697 / 711 = 98.03% |
+| Intentionally ignored fields | 14 / 711 = 1.97% |
+| Actual migrated rows/values/bytes | Not measured until execution |
+
+Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711`; `UNRESOLVED = 0`.
+
+The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
+
+The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+
+
 ## Inventory Rule
 
 > **Inventory = YES**  
@@ -1920,8 +1946,8 @@ Format: `table.field | structured | reference/dependency | migration hint`
 #__usergroups.parent_id | NO | #__usergroups.id (self tree) | LOOKUP/REVIEW
 #__users.id | NO | Referenced by many core tables | LOOKUP/REVIEW
 #__users.params | JSON / Joomla Registry | — | STRUCTURED/REVIEW
-#__users.otpKey | SECURITY / encrypted 2FA material | — | STRUCTURED/REVIEW
-#__users.otep | SECURITY / emergency codes | — | STRUCTURED/REVIEW
+#__users.otpKey | SECURITY / encrypted 2FA material | #__users.otpKey | TRANSFORM: clear active secret and require MFA re-enrollment
+#__users.otep | SECURITY / emergency codes | #__users.otep | TRANSFORM: clear active codes and require MFA re-enrollment
 #__user_usergroup_map.user_id | NO | #__users.id | LOOKUP/REVIEW
 #__user_usergroup_map.group_id | NO | #__usergroups.id | LOOKUP/REVIEW
 #__viewlevels.rules | JSON / user group IDs | Embeds #__usergroups.id in JSON | STRUCTURED/REVIEW
@@ -2134,9 +2160,9 @@ Format: `table.field | structured | reference/dependency | migration hint`
 #__action_logs.message | Structured/action message payload | — | ARCHIVE/IGNORE
 #__action_logs.user_id | NO | #__users.id | ARCHIVE/IGNORE
 #__action_logs.item_id | NO | Context-dependent by extension/action type | ARCHIVE/IGNORE
-#__postinstall_messages.extension_id | NO | #__extensions.extension_id | IGNORE
-#__postinstall_messages.action_file | File/RAD URI | — | IGNORE
-#__postinstall_messages.condition_file | File/RAD URI | — | IGNORE
+#__postinstall_messages.extension_id | NO | #__extensions.extension_id | REBUILD from J6 manifests
+#__postinstall_messages.action_file | File/RAD URI | #__postinstall_messages.action_file | REBUILD from J6 manifests
+#__postinstall_messages.condition_file | File/RAD URI | #__postinstall_messages.condition_file | REBUILD from J6 manifests
 ```
 
 ## Coverage Summary

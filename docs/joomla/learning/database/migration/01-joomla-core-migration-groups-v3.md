@@ -1,5 +1,31 @@
 # Joomla Core Database Migration Groups — Joomla 3
 
+## Mapping-report synchronization — 2026-08-12
+
+This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
+
+| Measure | Result |
+|---|---:|
+| Joomla 3 physical inventory | 78 tables / 711 fields |
+| Joomla 6 physical inventory | 76 tables / 832 fields |
+| Source-field accounting | 711 / 711 = 100.00% |
+| Resolved field decisions | 711 / 711 = 100.00% |
+| Resolved relationships | 168 / 168 = 100.00% |
+| Field-count migration/rebuild proxy | 691 / 711 = 97.19% |
+| Field-count preservation proxy | 697 / 711 = 98.03% |
+| Intentionally ignored fields | 14 / 711 = 1.97% |
+| Actual migrated rows/values/bytes | Not measured until execution |
+
+Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711`; `UNRESOLVED = 0`.
+
+The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
+
+The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+
+
 ## Migration Rule
 
 > **Inventory = YES**  
@@ -305,8 +331,8 @@ Typical decisions:
 - `#__action_logs` → `ARCHIVE` / `IGNORE`
 - `#__core_log_searches` → `ARCHIVE` / `IGNORE`
 - `#__overrider` → `REBUILD` / `IGNORE`
-- `#__postinstall_messages` → `IGNORE` / target-owned
-- `#__utf8_conversion` → `IGNORE`
+- `#__postinstall_messages` → `REBUILD` from the Joomla 6 installation/extension manifests; source rows are accounting evidence only
+- `#__utf8_conversion` → `DERIVED`; derive completion from successful charset/collation validation rather than copying the legacy marker
 
 ---
 

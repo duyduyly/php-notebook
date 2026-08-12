@@ -8,7 +8,7 @@ This revision replaces the documentation-only denominator with authoritative phy
 
 | Metric | Result | Required |
 |---|---|---|
-| Joomla 3 tables inventoried | 77 / 77 = 100.00% | 100% |
+| Joomla 3 tables inventoried | 78 / 78 = 100.00% | 100% |
 | Joomla 3 fields inventoried | 711 / 711 = 100.00% | 100% |
 | Source fields accounted for | 711 / 711 = 100.00% | 100% |
 | Source fields resolved | 711 / 711 = 100.00% | 100% |
@@ -29,7 +29,7 @@ The 100% claim is a **field-accounting and resolved-disposition claim for the pi
 
 ## 2. Migration Coverage Result
 
-The physical source inventory contains **77 core tables and 711 fields**. The primary matrix contains **711 unique rows**, **0 missing**, **0 duplicates**, and **0 unresolved**. The relationship matrix contains **168 resolved relationships**. This raises resolved mapping coverage from the prior documentation-only 54.52% to **100.00% for Joomla 3.10.12 core**.
+The physical source inventory contains **78 core tables and 711 fields**. The primary matrix contains **711 unique rows**, **0 missing**, **0 duplicates**, and **0 unresolved**. The relationship matrix contains **168 resolved relationships**. This raises resolved mapping coverage from the prior documentation-only 54.52% to **100.00% for Joomla 3.10.12 core**.
 
 ## 3. Source and Target Documents
 
@@ -153,7 +153,8 @@ Third-party extension tables, custom tables/columns, and local drift are outside
 | #__tags | JOOMLA_CORE | 30 | #__tags | DIRECT, ID_MAP, REBUILD, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__template_styles | JOOMLA_CORE | 8 | #__template_styles | DIRECT, ID_MAP, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__ucm_base | JOOMLA_CORE | 4 | #__ucm_base | REBUILD | RESOLVED |
-| #__ucm_content | JOOMLA_CORE | 42 | #__ucm_content | REBUILD | RESOLVED |
+| #__ucm_content | JOOMLA_CORE | 32 | #__ucm_content | REBUILD | RESOLVED |
+| #__ucm_history | JOOMLA_CORE | 10 | #__history | TRANSFORM | RESOLVED |
 | #__update_sites | JOOMLA_CORE | 7 | #__update_sites | DIRECT, ID_MAP, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__update_sites_extensions | JOOMLA_CORE | 2 | #__update_sites_extensions | ID_MAP | RESOLVED |
 | #__updates | JOOMLA_CORE | 14 | #__updates | REBUILD | RESOLVED |
@@ -793,16 +794,16 @@ Third-party extension tables, custom tables/columns, and local drift are outside
 | `#__ucm_content.core_catid` | int unsigned | YES | NO | 0 | — | — | Official J3.10.12 DDL |
 | `#__ucm_content.core_xreference` | varchar(50) | NO | NO | '' | — | A reference to enable linkages to external data sets. | Official J3.10.12 DDL |
 | `#__ucm_content.core_type_id` | int unsigned | YES | NO | 0 | IDX:idx_core_type_id | — | Official J3.10.12 DDL |
-| `#__ucm_content.version_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | AUTO_INCREMENT | — | Official J3.10.12 DDL |
-| `#__ucm_content.ucm_item_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J3.10.12 DDL |
-| `#__ucm_content.ucm_type_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J3.10.12 DDL |
-| `#__ucm_content.version_note` | varchar(255) | NO | NO | '' | — | Optional version name | Official J3.10.12 DDL |
-| `#__ucm_content.save_date` | datetime | NO | NO | '0000-00-00 00:00:00' | IDX:idx_save_date | — | Official J3.10.12 DDL |
-| `#__ucm_content.editor_user_id` | int unsigned | YES | NO | 0 | — | — | Official J3.10.12 DDL |
-| `#__ucm_content.character_count` | int unsigned | YES | NO | 0 | — | Number of characters in this version. | Official J3.10.12 DDL |
-| `#__ucm_content.sha1_hash` | varchar(50) | NO | NO | '' | — | SHA1 hash of the version_data column. | Official J3.10.12 DDL |
-| `#__ucm_content.version_data` | mediumtext | NO | NO | NO EXPLICIT DEFAULT | — | json-encoded string of version data | Official J3.10.12 DDL |
-| `#__ucm_content.keep_forever` | tinyint | NO | NO | 0 | — | 0=auto delete; 1=keep | Official J3.10.12 DDL |
+| `#__ucm_history.version_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | AUTO_INCREMENT | — | Official J3.10.12 DDL |
+| `#__ucm_history.ucm_item_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J3.10.12 DDL |
+| `#__ucm_history.ucm_type_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J3.10.12 DDL |
+| `#__ucm_history.version_note` | varchar(255) | NO | NO | '' | — | Optional version name | Official J3.10.12 DDL |
+| `#__ucm_history.save_date` | datetime | NO | NO | '0000-00-00 00:00:00' | IDX:idx_save_date | — | Official J3.10.12 DDL |
+| `#__ucm_history.editor_user_id` | int unsigned | YES | NO | 0 | — | — | Official J3.10.12 DDL |
+| `#__ucm_history.character_count` | int unsigned | YES | NO | 0 | — | Number of characters in this version. | Official J3.10.12 DDL |
+| `#__ucm_history.sha1_hash` | varchar(50) | NO | NO | '' | — | SHA1 hash of the version_data column. | Official J3.10.12 DDL |
+| `#__ucm_history.version_data` | mediumtext | NO | NO | NO EXPLICIT DEFAULT | — | json-encoded string of version data | Official J3.10.12 DDL |
+| `#__ucm_history.keep_forever` | tinyint | NO | NO | 0 | — | 0=auto delete; 1=keep | Official J3.10.12 DDL |
 | `#__update_sites.update_site_id` | int | NO | NO | NO EXPLICIT DEFAULT | PK; AUTO_INCREMENT | — | Official J3.10.12 DDL |
 | `#__update_sites.name` | varchar(100) | NO | YES | '' | — | — | Official J3.10.12 DDL |
 | `#__update_sites.type` | varchar(20) | NO | YES | '' | — | — | Official J3.10.12 DDL |
@@ -1574,17 +1575,17 @@ Third-party extension tables, custom tables/columns, and local drift are outside
 | `#__ucm_content.core_metadesc` | text | NO | YES | NO EXPLICIT DEFAULT | — | — | Official J6.1.2 DDL |
 | `#__ucm_content.core_catid` | int unsigned | YES | NO | 0 | — | — | Official J6.1.2 DDL |
 | `#__ucm_content.core_type_id` | int unsigned | YES | NO | 0 | IDX:idx_core_type_id | — | Official J6.1.2 DDL |
-| `#__ucm_content.version_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | AUTO_INCREMENT | — | Official J6.1.2 DDL |
-| `#__ucm_content.item_id` | varchar(50) | NO | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J6.1.2 DDL |
-| `#__ucm_content.version_note` | varchar(255) | NO | NO | '' | — | Optional version name | Official J6.1.2 DDL |
-| `#__ucm_content.save_date` | datetime | NO | NO | NO EXPLICIT DEFAULT | IDX:idx_save_date | — | Official J6.1.2 DDL |
-| `#__ucm_content.editor_user_id` | int unsigned | YES | NO | 0 | — | — | Official J6.1.2 DDL |
-| `#__ucm_content.character_count` | int unsigned | YES | NO | 0 | — | Number of characters in this version. | Official J6.1.2 DDL |
-| `#__ucm_content.sha1_hash` | varchar(50) | NO | NO | '' | — | SHA1 hash of the version_data column. | Official J6.1.2 DDL |
-| `#__ucm_content.version_data` | mediumtext | NO | NO | NO EXPLICIT DEFAULT | — | json-encoded string of version data | Official J6.1.2 DDL |
-| `#__ucm_content.keep_forever` | tinyint | NO | NO | 0 | — | 0=auto delete; 1=keep | Official J6.1.2 DDL |
-| `#__ucm_content.is_current` | tinyint | NO | NO | 0 | — | — | Official J6.1.2 DDL |
-| `#__ucm_content.is_legacy` | tinyint | NO | NO | 0 | — | — | Official J6.1.2 DDL |
+| `#__history.version_id` | int unsigned | YES | NO | NO EXPLICIT DEFAULT | AUTO_INCREMENT | — | Official J6.1.2 DDL |
+| `#__history.item_id` | varchar(50) | NO | NO | NO EXPLICIT DEFAULT | IDX:idx_ucm_item_id | — | Official J6.1.2 DDL |
+| `#__history.version_note` | varchar(255) | NO | NO | '' | — | Optional version name | Official J6.1.2 DDL |
+| `#__history.save_date` | datetime | NO | NO | NO EXPLICIT DEFAULT | IDX:idx_save_date | — | Official J6.1.2 DDL |
+| `#__history.editor_user_id` | int unsigned | YES | NO | 0 | — | — | Official J6.1.2 DDL |
+| `#__history.character_count` | int unsigned | YES | NO | 0 | — | Number of characters in this version. | Official J6.1.2 DDL |
+| `#__history.sha1_hash` | varchar(50) | NO | NO | '' | — | SHA1 hash of the version_data column. | Official J6.1.2 DDL |
+| `#__history.version_data` | mediumtext | NO | NO | NO EXPLICIT DEFAULT | — | json-encoded string of version data | Official J6.1.2 DDL |
+| `#__history.keep_forever` | tinyint | NO | NO | 0 | — | 0=auto delete; 1=keep | Official J6.1.2 DDL |
+| `#__history.is_current` | tinyint | NO | NO | 0 | — | — | Official J6.1.2 DDL |
+| `#__history.is_legacy` | tinyint | NO | NO | 0 | — | — | Official J6.1.2 DDL |
 | `#__update_sites.update_site_id` | int | NO | NO | NO EXPLICIT DEFAULT | PK; AUTO_INCREMENT | — | Official J6.1.2 DDL |
 | `#__update_sites.name` | varchar(100) | NO | YES | '' | — | — | Official J6.1.2 DDL |
 | `#__update_sites.type` | varchar(20) | NO | YES | '' | — | — | Official J6.1.2 DDL |
@@ -1798,7 +1799,8 @@ Third-party extension tables, custom tables/columns, and local drift are outside
 | #__template_styles | 8 | 8 | 8 | 8 | Exact final-baseline DDL column counts |
 | #__tuf_metadata | 0 | 0 | 7 | 7 | Exact final-baseline DDL column counts |
 | #__ucm_base | 4 | 4 | 4 | 4 | Exact final-baseline DDL column counts |
-| #__ucm_content | 42 | 40 | 40 | 42 | Exact final-baseline DDL column counts |
+| #__ucm_content | 32 | 31 | 31 | 31 | Exact final-baseline DDL column counts |
+| #__ucm_history / #__history | 10 | 11 | 11 | 11 | Renamed in Joomla 4; history identity/state evolved |
 | #__update_sites | 7 | 9 | 9 | 9 | Exact final-baseline DDL column counts |
 | #__update_sites_extensions | 2 | 2 | 2 | 2 | Exact final-baseline DDL column counts |
 | #__updates | 14 | 15 | 15 | 15 | Exact final-baseline DDL column counts |
@@ -1888,7 +1890,8 @@ Key evolution: partitioned J3 Finder link-term tables become a unified J6 table;
 | #__tags | #__tags | 30 | DIRECT, ID_MAP, REBUILD, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__template_styles | #__template_styles | 8 | DIRECT, ID_MAP, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__ucm_base | #__ucm_base | 4 | REBUILD | RESOLVED |
-| #__ucm_content | #__ucm_content | 42 | REBUILD | RESOLVED |
+| #__ucm_content | #__ucm_content | 32 | REBUILD | RESOLVED |
+| #__ucm_history | #__history | 10 | TRANSFORM | RESOLVED |
 | #__update_sites | #__update_sites | 7 | DIRECT, ID_MAP, TRANSFORM, VALUE_MAP | RESOLVED |
 | #__update_sites_extensions | #__update_sites_extensions | 2 | ID_MAP | RESOLVED |
 | #__updates | #__updates | 14 | REBUILD | RESOLVED |
@@ -2528,16 +2531,16 @@ Key evolution: partitioned J3 Finder link-term tables become a unified J6 table;
 | `#__ucm_content` | `core_catid` | int unsigned NOT NULL DEFAULT 0 | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__ucm_content` | `core_xreference` | varchar(50) NOT NULL DEFAULT '' COMMENT 'A reference to enable linkages to external data sets.' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=N, J5.4.7=N, J6.1.2=N; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__ucm_content` | `core_type_id` | int unsigned NOT NULL DEFAULT 0 | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `version_id` | int unsigned NOT NULL AUTO_INCREMENT | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `ucm_item_id` | int unsigned NOT NULL | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=N, J5.4.7=N, J6.1.2=N; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `ucm_type_id` | int unsigned NOT NULL | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=N, J5.4.7=N, J6.1.2=N; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `version_note` | varchar(255) NOT NULL DEFAULT '' COMMENT 'Optional version name' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `save_date` | datetime NOT NULL DEFAULT '0000-00-00 00:00:00' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `editor_user_id` | int unsigned NOT NULL DEFAULT 0 | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `character_count` | int unsigned NOT NULL DEFAULT 0 COMMENT 'Number of characters in this version.' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `sha1_hash` | varchar(50) NOT NULL DEFAULT '' COMMENT 'SHA1 hash of the version_data column.' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `version_data` | mediumtext NOT NULL COMMENT 'json-encoded string of version data' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content` | `keep_forever` | tinyint NOT NULL DEFAULT 0 COMMENT '0=auto delete; 1=keep' | `#__ucm_content` | — | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | REBUILD_RELATIONSHIP | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y; local migration docs provide disposition/semantic intent | MEDIUM | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
+| `#__ucm_history` | `version_id` | int unsigned NOT NULL AUTO_INCREMENT | `#__history` | `version_id` | int unsigned NOT NULL AUTO_INCREMENT | ID_MAP | Allocate history identity through migration_id_map(entity=history-version). | ID_MAP(history-version) | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | MEDIUM | ID_MAP_RECONCILIATION; one target version per source version. | RESOLVED |
+| `#__ucm_history` | `ucm_item_id` | int unsigned NOT NULL | `#__history` | `item_id` | varchar(50) NOT NULL | TRANSFORM | Build target item_id from the resolved content-type alias/context and mapped owner ID. | ID_MAP(contextual item) | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | HIGH | Parse item_id and confirm zero orphaned history versions. | RESOLVED |
+| `#__ucm_history` | `ucm_type_id` | int unsigned NOT NULL | `#__history` | `item_id` | varchar(50) NOT NULL | VALUE_MAP | Resolve the content type and combine its target alias/context with mapped ucm_item_id. | VALUE_MAP(content type) | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | HIGH | Every type resolves uniquely and agrees with target item_id. | RESOLVED |
+| `#__ucm_history` | `version_note` | varchar(255) NOT NULL DEFAULT '' COMMENT 'Optional version name' | `#__history` | `version_note` | varchar(255) NOT NULL DEFAULT '' | DIRECT | Preserve after length and encoding validation. | None | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | LOW | HASH_COMPARE by mapped history version. | RESOLVED |
+| `#__ucm_history` | `save_date` | datetime NOT NULL DEFAULT '0000-00-00 00:00:00' | `#__history` | `save_date` | datetime NOT NULL | TRANSFORM | Preserve valid dates; map zero-date to the fixed migration-batch timestamp and archive the raw sentinel. | None | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | MEDIUM | Target zero-dates = 0; transformed count equals source sentinel count. | RESOLVED |
+| `#__ucm_history` | `editor_user_id` | int unsigned NOT NULL DEFAULT 0 | `#__history` | `editor_user_id` | int unsigned NOT NULL DEFAULT 0 | ID_MAP | Map nonzero editor through USER ID map; preserve 0 as system/anonymous. | ID_MAP(user) | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | MEDIUM | ID reconciliation; only 0 may remain unmapped. | RESOLVED |
+| `#__ucm_history` | `character_count` | int unsigned NOT NULL DEFAULT 0 COMMENT 'Number of characters in this version.' | `#__history` | `character_count` | int unsigned NOT NULL DEFAULT 0 | DIRECT | Preserve and validate against transformed payload where decodable. | None | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | LOW | Per-row comparison and mismatch report. | RESOLVED |
+| `#__ucm_history` | `sha1_hash` | varchar(50) NOT NULL DEFAULT '' COMMENT 'SHA1 hash of the version_data column.' | `#__history` | `sha1_hash` | varchar(50) NOT NULL DEFAULT '' | TRANSFORM | Recompute from final serialized target version_data. | None | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | MEDIUM | Recomputed hash equals stored hash. | RESOLVED |
+| `#__ucm_history` | `version_data` | mediumtext NOT NULL COMMENT 'json-encoded string of version data' | `#__history` | `version_data` | mediumtext NOT NULL | TRANSFORM | Decode, remap embedded IDs by context, retain supported keys, archive raw payload, and canonical re-encode. | Embedded ID maps | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | HIGH | JSON validation; semantic fixtures; zero rejected payloads. | RESOLVED |
+| `#__ucm_history` | `keep_forever` | tinyint NOT NULL DEFAULT 0 COMMENT '0=auto delete; 1=keep' | `#__history` | `keep_forever` | tinyint NOT NULL DEFAULT 0 | VALUE_MAP | Accept only 0/1 and preserve Joomla 6 retention semantics. | None | Official DDL: #__ucm_history renamed to #__history in J4 and retained through J6 | LOW | ENUM distribution; invalid values = 0. | RESOLVED |
 | `#__update_sites` | `update_site_id` | int NOT NULL AUTO_INCREMENT | `#__update_sites` | `update_site_id` | int NOT NULL AUTO_INCREMENT | ID_MAP | Resolve non-sentinel value through migration_id_map(entity=update-site); reject/quarantine missing required references. | ID_MAP(update-site) | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y | MEDIUM | ID_MAP_RECONCILIATION + ORPHAN_CHECK + one-to-one/allowed-many cardinality. | RESOLVED |
 | `#__update_sites` | `name` | varchar(100) DEFAULT '' | `#__update_sites` | `name` | varchar(100) DEFAULT '' | DIRECT | Copy value; source and target physical type, signedness, nullability, and default are equal in pinned DDLs. | None | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y | NONE | ROW_COUNT + NULL_COUNT + canonical per-ID HASH_COMPARE. | RESOLVED |
 | `#__update_sites` | `type` | varchar(20) DEFAULT '' | `#__update_sites` | `type` | varchar(20) DEFAULT '' | VALUE_MAP | Resolve through migration_value_map using the logical/natural key; require installed target owner/language/context and reject unmapped values. | VALUE_MAP(type) | Official DDL field presence J4.4.14=Y, J5.4.7=Y, J6.1.2=Y | MEDIUM | ENUM/DISTINCT distribution reconciliation + zero unmapped values. | RESOLVED |
@@ -2763,9 +2766,9 @@ Primary business IDs may be preserved only after collision checks, but are still
 | #__ucm_content.core_content_item_id | contextual-item | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
 | #__ucm_content.asset_id | asset | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
 | #__ucm_content.core_type_id | content-type | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
-| #__ucm_content.ucm_item_id | contextual-item | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
-| #__ucm_content.ucm_type_id | content-type | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
-| #__ucm_content.editor_user_id | user | REBUILD_RELATIONSHIP | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
+| #__ucm_history.ucm_item_id | contextual-item | ID_MAP | Required | Owners and content types before history | Resolve the generated `#__history.item_id`; zero orphaned owners | RESOLVED |
+| #__ucm_history.ucm_type_id | content-type | VALUE_MAP | Required | Content types before history | Every source type resolves uniquely to the target item context | RESOLVED |
+| #__ucm_history.editor_user_id | user | ID_MAP | `0` is the only allowed sentinel | Users before history | LEFT JOIN through migration_id_map; zero missing nonzero users | RESOLVED |
 | #__update_sites_extensions.extension_id | extension | ID_MAP(extension) | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
 | #__updates.update_site_id | update-site | TARGET_GENERATED | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
 | #__updates.extension_id | extension | TARGET_GENERATED | Optional/sentinel allowed only if source DDL default or Joomla semantic rule permits it | Parent/entity before child; bridge after both sides | LEFT JOIN through migration_id_map; zero missing required references | RESOLVED |
@@ -2973,7 +2976,7 @@ Every difference uses explicit casting/range/length/null handling; no MySQL impl
 | #__ucm_content.core_modified_time | '0000-00-00 00:00:00' | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. |
 | #__ucm_content.core_publish_up | '0000-00-00 00:00:00' | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. |
 | #__ucm_content.core_publish_down | '0000-00-00 00:00:00' | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. |
-| #__ucm_content.save_date | '0000-00-00 00:00:00' | — | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. |
+| #__ucm_history.save_date | '0000-00-00 00:00:00' | datetime NOT NULL | TRANSFORM | Map to the fixed migration-batch timestamp and archive the raw sentinel; preserve valid dates. |
 | #__user_notes.checked_out_time | '0000-00-00 00:00:00' | NO EXPLICIT DEFAULT | TRANSFORM | Set the target editing lock to the Joomla 6 unlocked value; do not retain source lock state. |
 | #__user_notes.created_time | '0000-00-00 00:00:00' | NO EXPLICIT DEFAULT | TRANSFORM | Map `0000-00-00 00:00:00`/empty sentinel to NULL when J6 is nullable, otherwise to target default; normalize valid timestamp unchanged in UTC. |
 | #__user_notes.modified_time | '0000-00-00 00:00:00' | NO EXPLICIT DEFAULT | TRANSFORM | Map `0000-00-00 00:00:00`/empty sentinel to NULL when J6 is nullable, otherwise to target default; normalize valid timestamp unchanged in UTC. |
@@ -3033,7 +3036,7 @@ Apply only to temporal fields whose J6 DDL accepts NULL; otherwise use the expli
 | `#__tags.images` | text | #__tags.images | JSON_TRANSFORM | Losslessly archive raw payload; decode; apply owner/version key manifest; remap embedded IDs/paths; retain supported keys; canonical re-encode; fail row on invalid structure. | Compute expected transform independently; HASH_COMPARE/JSON_VALIDATION; zero rejected rows. | RESOLVED |
 | `#__tags.urls` | text | #__tags.urls | JSON_TRANSFORM | Losslessly archive raw payload; decode; apply owner/version key manifest; remap embedded IDs/paths; retain supported keys; canonical re-encode; fail row on invalid structure. | Compute expected transform independently; HASH_COMPARE/JSON_VALIDATION; zero rejected rows. | RESOLVED |
 | `#__template_styles.params` | text | #__template_styles.params | JSON_TRANSFORM | Losslessly archive raw payload; decode; apply owner/version key manifest; remap embedded IDs/paths; retain supported keys; canonical re-encode; fail row on invalid structure. | Compute expected transform independently; HASH_COMPARE/JSON_VALIDATION; zero rejected rows. | RESOLVED |
-| `#__ucm_content.version_data` | mediumtext | archive | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
+| `#__ucm_history.version_data` | mediumtext | #__history.version_data | JSON_TRANSFORM | Archive raw payload, decode, remap embedded IDs by content context, retain supported keys, and canonical re-encode. | JSON_VALIDATION + semantic fixtures + zero rejected payloads. | RESOLVED |
 | `#__updates.data` | text | archive | REBUILD | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__user_notes.body` | text | #__user_notes.body | JSON_TRANSFORM | Losslessly archive raw payload; decode; apply owner/version key manifest; remap embedded IDs/paths; retain supported keys; canonical re-encode; fail row on invalid structure. | Compute expected transform independently; HASH_COMPARE/JSON_VALIDATION; zero rejected rows. | RESOLVED |
 | `#__user_profiles.profile_value` | text | #__user_profiles.profile_value | JSON_TRANSFORM | Losslessly archive raw payload; decode; apply owner/version key manifest; remap embedded IDs/paths; retain supported keys; canonical re-encode; fail row on invalid structure. | Compute expected transform independently; HASH_COMPARE/JSON_VALIDATION; zero rejected rows. | RESOLVED |
@@ -3229,16 +3232,16 @@ The implementation must maintain a versioned payload manifest per owning core/in
 | `#__ucm_content.core_catid` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__ucm_content.core_xreference` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__ucm_content.core_type_id` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.version_id` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.ucm_item_id` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.ucm_type_id` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.version_note` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.save_date` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.editor_user_id` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.character_count` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.sha1_hash` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.version_data` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
-| `#__ucm_content.keep_forever` | #__ucm_content | REBUILD | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
+| `#__ucm_history.version_id` | #__history.version_id | ID_MAP | Map history identity. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.ucm_item_id` | #__history.item_id | TRANSFORM | Build contextual target item identity. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.ucm_type_id` | #__history.item_id | VALUE_MAP | Resolve content-type context. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.version_note` | #__history.version_note | DIRECT | Preserve value. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.save_date` | #__history.save_date | TRANSFORM | Normalize zero-date. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.editor_user_id` | #__history.editor_user_id | ID_MAP | Map user ID. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.character_count` | #__history.character_count | DIRECT | Preserve and validate count. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.sha1_hash` | #__history.sha1_hash | TRANSFORM | Recompute after payload transform. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.version_data` | #__history.version_data | TRANSFORM | Transform structured history payload. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
+| `#__ucm_history.keep_forever` | #__history.keep_forever | VALUE_MAP | Validate and preserve 0/1 semantics. | Verify against the complete field mapping row and mapped history identity. | RESOLVED |
 | `#__updates.update_id` | #__updates | REBUILD | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__updates.update_site_id` | #__updates | REBUILD | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
 | `#__updates.extension_id` | #__updates | REBUILD | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Run owner rebuild; semantic counts/invariants/orphan checks and feature smoke tests. | RESOLVED |
@@ -3305,7 +3308,7 @@ The implementation must maintain a versioned payload manifest per owning core/in
 | #__schemas | extension_id, version_id | Canonical migrated owners/content plus completed ID/value maps | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Owner semantic tests + counts + invariants + orphan checks |
 | #__tags | lft, rgt, level, path | Canonical migrated owners/content plus completed ID/value maps | Recalculate nested-set/path value from mapped parent and deterministic sibling order. | Owner semantic tests + counts + invariants + orphan checks |
 | #__ucm_base | ucm_id, ucm_item_id, ucm_type_id, ucm_language_id | Canonical migrated owners/content plus completed ID/value maps | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Owner semantic tests + counts + invariants + orphan checks |
-| #__ucm_content | core_content_id, core_type_alias, core_title, core_alias, core_body, core_state, core_checked_out_time, core_checked_out_user_id, core_access, core_params, core_featured, core_metadata, core_created_user_id, core_created_by_alias, core_created_time, core_modified_user_id, core_modified_time, core_language, core_publish_up, core_publish_down, core_content_item_id, asset_id, core_images, core_urls, core_hits, core_version, core_ordering, core_metakey, core_metadesc, core_catid, core_xreference, core_type_id, version_id, ucm_item_id, ucm_type_id, version_note, save_date, editor_user_id, character_count, sha1_hash, version_data, keep_forever | Canonical migrated owners/content plus completed ID/value maps | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Owner semantic tests + counts + invariants + orphan checks |
+| #__ucm_content | core_content_id, core_type_alias, core_title, core_alias, core_body, core_state, core_checked_out_time, core_checked_out_user_id, core_access, core_params, core_featured, core_metadata, core_created_user_id, core_created_by_alias, core_created_time, core_modified_user_id, core_modified_time, core_language, core_publish_up, core_publish_down, core_content_item_id, asset_id, core_images, core_urls, core_hits, core_version, core_ordering, core_metakey, core_metadesc, core_catid, core_xreference, core_type_id | Canonical migrated owners/content plus completed ID/value maps | Regenerate UCM from canonical records/content types after ID maps are final; source UCM IDs are not authoritative. | Owner semantic tests + counts + invariants + orphan checks |
 | #__updates | update_id, update_site_id, extension_id, name, description, element, type, folder, client_id, version, data, detailsurl, infourl, extra_query | Canonical migrated owners/content plus completed ID/value maps | Joomla 6 installation/update discovery owns this value; regenerate after compatible extensions are installed. | Owner semantic tests + counts + invariants + orphan checks |
 | #__usergroups | lft, rgt | Canonical migrated owners/content plus completed ID/value maps | Recalculate nested-set/path value from mapped parent and deterministic sibling order. | Owner semantic tests + counts + invariants + orphan checks |
 
@@ -3435,9 +3438,9 @@ The implementation must maintain a versioned payload manifest per owning core/in
 | #__tuf_metadata | snapshot | text DEFAULT NULL | TARGET_DEFAULT | Target installation owns it | Keep Joomla 6.1.2 installed defaults; apply approved manual configuration afterward. | DDL constraint check + owning-component semantic test | RESOLVED |
 | #__tuf_metadata | timestamp | text DEFAULT NULL | TARGET_DEFAULT | Target installation owns it | Keep Joomla 6.1.2 installed defaults; apply approved manual configuration afterward. | DDL constraint check + owning-component semantic test | RESOLVED |
 | #__tuf_metadata | mirrors | text DEFAULT NULL | TARGET_DEFAULT | Target installation owns it | Keep Joomla 6.1.2 installed defaults; apply approved manual configuration afterward. | DDL constraint check + owning-component semantic test | RESOLVED |
-| #__ucm_content | item_id | VARCHAR(50) NOT NULL | TARGET_GENERATED | During UCM rebuild | Joomla 6 UCM rebuild derives it from canonical content. | DDL constraint check + owning-component semantic test | RESOLVED |
-| #__ucm_content | is_current | tinyint NOT NULL DEFAULT 0 | TARGET_GENERATED | During UCM rebuild | Joomla 6 UCM rebuild derives it from canonical content. | DDL constraint check + owning-component semantic test | RESOLVED |
-| #__ucm_content | is_legacy | tinyint NOT NULL DEFAULT 0 | TARGET_GENERATED | During UCM rebuild | Joomla 6 UCM rebuild derives it from canonical content. | DDL constraint check + owning-component semantic test | RESOLVED |
+| #__history | item_id | VARCHAR(50) NOT NULL | DERIVED | Yes | Build from resolved source content type/context plus mapped owning item ID. | Parse item identity + orphan check | RESOLVED |
+| #__history | is_current | tinyint NOT NULL DEFAULT 0 | DERIVED | Yes | Mark only the newest migrated version per target item as current. | Exactly one current row per item when history exists | RESOLVED |
+| #__history | is_legacy | tinyint NOT NULL DEFAULT 0 | REQUIRED_CONSTANT | Yes | Set to `1` for migrated Joomla 3 history rows. | All migrated legacy rows = 1 | RESOLVED |
 | #__update_sites | checked_out | int unsigned | TARGET_DEFAULT | Per J6 DDL | Use explicit J6 default `NO EXPLICIT DEFAULT` or owning API generation; fail if neither supplies a legal value. | DDL constraint check + owning-component semantic test | RESOLVED |
 | #__update_sites | checked_out_time | datetime NULL DEFAULT NULL | TARGET_DEFAULT | Per J6 DDL | Use explicit J6 default `NULL` or owning API generation; fail if neither supplies a legal value. | DDL constraint check + owning-component semantic test | RESOLVED |
 | #__updates | changelogurl | text | TARGET_DEFAULT | Per J6 DDL | Use explicit J6 default `NO EXPLICIT DEFAULT` or owning API generation; fail if neither supplies a legal value. | DDL constraint check + owning-component semantic test | RESOLVED |
@@ -3498,7 +3501,7 @@ The implementation must maintain a versioned payload manifest per owning core/in
 
 ## 19. Migration Execution Dependencies
 
-1. Pin source 3.10.12 and target 6.1.2; export live `information_schema` and diff it against the 77-table/711-field baseline.
+1. Pin source 3.10.12 and target 6.1.2; export live `information_schema` and diff it against the 78-table/711-field baseline.
 2. Classify every extra table/column as `THIRD_PARTY_EXTENSION`, `CUSTOM_TABLE`, or `UNKNOWN`; do not start until separately mapped.
 3. Install compatible J6 extensions, modules, plugins, templates, and languages; create natural-key value maps.
 4. Create migration audit, archive, ID-map, value-map, rejection, and batch-control tables.
@@ -3533,7 +3536,7 @@ The implementation must maintain a versioned payload manifest per owning core/in
 ## 21. Missing Field Audit
 
 ```text
-Official Joomla 3.10.12 source tables: 77
+Official Joomla 3.10.12 source tables: 78
 Official Joomla 3.10.12 source fields: 711
 Unique source fields in mapping: 711
 Missing: 0
@@ -3561,21 +3564,21 @@ Non-blocking execution conditions: live schema must equal or extend the pinned b
 
 | Decision | Count |
 |---|---|
-| DIRECT | 161 |
-| TRANSFORM | 130 |
-| ID_MAP | 104 |
-| VALUE_MAP | 79 |
+| DIRECT | 163 |
+| TRANSFORM | 134 |
+| ID_MAP | 106 |
+| VALUE_MAP | 81 |
 | SPLIT | 0 |
 | MERGE | 0 |
 | DERIVED | 1 |
-| REBUILD | 216 |
+| REBUILD | 206 |
 | ARCHIVE | 6 |
 | IGNORE | 14 |
 | UNSUPPORTED | 0 |
 | UNRESOLVED | 0 |
 
 ```text
-Table Coverage = 77 / 77 = 100.00%
+Table Coverage = 78 / 78 = 100.00%
 Field Inventory Coverage = 711 / 711 = 100.00%
 Resolved Field Coverage = (711 - 0) / 711 = 100.00%
 Relationship Coverage = 168 / 168 = 100.00%
@@ -3585,7 +3588,7 @@ Intentionally invalidated session/token fields = 14 / 711 = 1.97%
 Actual migrated rows/values/bytes = NOT MEASURED
 
 TOTAL J3 SOURCE FIELDS = 711
-DIRECT 161 + TRANSFORM 130 + ID_MAP 104 + VALUE_MAP 79 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 216 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711
+DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711
 UNRESOLVED = 0
 TOTAL J3 SOURCE FIELDS = UNIQUE SOURCE FIELDS PRESENT IN FIELD ACCOUNTING = 711
 MISSING = 0

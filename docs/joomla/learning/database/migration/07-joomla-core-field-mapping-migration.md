@@ -1,5 +1,31 @@
 # Joomla Core Field Mapping — Joomla 3.10.12 → Joomla 6.1.2
 
+## Mapping-report synchronization — 2026-08-12
+
+This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
+
+| Measure | Result |
+|---|---:|
+| Joomla 3 physical inventory | 78 tables / 711 fields |
+| Joomla 6 physical inventory | 76 tables / 832 fields |
+| Source-field accounting | 711 / 711 = 100.00% |
+| Resolved field decisions | 711 / 711 = 100.00% |
+| Resolved relationships | 168 / 168 = 100.00% |
+| Field-count migration/rebuild proxy | 691 / 711 = 97.19% |
+| Field-count preservation proxy | 697 / 711 = 98.03% |
+| Intentionally ignored fields | 14 / 711 = 1.97% |
+| Actual migrated rows/values/bytes | Not measured until execution |
+
+Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711`; `UNRESOLVED = 0`.
+
+The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
+
+The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+
+
 > **Source field accounting = 711/711 (100%)**  
 > **Target physical inventory = 76/76 tables and 832/832 fields (100%)**  
 > **Missing / ambiguous / silently dropped source fields = 0 required**  
@@ -7,7 +33,7 @@
 
 This document is the Joomla Core specialization of [`templates/database-migration-field-mapping-template.md`](templates/database-migration-field-mapping-template.md). The canonical V3/V6 field inventories remain the physical DDL/type source of truth; this document remains the field-level migration-decision source of truth.
 
-**Codes:** M=D direct, T transform, L lookup, S structured, G generated, B rebuild, R reference-only, A archive, I ignore. X=lookup domain/parser/special rule: DT date/null, ASSET, TREE, PW password, 2FA, HID/HSN history, ML/MS menu, FI/FV fields, AI/AK associations, UCM, TAG, WF workflow, FT featured, FM Finder count, PT privacy. Row order is V3 ordinal. Target field is same-name in the mapped physical target table unless an explicit override below says otherwise.
+**Codes:** M=D direct, T transform, L lookup, S structured, G generated, Y derived, B rebuild, R reference-only, A archive, I ignore. X=lookup domain/parser/special rule: DT date/null, ASSET, TREE, PW password, 2FA, HID/HSN history, ML/MS menu, FI/FV fields, AI/AK associations, UCM, TAG, WF workflow, FT featured, FM Finder count, PT privacy. Row order is V3 ordinal. Target field is same-name in the mapped physical target table unless an explicit override below says otherwise.
 
 Verification follows M+X: D schema-safe equality; T semantic conversion; L target exists/no orphan; S parse→remap→reparse; G deterministic; B integrity; R semantic identity; A archive count; I accounted reason. Same-name alone never permits D. IDs use `value_mapping`; sentinels and polymorphic context are resolved before lookup. Unknown/review/pending/optional/ambiguous/unmapped are forbidden.
 
@@ -169,8 +195,8 @@ mapping_cardinality = MANY_TO_ONE
 |params|R||
 |custom_data|R||
 |system_data|A||
-|checked_out|R||
-|checked_out_time|R||
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |ordering|R||
 |state|R||
 ### #__schemas
@@ -252,8 +278,8 @@ mapping_cardinality = MANY_TO_ONE
 |params|S|JOOMLA_REGISTRY/JSON|
 |lastResetTime|T|DT|
 |resetCount|D||
-|otpKey|A|2FA|
-|otep|A|2FA|
+|otpKey|T|2FA_RESET|
+|otep|T|2FA_RESET|
 |requireReset|D||
 |authProvider|L|AUTH_PROVIDER_PLUGIN|
 ### #__user_usergroup_map
@@ -303,8 +329,8 @@ mapping_cardinality = MANY_TO_ONE
 |note|D||
 |description|S|HTML_REFERENCE_SCAN|
 |published|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |access|L|VIEWLEVEL|
 |params|S|JOOMLA_REGISTRY/JSON|
 |metadesc|D||
@@ -331,8 +357,8 @@ mapping_cardinality = MANY_TO_ONE
 |note|D||
 |description|S|HTML_REFERENCE_SCAN|
 |published|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |access|L|VIEWLEVEL|
 |params|S|JOOMLA_REGISTRY/JSON|
 |metadesc|D||
@@ -371,8 +397,8 @@ mapping_cardinality = MANY_TO_ONE
 |note|D||
 |description|S|HTML_REFERENCE_SCAN|
 |state|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |ordering|D||
 |params|S|JOOMLA_REGISTRY/JSON|
 |language|L|LANGUAGE|
@@ -397,8 +423,8 @@ mapping_cardinality = MANY_TO_ONE
 |description|S|HTML_REFERENCE_SCAN|
 |state|D||
 |required|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |ordering|D||
 |params|S|JOOMLA_REGISTRY/JSON|
 |fieldparams|S|JOOMLA_REGISTRY/JSON|
@@ -430,8 +456,8 @@ mapping_cardinality = MANY_TO_ONE
 |created_by_alias|D||
 |modified|T|DT|
 |modified_by|L|USER|
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |publish_up|T|DT|
 |publish_down|T|DT|
 |images|S|MEDIA_URL_JSON|
@@ -527,16 +553,16 @@ mapping_cardinality = MANY_TO_ONE
 ### #__ucm_history
 |Source|M|X|
 |---|:-:|---|
-|version_id|D||
+|version_id|L|HISTORY_VERSION|
 |ucm_item_id|T|HID|
-|ucm_type_id|T|HID|
+|ucm_type_id|L|CONTENT_TYPE|
 |version_note|D||
 |save_date|T|DT|
 |editor_user_id|L|USER|
 |character_count|D||
-|sha1_hash|D||
+|sha1_hash|T|HISTORY_HASH|
 |version_data|S|HISTORY_SNAPSHOT|
-|keep_forever|D||
+|keep_forever|L|BOOLEAN_01|
 ## G5
 ### #__template_styles
 |Source|M|X|
@@ -573,8 +599,8 @@ mapping_cardinality = MANY_TO_ONE
 |parent_id|L|MENU|
 |level|G|TREE|
 |component_id|L|EXTENSION|
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |browserNav|D||
 |access|L|VIEWLEVEL|
 |img|S|MEDIA_PATH|
@@ -596,8 +622,8 @@ mapping_cardinality = MANY_TO_ONE
 |content|S|HTML_REFERENCE_SCAN|
 |ordering|D||
 |position|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |publish_up|T|DT|
 |publish_down|T|DT|
 |published|D||
@@ -632,8 +658,8 @@ mapping_cardinality = MANY_TO_ONE
 |email_to|D||
 |default_con|D||
 |published|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |ordering|D||
 |params|S|JOOMLA_REGISTRY/JSON|
 |user_id|L|USER|
@@ -670,8 +696,8 @@ mapping_cardinality = MANY_TO_ONE
 |published|D||
 |numarticles|D||
 |cache_time|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |ordering|D||
 |rtl|D||
 |access|L|VIEWLEVEL|
@@ -717,8 +743,8 @@ mapping_cardinality = MANY_TO_ONE
 |purchase_type|D||
 |track_clicks|D||
 |track_impressions|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |publish_up|T|DT|
 |publish_down|T|DT|
 |reset|T|DT|
@@ -738,8 +764,8 @@ mapping_cardinality = MANY_TO_ONE
 |email|D||
 |extrainfo|D||
 |state|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |metakey|D||
 |own_prefix|D||
 |metakey_prefix|D||
@@ -793,8 +819,8 @@ mapping_cardinality = MANY_TO_ONE
 |subject|D||
 |body|S|HTML_REFERENCE_SCAN|
 |state|D||
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |created_user_id|L|USER|
 |created_time|T|DT|
 |modified_user_id|L|USER|
@@ -877,8 +903,8 @@ mapping_cardinality = MANY_TO_ONE
 |created_by_alias|D||
 |modified|T|DT|
 |modified_by|L|USER|
-|checked_out|L|USER|
-|checked_out_time|T|DT|
+|checked_out|T|CHECKOUT_RESET|
+|checked_out_time|T|CHECKOUT_RESET|
 |map_count|G|FM|
 |data|S|FINDER_FILTER_DATA|
 |params|S|JOOMLA_REGISTRY/JSON|
@@ -1087,24 +1113,24 @@ mapping_cardinality = MANY_TO_ONE
 ### #__postinstall_messages
 |Source|M|X|
 |---|:-:|---|
-|postinstall_message_id|I||
-|extension_id|I||
-|title_key|I||
-|description_key|I||
-|action_key|I||
-|language_extension|I||
-|language_client_id|I||
-|type|I||
-|action_file|I||
-|action|I||
-|condition_file|I||
-|condition_method|I||
-|version_introduced|I||
-|enabled|I||
+|postinstall_message_id|B|POSTINSTALL|
+|extension_id|B|POSTINSTALL|
+|title_key|B|POSTINSTALL|
+|description_key|B|POSTINSTALL|
+|action_key|B|POSTINSTALL|
+|language_extension|B|POSTINSTALL|
+|language_client_id|B|POSTINSTALL|
+|type|B|POSTINSTALL|
+|action_file|B|POSTINSTALL|
+|action|B|POSTINSTALL|
+|condition_file|B|POSTINSTALL|
+|condition_method|B|POSTINSTALL|
+|version_introduced|B|POSTINSTALL|
+|enabled|B|POSTINSTALL|
 ### #__utf8_conversion
 |Source|M|X|
 |---|:-:|---|
-|converted|I||
+|converted|Y|UTF8_AUDIT|
 
 ---
 
@@ -1117,8 +1143,8 @@ The target physical inventory is authoritative. The active table-level migration
 | Source | Physical target counterpart | `field_status` | Final decision | Reason |
 |---|---|---|---|---|
 | `#__extensions.system_data` | — | `MISSING` | `ARCHIVE` | Source-only legacy extension state. |
-| `#__users.otpKey` | `#__users.otpKey` | `SKIP` | `ARCHIVE` | Joomla 6 still has the physical column, but legacy Joomla 3 2FA secret state is not activated/migrated into the Joomla 6 MFA model. |
-| `#__users.otep` | `#__users.otep` | `SKIP` | `ARCHIVE` | Joomla 6 still has the physical column, but legacy Joomla 3 emergency 2FA state is not activated/migrated into the Joomla 6 MFA model. |
+| `#__users.otpKey` | `#__users.otpKey` | `READY` | `TRANSFORM` | Clear the active legacy secret, require target-side MFA re-enrollment, and retain only non-secret audit evidence. |
+| `#__users.otep` | `#__users.otep` | `READY` | `TRANSFORM` | Clear legacy emergency codes, require target-side MFA re-enrollment, and retain only non-secret audit evidence. |
 | `#__content.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
 | `#__contact_details.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
 | `#__newsfeeds.xreference` | — | `MISSING` | `ARCHIVE` | Source-only field. |
@@ -1128,7 +1154,7 @@ The target physical inventory is authoritative. The active table-level migration
 | `#__user_keys.invalid` | — | `MISSING` | `IGNORE` | J6 `#__user_keys` no longer has the legacy `invalid` field and remember-me tokens are not migrated. |
 | `#__core_log_searches.search_term` | — | `MISSING` | `ARCHIVE` | Legacy table is absent from J6 active schema; historical evidence is archived. |
 | `#__core_log_searches.hits` | — | `MISSING` | `ARCHIVE` | Legacy table is absent from J6 active schema; historical evidence is archived. |
-| `#__utf8_conversion.converted` | — | `MISSING` | `IGNORE` | Joomla 3 conversion-state table is absent from J6. |
+| `#__utf8_conversion.converted` | migration verification evidence | `READY` | `DERIVED` | Derive completion from successful Joomla 6 charset/collation verification; do not copy the marker. |
 
 The previous shorthand `users.otpKey/otep → -` is invalid and must not be used by generators. Both fields physically exist in the declared Joomla 6.1.2 inventory.
 
@@ -1146,8 +1172,8 @@ Examples:
 
 #__postinstall_messages.*
     physical target exists
-    mapping_type = IGNORE
-    field_status = SKIP
+    mapping_type = REBUILD
+    field_status = READY after Joomla 6 manifest rebuild
 
 #__user_keys.id/user_id/token/series/time/uastring
     physical target exists
@@ -1202,7 +1228,7 @@ Known source-field target exceptions are the explicit override table above. `#__
 
 Covers IDs via `value_mapping`; sentinel and polymorphic references; JSON/Registry/ACL/HTML/URL/query/media/path/field values; zero-date/null/default; trees; PK/composite/unique/collision/truncation/range/signedness/collation; session/user_keys/password/legacy 2FA; UCM/Finder rebuild; menus; custom fields; associations/tags; privacy; workflow generation. Raw string ID replacement and secret logging are forbidden.
 
-Source-only explicit outcomes include at minimum: `extensions.system_data`, content/contact/newsfeeds `xreference` = `ARCHIVE`; `ucm_content.core_xreference`, `finder_taxonomy.ordering`, `finder_tokens_aggregate.map_suffix` = `REBUILD`; `user_keys.invalid`, `utf8_conversion.converted` = `IGNORE`; `core_log_searches.*` = `ARCHIVE`.
+Source-only explicit outcomes include at minimum: `extensions.system_data`, content/contact/newsfeeds `xreference` = `ARCHIVE`; `ucm_content.core_xreference`, `finder_taxonomy.ordering`, `finder_tokens_aggregate.map_suffix` = `REBUILD`; `user_keys.invalid` = `IGNORE`; `utf8_conversion.converted` = `DERIVED`; `core_log_searches.*` = `ARCHIVE`.
 
 Seed `migration_mapping.field_mapping` deterministically from this contract and the two physical field inventories. Do **not** reduce mapping identity to only `(source_version, source_table, source_field)` if grouped/one-to-many mappings are present. Count source coverage by distinct source-field key.
 
@@ -1360,8 +1386,8 @@ Known hard assertions:
 
 ```text
 #__extensions.system_data       = ARCHIVE
-#__users.otpKey                 = ARCHIVE
-#__users.otep                   = ARCHIVE
+#__users.otpKey                 = TRANSFORM
+#__users.otep                   = TRANSFORM
 #__content.xreference           = ARCHIVE
 #__contact_details.xreference   = ARCHIVE
 #__newsfeeds.xreference         = ARCHIVE
@@ -1460,7 +1486,7 @@ Examples:
 | `#__content.catid` | `int unsigned` | INDEX | `#__content.catid` | `int unsigned` | INDEX | `READY` | `LOGICAL_FK` | L | `CATEGORY` |
 | `#__content.images` | `text` | NONE | `#__content.images` | `text` | NONE | `READY` | `EMBEDDED_REFERENCE` | S | `MEDIA_URL_JSON` |
 | `#__content.xreference` | `varchar(50)` | INDEX | — | — | — | `MISSING` | `NONE` | A | source-only archive |
-| `#__users.otpKey` | `varchar(1000)` | NONE | `#__users.otpKey` | `varchar(1000)` | NONE | `SKIP` | `NONE` | A | legacy 2FA archived; active copy forbidden |
+| `#__users.otpKey` | `varchar(1000)` | NONE | `#__users.otpKey` | `varchar(1000)` | NONE | `READY` | `NONE` | T | clear active secret; require MFA re-enrollment |
 | `#__fields_values.item_id` | `varchar(255)` | INDEX | `#__fields_values.item_id` | `varchar(255)` | INDEX | `READY` | `POLYMORPHIC` | L | `ENTITY_BY_FIELD_CONTEXT` |
 | `#__menu.link` | `varchar(1024)` | NONE | `#__menu.link` | `varchar(1024)` | NONE | `READY` | `EMBEDDED_REFERENCE` | S | query-string IDs |
 | `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `#__modules_menu.menuid` | `int` | COMPOSITE_PK | `READY` | `LOGICAL_FK` | L | `0=all`, negative=exclude, positive=`MENU` |

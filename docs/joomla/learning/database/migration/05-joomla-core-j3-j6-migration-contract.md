@@ -1,5 +1,31 @@
 # Joomla Core J3 → J6 Migration Contract
 
+## Mapping-report synchronization — 2026-08-12
+
+This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
+
+| Measure | Result |
+|---|---:|
+| Joomla 3 physical inventory | 78 tables / 711 fields |
+| Joomla 6 physical inventory | 76 tables / 832 fields |
+| Source-field accounting | 711 / 711 = 100.00% |
+| Resolved field decisions | 711 / 711 = 100.00% |
+| Resolved relationships | 168 / 168 = 100.00% |
+| Field-count migration/rebuild proxy | 691 / 711 = 97.19% |
+| Field-count preservation proxy | 697 / 711 = 98.03% |
+| Intentionally ignored fields | 14 / 711 = 1.97% |
+| Actual migrated rows/values/bytes | Not measured until execution |
+
+Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81 + SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206 + ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711`; `UNRESOLVED = 0`.
+
+The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
+
+The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+
+
 ## Purpose and Guarantee
 
 > **Inventory = 100%**  
@@ -53,6 +79,7 @@ A source object must resolve to exactly one final outcome.
 | `STRUCTURED` | Parse structured content, remap embedded references, validate, and serialize. |
 | `DEFAULT` | Use the Joomla 6 DDL/application default. |
 | `GENERATED` | Generate target data from target state or migrated entities. |
+| `DERIVED` | Calculate migration evidence or a target value deterministically from source/target state. |
 | `REBUILD` | Do not copy generated source data; rebuild it in Joomla 6. |
 | `REFERENCE_ONLY` | Use source data only to identify/map target-owned records. |
 | `ARCHIVE` | Preserve source data in migration archive; do not make it active Joomla 6 core data. |
@@ -230,8 +257,8 @@ Every one of the **711 Joomla 3 source fields** is assigned through the followin
 | 74 | `#__action_logs` | migration archive | `ARCHIVE` | preserve historical audit evidence without inserting legacy log semantics into active J6 log |
 | 75 | `#__core_log_searches` | migration archive | `ARCHIVE` | obsolete historical search-log semantics; do not reinterpret as J6 finder logging |
 | 76 | `#__overrider` | `#__overrider` | `TRANSFORM` | preserve intentional language overrides after validating target language/file identity |
-| 77 | `#__postinstall_messages` | — | `IGNORE` | installation/version-specific messages are target-owned |
-| 78 | `#__utf8_conversion` | — | `IGNORE` | obsolete Joomla 3 conversion-state marker |
+| 77 | `#__postinstall_messages` | `#__postinstall_messages` | `REBUILD` | regenerate from Joomla 6 core/extension manifests; never copy version-specific source rows blindly |
+| 78 | `#__utf8_conversion` | migration verification evidence | `DERIVED` | derive conversion completion from successful target charset/collation checks |
 
 ### Source table gate
 
