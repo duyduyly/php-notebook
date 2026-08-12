@@ -1,26 +1,16 @@
 # End-to-End Database Migration Workflow Tutorial
 
-> Controlled top-down database migration using preserved inventory detail, mapping definitions, one row per workflow step, centralized workflow history, one-time migration-script execution, and validation evidence.
+> Controlled top-down database migration with an isolated test-database preflight, explicit producer/consumer contracts, checklist-driven Codex planning, prompt-only rollback, execution-until-PASS testing, centralized workflow history, and final MySQL files for manual execution.
 
 ---
 
 ## 1. Final Architecture
 
-This document keeps the existing workflow and data model unchanged.
+This revision changes the workflow only by adding the explicitly requested Step 0:
 
 ```text
-workflow_enum                       hard-coded step definition/order
-        ↓
-workflow                            one named migration flow, e.g. JOOMLA_CORE
-        ↓
-workflow_step                       one row for every step in that workflow
-        ↓
-workflow_execution_history          one final evidence row for every workflow_step
-```
-
-Canonical workflow:
-
-```text
+TEST_DATABASE_SETUP
+    ↓ PASS
 INVENTORY_MAPPING
     ↓ PASS
 INVENTORY_VERIFY
@@ -36,9 +26,21 @@ FINAL_VERIFY
 WORKFLOW PASS
 ```
 
-No rollback step is added to the workflow.
+`TEST_DATABASE_SETUP` exists to provide an isolated MySQL environment in which Codex can execute the generated SQL before returning the final files for manual use.
 
-Rollback is only a requirement inside the Codex-generated SQL for the current step.
+The runtime model remains:
+
+```text
+workflow_enum                       hard-coded step definition/order
+        ↓
+workflow                            one named migration flow, e.g. JOOMLA_CORE
+        ↓
+workflow_step                       one row for every step in that workflow
+        ↓
+workflow_execution_history          one final evidence row for every workflow_step
+```
+
+Rollback remains SQL/prompt behavior only. No rollback workflow step, attempt model, rollback table, or new rollback status is introduced.
 
 ---
 
@@ -83,15 +85,18 @@ migration_mapping
 └── value_mapping
 ```
 
-Inventory/mapping definitions remain unchanged. Workflow-level final evidence remains centralized in `workflow_execution_history`.
+The existing inventory, mapping, execution, validation, and workflow data models remain unchanged.
 
 ---
 
 ## 3. Hard-Coded Workflow Enum
 
-`workflow_enum` is hard-coded in application/source code and is not a database table.
+`workflow_enum` is hard-coded in source code and is not a database table.
+
+Canonical order:
 
 ```text
+ 0 TEST_DATABASE_SETUP
 10 INVENTORY_MAPPING
 20 INVENTORY_VERIFY
 30 MAPPING_VERIFY
@@ -105,6 +110,7 @@ Recommended PHP enum:
 ```php
 enum MigrationWorkflowStep: string
 {
+    case TEST_DATABASE_SETUP = 'TEST_DATABASE_SETUP';
     case INVENTORY_MAPPING = 'INVENTORY_MAPPING';
     case INVENTORY_VERIFY = 'INVENTORY_VERIFY';
     case MAPPING_VERIFY = 'MAPPING_VERIFY';
@@ -115,6 +121,7 @@ enum MigrationWorkflowStep: string
     public function order(): int
     {
         return match ($this) {
+            self::TEST_DATABASE_SETUP => 0,
             self::INVENTORY_MAPPING => 10,
             self::INVENTORY_VERIFY => 20,
             self::MAPPING_VERIFY => 30,
@@ -127,7 +134,8 @@ enum MigrationWorkflowStep: string
     public function previous(): ?self
     {
         return match ($this) {
-            self::INVENTORY_MAPPING => null,
+            self::TEST_DATABASE_SETUP => null,
+            self::INVENTORY_MAPPING => self::TEST_DATABASE_SETUP,
             self::INVENTORY_VERIFY => self::INVENTORY_MAPPING,
             self::MAPPING_VERIFY => self::INVENTORY_VERIFY,
             self::MIGRATION => self::MAPPING_VERIFY,
@@ -139,6 +147,7 @@ enum MigrationWorkflowStep: string
     public function next(): ?self
     {
         return match ($this) {
+            self::TEST_DATABASE_SETUP => self::INVENTORY_MAPPING,
             self::INVENTORY_MAPPING => self::INVENTORY_VERIFY,
             self::INVENTORY_VERIFY => self::MAPPING_VERIFY,
             self::MAPPING_VERIFY => self::MIGRATION,
@@ -156,20 +165,20 @@ enum MigrationWorkflowStep: string
 
 One `workflow` row represents one complete named migration flow.
 
-Recommended columns:
+Recommended columns remain:
 
-| Column | Type | Purpose |
-|---|---|---|
-| `id` | bigint UN AI PK | Workflow ID. |
-| `workflow_name` | varchar(128) | Scope such as `JOOMLA_CORE`. |
-| `workflow_version` | varchar(64) | Workflow version. |
-| `source_snapshot_id` | bigint UN NULL | Filled by `INVENTORY_MAPPING`. |
-| `target_snapshot_id` | bigint UN NULL | Filled by `INVENTORY_MAPPING`. |
-| `mapping_release_id` | bigint UN NULL | Filled by `INVENTORY_MAPPING`. |
-| `status` | varchar(16) | `PENDING/RUNNING/PASS/FAIL/LOCKED`. |
-| `created_at` | datetime(6) | Created time. |
-| `started_at` | datetime(6) NULL | Start time. |
-| `completed_at` | datetime(6) NULL | Completion time. |
+```text
+id
+workflow_name
+workflow_version
+source_snapshot_id
+target_snapshot_id
+mapping_release_id
+status
+created_at
+started_at
+completed_at
+```
 
 Recommended identity:
 
@@ -181,7 +190,7 @@ Example:
 
 ```text
 workflow_name    = JOOMLA_CORE
-workflow_version = V1
+workflow_version = j3-to-j6-20260812-02
 ```
 
 ---
@@ -192,6 +201,7 @@ Each enum step is a separate row.
 
 | step_order | step_code | Initial status |
 |---:|---|---|
+| 0 | `TEST_DATABASE_SETUP` | `PENDING` |
 | 10 | `INVENTORY_MAPPING` | `PENDING` |
 | 20 | `INVENTORY_VERIFY` | `PENDING` |
 | 30 | `MAPPING_VERIFY` | `PENDING` |
@@ -199,30 +209,17 @@ Each enum step is a separate row.
 | 50 | `VALIDATION_DATA` | `PENDING` |
 | 60 | `FINAL_VERIFY` | `PENDING` |
 
-Recommended columns:
-
-```text
-id
-workflow_id
-step_code
-step_order
-status
-started_at
-completed_at
-updated_at
-```
-
-Recommended keys:
+Recommended keys remain:
 
 ```text
 UNIQUE (workflow_id, step_code)
 UNIQUE (workflow_id, step_order)
 ```
 
-Current step:
+Current step is:
 
 ```text
-1. RUNNING step if one exists;
+1. the RUNNING step if one exists;
 2. otherwise the lowest step_order whose status is not PASS.
 ```
 
@@ -230,7 +227,7 @@ Current step:
 
 ## 6. Workflow Execution History
 
-`workflow_execution_history` stores the final reusable summary/evidence for one workflow step.
+`workflow_execution_history` remains the final reusable summary/evidence for one workflow step.
 
 ```text
 workflow
@@ -250,63 +247,9 @@ Recommended uniqueness remains:
 UNIQUE (workflow_step_id)
 ```
 
-No `attempt_no`, rollback status, retry status, or additional history lifecycle is added.
+No `attempt_no`, rollback status, retry status, or alternative history lifecycle is introduced.
 
-Recommended evidence fields remain:
-
-```text
-workflow_step_id
-mapping_release_id
-source_snapshot_id
-target_snapshot_id
-mapping_version
-contract_fingerprint
-
-source_table_count
-source_field_count
-target_table_count
-target_field_count
-active_table_mapping_count
-active_field_mapping_count
-
-ready_field_count
-skip_field_count
-missing_field_count
-processed_field_count
-successful_field_count
-failed_field_count
-
-source_record_baseline_total
-processed_record_count
-successful_record_count
-skipped_record_count
-rebuilt_record_count
-archived_record_count
-failed_record_count
-unaccounted_record_count
-
-verification_checked_count
-verification_passed_count
-verification_failed_count
-
-script_count
-successful_script_count
-failed_script_count
-
-missing_record_count
-unexpected_record_count
-duplicate_record_count
-broken_reference_count
-migration_error_count
-validation_failure_count
-
-contract_verification
-data_migration_verification
-status
-verified_at
-```
-
-Canonical final result:
+Canonical final result remains:
 
 ```text
 status = PASS / FAIL
@@ -316,162 +259,312 @@ The next workflow step is allowed only from a previous `PASS` history row.
 
 ---
 
-## 7. Inventory Detail Tables
+## 7. Step 0 — Test Database Contract
 
-Keep unchanged:
+`TEST_DATABASE_SETUP` creates or prepares an isolated MySQL test environment before any generated migration SQL is accepted as final.
+
+### Purpose
 
 ```text
-database_list
-inventory_snapshot
-table_list
-field_inventory
-table_dependency
-record_inventory
+Production / real migration databases
+            │
+            │ must not be used for Codex trial-and-error
+            ▼
+Isolated test database/environment
+            │
+            ├── run generated SQL
+            ├── verify assertions
+            ├── rollback/reset when needed
+            ├── fix script
+            └── rerun until PASS
 ```
 
-```text
-inventory detail
-= exact discovered evidence
+### Required behavior
 
-workflow_execution_history
-= final step summary / reusable checkpoint
+Codex must:
+
+1. Detect the databases/schemas referenced by the migration workflow.
+2. Create or select an isolated test database environment using names clearly marked as test-only.
+3. Never overwrite or mutate the real source/target databases during the generation/test loop.
+4. Reproduce enough schema/data baseline for the current step to be meaningfully executed.
+5. Keep the real source database read-only during testing whenever possible.
+6. If the workflow spans multiple MySQL schemas (`source`, `target`, `migration_inventory`, `migration_mapping`), create corresponding isolated test copies rather than pretending one schema is sufficient.
+7. Record the exact test database names in `00-test-database-setup-plan.md`.
+8. Do not mark Step 0 PASS until connectivity, schema availability, required permissions, and reset/rebuild capability have all been proven.
+
+Step 0 does not change the existing migration table model. It prepares the environment in which the generated SQL is proven before manual execution.
+
+---
+
+## 8. Cross-Step Producer / Consumer Contract
+
+This rule is mandatory for every plan and every SQL-generation step.
+
+Before Codex generates final executable SQL, it must identify every value consumed by the current step and every value that the next step will consume.
+
+For every required value, record:
+
+```text
+consumer step
+required value/state
+producer step
+storage table.column
+expected value/state
+exact producer SQL block
+verification query
+```
+
+Required decision rule:
+
+```text
+required value has a valid producer + verification
+    → continue
+
+required value has no producer
+or producer SQL does not populate it
+or expected state does not match
+    → SCRIPT_CONTRACT_GAP
+    → do not finalize SQL
+    → fix the producer/current plan and SQL first
+```
+
+Example:
+
+| Consumer | Required value | Producer | Storage | Producer SQL exists? |
+|---|---|---|---|---|
+| `INVENTORY_VERIFY` | source `coverage_status = PASS` | `INVENTORY_MAPPING` | `table_list.coverage_status` | must be PASS |
+| `INVENTORY_VERIFY` | target `coverage_status = PASS` | `INVENTORY_MAPPING` | `table_list.coverage_status` | must be PASS |
+| `MAPPING_VERIFY` | mapping release identity | `INVENTORY_MAPPING` | `workflow.mapping_release_id` | must be PASS |
+| `MIGRATION` | contract verification PASS | `MAPPING_VERIFY` | `workflow_execution_history.status` | must be PASS |
+| `VALIDATION_DATA` | migration accounting | `MIGRATION` | `migration_step_result` + history | must be PASS |
+| `FINAL_VERIFY` | validation PASS | `VALIDATION_DATA` | `workflow_execution_history.status` | must be PASS |
+
+A step cannot PASS only because its own SQL executed successfully. It can PASS only when:
+
+```text
+its own success criteria are satisfied
+AND
+all outputs required by the next step are actually persisted and verified
 ```
 
 ---
 
-## 8. Mapping Tables
+## 9. Mandatory Plan Checklist Format
 
-Keep unchanged:
+Every `*-plan.md` must contain explicit Markdown checklists. A prose-only plan is not acceptable.
 
-```text
-mapping_release
-      ↓
-table_mapping
-      ↓
-field_mapping
-      ↓
-value_mapping
+Each plan must contain these sections exactly or equivalently:
+
+### A. Input and evidence checklist
+
+```markdown
+- [ ] Workflow identity resolved.
+- [ ] Current workflow step resolved.
+- [ ] Previous-step PASS evidence resolved where applicable.
+- [ ] Source database/schema confirmed.
+- [ ] Target database/schema confirmed.
+- [ ] Required migration documents/mapping evidence loaded.
+- [ ] No required input is assumed without evidence.
 ```
 
-`field_mapping.field_status` remains:
+### B. Scope coverage checklist
 
-```text
-READY
-SKIP
-MISSING
+```markdown
+- [ ] 100% in-scope tables enumerated.
+- [ ] 100% in-scope physical fields enumerated where applicable.
+- [ ] 100% required record/accounting scope identified.
+- [ ] Required dependencies/ordering identified.
+- [ ] Explicit SKIP/IGNORE/ARCHIVE/REBUILD cases accounted where applicable.
+- [ ] No unknown or silently omitted object remains.
 ```
 
-`INVENTORY_MAPPING` creates inventory + mapping definitions.
+### C. Producer / consumer checklist
 
-`INVENTORY_VERIFY` and `MAPPING_VERIFY` verify them separately.
+```markdown
+- [ ] Every value consumed by the current step has a producer.
+- [ ] Every producer identifies exact table.column storage.
+- [ ] Every producer identifies the SQL block that writes the value.
+- [ ] Every consumed value has a verification query.
+- [ ] Every output required by the next step is listed.
+- [ ] Current SQL persists every required next-step output.
+- [ ] SCRIPT_CONTRACT_GAP count = 0.
+```
+
+### D. SQL safety and rollback checklist
+
+```markdown
+- [ ] Write blocks identified.
+- [ ] Transaction-safe blocks use START TRANSACTION/COMMIT/ROLLBACK where safe.
+- [ ] Non-transaction-safe operations have compensating rollback/cleanup using existing structures only.
+- [ ] Failed run cannot leave a final PASS history row.
+- [ ] Failed run leaves the current step retryable.
+- [ ] Real production/source data is not modified during Codex testing.
+```
+
+### E. Test execution checklist
+
+```markdown
+- [ ] Step 0 test environment is available.
+- [ ] Generated SQL executed against the isolated test environment.
+- [ ] SQL syntax/runtime errors = 0.
+- [ ] Workflow gate errors = 0.
+- [ ] Producer/consumer contract failures = 0.
+- [ ] Required accounting assertions PASS.
+- [ ] Rollback/reset tested when a failure path is relevant.
+- [ ] Script rerun after correction succeeds from a clean/reset test baseline.
+```
+
+### F. PASS gate checklist
+
+```markdown
+- [ ] All Success criteria are proven.
+- [ ] All required failure counters = 0.
+- [ ] Required next-step outputs exist and are verified.
+- [ ] Final history/status updates happen only on PASS.
+- [ ] No later workflow step is executed automatically.
+```
+
+### G. Manual-run readiness checklist
+
+```markdown
+- [ ] Final SQL is the exact version that passed the isolated test execution.
+- [ ] Test-only database/schema names are replaced by safe runtime variables/placeholders where required.
+- [ ] Manual execution order is documented by numbered SQL comments.
+- [ ] Required pre-run database names/variables are clearly listed at the top of the SQL file.
+- [ ] Rollback instructions are present.
+- [ ] Expected PASS result/check query is present at the end of the SQL file.
+- [ ] No unresolved TODO/FIXME/placeholder remains except explicit user-supplied DB identifiers.
+```
+
+Checklist rules:
+
+```text
+- Codex may mark [x] only when it has concrete evidence.
+- Every failed item remains [ ] and is listed in Blocking Items.
+- Final SQL must not be returned as ready-for-manual-use while any blocking checklist item remains unchecked.
+```
 
 ---
 
-## 9. Execution and Validation Detail
+## 10. Generate → Execute → Fix → Regenerate Rule
 
-### Migration execution
-
-```text
-migration_script
-      ↓
-execute_log
-      ↓
-migration_step_result
-      ↓
-migration_error
-```
-
-One-time script guard remains unchanged:
+For every workflow step, Codex must use this loop before returning the final SQL:
 
 ```text
-UNIQUE (workflow_step_id, script_id)
+Build/update plan + checklist
+        ↓
+Generate candidate SQL
+        ↓
+Execute candidate SQL on Step 0 test environment
+        ↓
+All required checks PASS?
+   ┌────┴────┐
+   NO       YES
+   │          │
+   ↓          ↓
+Analyze       Finalize exact tested SQL
+root cause        ↓
+   ↓          Return plan + SQL for manual execution
+Fix plan/SQL
+   ↓
+Reset/rollback test DB to required baseline
+   ↓
+Execute again
 ```
 
-A successful committed MIGRATION execution therefore cannot be run again for the same workflow step.
+Codex must not stop at “SQL generated”.
 
-### Data validation
+Codex stops only when either:
 
 ```text
-validation_result
-      ↓
-validation_failure
+A. all required checks PASS in the test environment
+   → return the exact tested SQL for manual execution
+
+OR
+
+B. a real external blocker prevents testing
+   → do not claim success
+   → list the blocker and the unchecked checklist items
 ```
 
-The workflow-level summary is written to the `VALIDATION_DATA` history row.
-
----
-
-## 10. Top-Down Step Gate
-
-For requested step `X`:
+A successful generation cycle requires:
 
 ```text
-1. Load the workflow.
-2. Load workflow_step rows ordered by step_order.
-3. Determine the first non-PASS step.
-4. Requested step must equal that step.
-5. Resolve the previous enum step.
-6. Previous workflow_execution_history.status must be PASS, except for the first step.
-7. Current workflow_step must not already have workflow_execution_history.
-8. Execute only the current step.
-9. Write detail evidence.
-10. Insert the final workflow_execution_history row only when the step has reached its final result.
-11. Mark the current workflow_step PASS only when history.status = PASS.
-12. Never execute the next step automatically.
+SQL parses and executes
+workflow gates PASS
+producer/consumer contract PASS
+step-specific accounting PASS
+rollback/reset safety PASS where applicable
+next-step required outputs PASS
+manual-run readiness checklist PASS
 ```
-
-Rollback does not change these workflow rules.
 
 ---
 
 ## 11. Prompt-Only Rollback Rule
 
-Rollback is intentionally implemented only inside generated SQL/prompt behavior. It is **not** a workflow step and does **not** add any database columns, tables, enums, or statuses.
+Rollback remains prompt/SQL behavior only.
 
-For SQL that modifies data, Codex must prefer this pattern when technically safe:
+For transactional writes, prefer:
 
 ```sql
 START TRANSACTION;
 
 -- prechecks
 -- current-step writes
--- current-step detail evidence
--- verification/assertion queries
+-- detail evidence
+-- assertions
 
--- COMMIT only when every current-step success condition is satisfied.
 COMMIT;
 ```
 
-On a detected failure before commit:
+On failure before successful finalization:
 
 ```sql
 ROLLBACK;
 ```
 
-After rollback:
+If an operation cannot be safely transaction-rolled back, Codex must document compensating rollback/cleanup SQL using the existing data model only.
+
+Do not add:
 
 ```text
-- workflow data returns to its pre-run state for transactional writes;
-- no final workflow_execution_history row should remain from the failed transaction;
-- no committed execute_log/result row from the failed transaction should block the retry;
-- the same workflow step can be corrected and the SQL can be run again;
-- the next workflow step remains blocked.
+rollback workflow step
+attempt table
+rollback table
+backup table as a new workflow feature
+attempt_no
+rollback_status
+new workflow statuses
 ```
 
-Important constraint for Codex:
-
-```text
-If a required statement cannot be safely rolled back by the transaction,
-Codex must document a compensating rollback block in the generated SQL
-using the existing tables/data model only.
-Do not add rollback tables, attempt tables, backup tables, or new workflow statuses.
-```
-
-This design intentionally does not preserve failed-attempt audit history. Persisting failed attempts while also allowing retries would require a different history/unique-key model, which is outside this workflow.
+After rollback/reset, the same current step must be testable again from a known baseline.
 
 ---
 
-## 12. JOOMLA_CORE Seed Example
+## 12. Top-Down Step Gate
+
+For requested step `X`:
+
+```text
+1. Load workflow.
+2. Load workflow_step rows ordered by step_order.
+3. Determine first non-PASS step.
+4. Requested step must equal that step.
+5. Resolve previous enum step.
+6. Previous workflow_execution_history.status must be PASS, except Step 0.
+7. Current workflow_step must not already have final workflow_execution_history.
+8. Validate producer/consumer contract.
+9. Execute only the current step on the isolated test environment during generation/testing.
+10. Write required detail evidence.
+11. Insert final workflow_execution_history only after all current-step checks PASS.
+12. Mark current workflow_step PASS only when history.status = PASS.
+13. Never execute the next workflow step automatically as part of the current step SQL.
+```
+
+---
+
+## 13. JOOMLA_CORE Seed Example
 
 ```sql
 INSERT INTO migration_inventory.workflow (
@@ -480,7 +573,7 @@ INSERT INTO migration_inventory.workflow (
     status
 ) VALUES (
     'JOOMLA_CORE',
-    'V1',
+    'j3-to-j6-20260812-02',
     'PENDING'
 );
 
@@ -492,15 +585,16 @@ INSERT INTO migration_inventory.workflow_step (
     step_order,
     status
 ) VALUES
-    (@workflow_id, 'INVENTORY_MAPPING', 10, 'PENDING'),
-    (@workflow_id, 'INVENTORY_VERIFY',  20, 'PENDING'),
-    (@workflow_id, 'MAPPING_VERIFY',    30, 'PENDING'),
-    (@workflow_id, 'MIGRATION',         40, 'PENDING'),
-    (@workflow_id, 'VALIDATION_DATA',   50, 'PENDING'),
-    (@workflow_id, 'FINAL_VERIFY',      60, 'PENDING');
+    (@workflow_id, 'TEST_DATABASE_SETUP', 0,  'PENDING'),
+    (@workflow_id, 'INVENTORY_MAPPING',   10, 'PENDING'),
+    (@workflow_id, 'INVENTORY_VERIFY',    20, 'PENDING'),
+    (@workflow_id, 'MAPPING_VERIFY',      30, 'PENDING'),
+    (@workflow_id, 'MIGRATION',           40, 'PENDING'),
+    (@workflow_id, 'VALIDATION_DATA',     50, 'PENDING'),
+    (@workflow_id, 'FINAL_VERIFY',        60, 'PENDING');
 ```
 
-Current allowed step:
+Check current allowed step:
 
 ```sql
 SELECT id, workflow_id, step_code, step_order, status
@@ -511,227 +605,286 @@ ORDER BY step_order
 LIMIT 1;
 ```
 
+Initially:
+
+```text
+CURRENT STEP = TEST_DATABASE_SETUP
+```
+
 ---
 
-## 13. Codex Output Convention
+## 14. Codex Output Convention
 
-Every workflow-step prompt must generate exactly two files:
+Every workflow-step prompt generates exactly two files:
 
 ```text
 1. <order>-<step-code>-plan.md
 2. <order>-<step-code>.sql
 ```
 
-The plan file must contain:
+Examples:
 
 ```text
-- complete scope;
-- evidence/source list;
-- ordered implementation plan;
-- 100% scope checklist;
-- prechecks;
-- PASS/FAIL rules;
-- rollback strategy for every write block;
-- retry instructions after successful rollback;
-- completion checklist.
+00-test-database-setup-plan.md
+00-test-database-setup.sql
+
+10-inventory-mapping-plan.md
+10-inventory-mapping.sql
+
+20-inventory-verify-plan.md
+20-inventory-verify.sql
 ```
 
-The SQL file must contain numbered comments and this logical structure where applicable:
+The final `.sql` file must be the **exact candidate that passed the isolated test execution**, except for explicitly documented runtime database-name variables/placeholders required for manual execution.
+
+The SQL file must use numbered comments, for example:
 
 ```text
-00. workflow/current-step precheck
-01. previous-step PASS gate
-02. current-step duplicate/history guard
-03. START TRANSACTION
-04. current-step SQL writes/checks
-05. detail evidence writes
-06. current-step verification
-07. COMMIT + final history/status update when PASS
-08. ROLLBACK path when FAIL
-09. compensating rollback SQL only when transaction rollback is insufficient
-10. post-rollback checks/instructions showing that the same step may be retried
+00. required variables / database names
+01. workflow/current-step precheck
+02. previous-step PASS gate
+03. producer/consumer assertions
+04. START TRANSACTION where applicable
+05. current-step writes/checks
+06. detail evidence
+07. current-step verification
+08. next-step output verification
+09. final history/status update
+10. COMMIT on PASS
+11. ROLLBACK/cleanup instructions on failure
+12. final manual PASS verification query
 ```
-
-No SQL file may execute the next workflow step.
 
 ---
 
-## 14. Codex Prompts Per Workflow Step
+## 15. Codex Prompts Per Workflow Step
+
+### Prompt — `TEST_DATABASE_SETUP`
+
+```text
+# Goal
+Create and prove an isolated MySQL test database/environment for the selected migration workflow so every later generated SQL file can be executed, corrected, reset, and rerun safely before it is returned for manual execution.
+
+# Success criteria
+- Resolve all schemas/databases referenced by the workflow.
+- Create/select clearly named test-only equivalents without modifying real source/target data.
+- Confirm MySQL connectivity, required permissions, charset/collation expectations, and required engines.
+- Reproduce the minimum source/target/control baseline needed to execute later workflow SQL meaningfully.
+- Prove the environment can be reset/recreated after a failed test run.
+- Create the TEST_DATABASE_SETUP final history row only when all environment checks PASS.
+- Produce explicit test database names and reset instructions for later steps.
+
+# Constraints
+- Never use production/real target databases for Codex trial-and-error execution.
+- Prefer source data read-only; clone/copy only what is needed for isolated testing.
+- If the workflow references multiple schemas, create isolated test equivalents for all required schemas rather than collapsing incompatible schemas into one.
+- Do not change the existing workflow-control schema beyond the requested Step 0 row.
+- Do not run INVENTORY_MAPPING or any later workflow step.
+- Do not claim PASS unless the reset/rebuild path has been demonstrated.
+
+# Output
+Create exactly two files:
+1. `00-test-database-setup-plan.md` — include the mandatory Input/Evidence, Scope, Producer/Consumer, Safety/Rollback, Test Execution, PASS Gate, and Manual-Run Readiness checklists; list exact test database names, baseline strategy, permissions, reset procedure, and blocking items.
+2. `00-test-database-setup.sql` — copy/paste runnable MySQL with numbered comments to create/select the isolated test environment, verify permissions/schema availability, prepare the required baseline, verify reset readiness, and write final Step 0 history/PASS only when all checks succeed.
+Execute this SQL against the test MySQL environment. If it fails, fix the plan/SQL and rerun until all required checks PASS before returning the final files.
+```
 
 ### Prompt — `INVENTORY_MAPPING`
 
 ```text
 # Goal
-Build the INVENTORY_MAPPING step for the selected migration workflow. Inventory 100% of the defined source/target schema scope and materialize the reviewed mapping contract without migrating application business data.
+Build INVENTORY_MAPPING to inventory 100% of the defined source/target scope and materialize the reviewed mapping contract without migrating application business data.
 
 # Success criteria
-- Confirm INVENTORY_MAPPING is the first allowed non-PASS workflow step.
+- Confirm TEST_DATABASE_SETUP history = PASS.
+- Confirm INVENTORY_MAPPING is the current first non-PASS step.
 - Account for every in-scope source/target table and physical field.
-- Capture required record baselines and known dependencies.
-- Create one mapping_release bound to the exact source/target snapshots.
-- Materialize all reviewed table_mapping, field_mapping, and required STATIC value_mapping rows.
-- Preserve READY / SKIP / MISSING exactly as defined.
+- Capture record baselines and required dependencies.
+- Create mapping_release bound to the exact source/target snapshots.
+- Materialize reviewed table_mapping, field_mapping, and required STATIC value_mapping rows.
+- Preserve READY / SKIP / MISSING exactly as approved.
+- Populate every status/value consumed by INVENTORY_VERIFY and MAPPING_VERIFY, including source and target coverage state.
 - Update workflow source_snapshot_id, target_snapshot_id, and mapping_release_id.
-- Insert the final workflow_execution_history row only when the step succeeds.
-- Leave no partial committed preparation data when the step fails.
+- Producer/consumer contract gap count = 0.
+- Final history and current-step PASS are written only after every check succeeds.
 
 # Constraints
 - Do not invent schema objects, dependencies, mappings, values, or counts.
-- Do not silently drop in-scope source tables or fields.
+- Do not silently omit in-scope source or target objects.
 - Do not run later workflow steps.
-- Do not change the workflow, database schema, enum, or mapping logic.
-- Use transaction rollback for current-step writes where safe.
-- If transaction rollback is insufficient for an existing required statement, include compensating rollback SQL using only the existing data model.
-- After rollback, leave the current step retryable and do not create a final history row.
+- Use prompt-only rollback/cleanup rules from this document.
+- Test only in the Step 0 isolated environment during generation.
+- If a downstream-required value has no producer, stop with SCRIPT_CONTRACT_GAP and fix the plan/SQL before finalizing.
 
 # Output
 Create exactly two files:
-1. `10-inventory-mapping-plan.md` — plan, evidence list, ordered tasks, 100% checklist, PASS/FAIL conditions, rollback plan for every write block, retry instructions, and completion checklist.
-2. `10-inventory-mapping.sql` — copy/paste runnable MySQL with numbered comments, workflow gates, START TRANSACTION where applicable, inventory/mapping writes, accounting checks, COMMIT only on success, ROLLBACK/compensating rollback on failure, post-rollback checks, final history insert and current-step PASS update only on success.
+1. `10-inventory-mapping-plan.md` — include all seven mandatory checklist groups, a complete Producer/Consumer Matrix, ordered implementation tasks, 100% scope accounting, rollback/reset strategy, blocking items, and PASS formulas.
+2. `10-inventory-mapping.sql` — numbered, copy/paste runnable MySQL with workflow gates, producer/consumer assertions, inventory/mapping writes, source+target coverage updates, accounting checks, rollback/cleanup, next-step output verification, and final history/PASS only on success.
+Execute the candidate SQL on the Step 0 test environment. On any failure, identify root cause, update plan/checklist, fix/regenerate SQL, reset/rollback the test baseline, and rerun. Return only the exact SQL version that passes all checks.
 ```
 
 ### Prompt — `INVENTORY_VERIFY`
 
 ```text
 # Goal
-Build the INVENTORY_VERIFY step that independently proves the inventory created by INVENTORY_MAPPING matches the actual selected source and target databases.
+Build INVENTORY_VERIFY to independently prove that INVENTORY_MAPPING matches the actual selected source and target databases and that all inventory evidence required by mapping verification exists.
 
 # Success criteria
 - Confirm INVENTORY_MAPPING history = PASS.
 - Confirm INVENTORY_VERIFY is the current first non-PASS step.
-- Re-check source/target snapshot identity and schema evidence.
-- Verify all in-scope tables, physical fields, record baselines, and required dependencies are accounted.
-- Produce explicit missing/duplicate/unresolved counts.
-- PASS only when required unresolved failure counts are zero.
-- Insert the final workflow_execution_history row only when the step completes successfully.
+- Build a consumer list for every status/count/snapshot/table/field/dependency value used by this step.
+- Trace every consumed value to its producer table.column and exact producer SQL block.
+- Verify source/target snapshot identity, tables, physical fields, record baselines, dependencies, and required coverage statuses.
+- Missing, duplicate, unresolved, and SCRIPT_CONTRACT_GAP counts = 0.
+- Verify every output required by MAPPING_VERIFY exists.
+- Final history/PASS is written only after every verification succeeds.
 
 # Constraints
-- Do not change mapping definitions or application business data.
-- Do not fabricate expected counts.
-- Do not run later workflow steps.
-- Do not change schema or workflow logic.
-- Any temporary/control writes used by the SQL must be transaction-safe or have compensating cleanup/rollback using existing structures.
-- A failed verification run must leave the step retryable and must not leave a final PASS history row.
+- Do not repair INVENTORY_MAPPING silently inside the verifier.
+- If a required value was not produced by Step 10, report SCRIPT_CONTRACT_GAP and fix the producing plan/SQL rather than hiding the defect.
+- Do not change mapping decisions or application business data.
+- Do not run later steps.
+- Use the isolated Step 0 environment for execution testing.
 
 # Output
 Create exactly two files:
-1. `20-inventory-verify-plan.md` — verification plan, evidence matrix, 100% checklist, PASS/FAIL rules, rollback/cleanup plan for SQL-side writes, retry instructions.
-2. `20-inventory-verify.sql` — runnable MySQL with numbered comments, previous-step gate, inventory reconciliation, transaction/cleanup protection for writes, PASS/FAIL checks, final history insert and current-step PASS update only when successful.
+1. `20-inventory-verify-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, evidence matrix, 100% verification checklist, PASS/FAIL formulas, rollback/cleanup plan, and blocking items.
+2. `20-inventory-verify.sql` — numbered runnable MySQL with previous-step gate, producer checks, source/target inventory reconciliation, coverage-status checks, failure counters, next-step output verification, protected final history/PASS update, and rollback/cleanup path.
+Execute on the isolated test environment and keep fixing/regenerating until all required checks PASS. Return only the successfully tested SQL.
 ```
 
 ### Prompt — `MAPPING_VERIFY`
 
 ```text
 # Goal
-Build the MAPPING_VERIFY step that proves the mapping_release completely and unambiguously covers the inventory already proven by INVENTORY_VERIFY.
+Build MAPPING_VERIFY to prove that the mapping_release completely, uniquely, and executably covers the inventory already proven by INVENTORY_VERIFY.
 
 # Success criteria
 - Confirm INVENTORY_VERIFY history = PASS.
 - Confirm MAPPING_VERIFY is the current first non-PASS step.
-- Verify release snapshot binding, table mapping coverage, field mapping coverage, READY/SKIP/MISSING validity, required expressions/rules, and contract fingerprint.
-- Unmapped, ambiguous, duplicate, invalid, and missing-rule counts must be zero for PASS.
-- Insert the final workflow_execution_history row only on a successful completed verification.
+- Trace every consumed mapping/snapshot/status/fingerprint value to a valid producer.
+- Verify release snapshot binding, table mapping coverage, field mapping coverage, READY/SKIP/MISSING validity, required migration/verification rules, and contract fingerprint.
+- Unmapped, ambiguous, duplicate, invalid, missing-rule, and SCRIPT_CONTRACT_GAP counts = 0.
+- Verify every contract/result required by MIGRATION is persisted.
+- Final history/PASS is written only when the complete contract verification succeeds.
 
 # Constraints
-- Do not alter mapping decisions to make verification pass.
+- Do not alter mapping decisions simply to make verification pass.
 - Do not migrate application data or run later steps.
-- Do not change schema/workflow logic.
-- Protect any SQL-side writes with rollback/cleanup using the existing data model only.
-- A failed run must leave the current step retryable and must not leave a final PASS history row.
+- Do not invent a producer for missing mapping state.
+- Use the Step 0 isolated environment for all generated-SQL execution/testing.
 
 # Output
 Create exactly two files:
-1. `30-mapping-verify-plan.md` — mapping verification plan, coverage formulas, 100% checklist, zero-tolerance failure list, rollback/cleanup plan, retry instructions.
-2. `30-mapping-verify.sql` — runnable MySQL with numbered comments, workflow gate, mapping checks, transaction/cleanup protection for writes, PASS/FAIL decision, final history insert and current-step PASS update only on success.
+1. `30-mapping-verify-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, coverage formulas, zero-tolerance failure checklist, rollback/cleanup plan, and blocking items.
+2. `30-mapping-verify.sql` — numbered runnable MySQL with workflow gate, producer assertions, mapping coverage checks, READY/SKIP/MISSING checks, fingerprint/contract checks, MIGRATION-output readiness checks, and final history/PASS only on complete success.
+Execute, diagnose, fix/regenerate, reset, and rerun in the isolated test environment until all checks PASS; return only the tested SQL.
 ```
 
 ### Prompt — `MIGRATION`
 
 ```text
 # Goal
-Build the MIGRATION step that executes the required MySQL migration scripts from the verified mapping contract, records execution evidence, and fully accounts for migrated fields and records.
+Build MIGRATION to execute the required MySQL migration operations from the verified mapping contract, record execution evidence, and fully account for migrated fields and records.
 
 # Success criteria
 - Confirm MAPPING_VERIFY history = PASS.
 - Confirm MIGRATION is the current first non-PASS step.
-- Determine all required migration scripts, stable script_id, hash/version, order, and dependencies.
-- Enforce existing one-time execute_log guard for committed script execution.
-- Every successful committed script has execute_log and migration_step_result evidence.
-- Runtime errors are represented by the existing migration_error mechanism where applicable.
-- failed_script_count, failed_field_count, failed_record_count, unaccounted_record_count, and migration_error_count must be zero before PASS.
-- Insert final MIGRATION workflow_execution_history only after the complete migration transaction/result is successful.
+- Trace every consumed mapping/ID/value/dependency input to its producer.
+- Determine all required migration scripts/blocks, stable script_id, hash/version, execution order, and dependencies.
+- Respect the existing one-time execute_log guard for successful committed execution.
+- Every required script/block has explicit field/record accounting.
+- failed_script_count = 0, failed_field_count = 0, failed_record_count = 0, unaccounted_record_count = 0, migration_error_count = 0.
+- Persist every migration result/runtime mapping/evidence required by VALIDATION_DATA.
+- Producer/consumer contract gap count = 0.
+- Final MIGRATION history/PASS is written only after all migration assertions succeed.
 
 # Constraints
-- Do not change verified mapping rules or workflow/database schema.
+- Do not change verified mapping rules or database/workflow schema.
 - Do not run VALIDATION_DATA or FINAL_VERIFY.
-- Do not silently continue after a failed migration assertion.
-- Structure migration writes so a failure before final commit can be rolled back and the same MIGRATION step can be retried.
-- Do not persist a failed execute_log/history row if doing so would trigger the existing uniqueness guard and prevent retry.
-- If any existing required operation cannot be safely transaction-rolled back, provide compensating rollback SQL using existing tables only and document exactly how to verify restoration before retry.
+- Do not silently continue after a failed assertion.
+- Failed test runs must be rollback/reset so they do not consume the one-time execution guard.
+- Use only the Step 0 isolated environment while generating/testing.
 
 # Output
 Create exactly two files:
-1. `40-migration-plan.md` — complete script inventory, dependency/order plan, 100% checklist, accounting formulas, existing one-time guards, rollback plan per migration block, restoration verification, and retry instructions.
-2. `40-migration.sql` — copy/paste runnable MySQL with numbered comments, previous-step/current-step guards, transaction boundary where safe, migration blocks in dependency order, detail evidence writes, assertions, COMMIT only after success, ROLLBACK/compensating rollback on failure, restoration checks, then final workflow history and PASS update only for the successful committed run.
+1. `40-migration-plan.md` — include all seven mandatory checklist groups, complete script/block inventory, Producer/Consumer Matrix, dependency/order checklist, accounting formulas, one-time guard checks, rollback/reset plan per write block, and blocking items.
+2. `40-migration.sql` — numbered copy/paste runnable MySQL with previous-step gate, producer assertions, execution-order guards, migration blocks, execute_log/result/error handling, aggregate accounting, VALIDATION_DATA-output readiness checks, rollback/reset path, and final history/PASS only on success.
+Execute the candidate on the isolated test environment. Any failure requires root-cause analysis, plan/checklist correction, SQL regeneration, baseline reset, and rerun. Return only the exact SQL that passes all checks.
 ```
 
 ### Prompt — `VALIDATION_DATA`
 
 ```text
 # Goal
-Build the VALIDATION_DATA step that verifies actual migrated target data against the verified inventory/mapping contract and migration evidence without changing migrated business data.
+Build VALIDATION_DATA to verify actual migrated target data against verified inventory, mapping, and migration evidence without repairing business data.
 
 # Success criteria
 - Confirm MIGRATION history = PASS.
 - Confirm VALIDATION_DATA is the current first non-PASS step.
-- Verify record counts/identity, mapped field values, structured transformations, runtime ID/value outcomes, duplicates, missing/unexpected records, and broken references.
-- Write validation_result / validation_failure evidence using the existing model.
-- Required failure counters must be zero before PASS.
-- Insert final VALIDATION_DATA history only when the verification step completes successfully.
+- Trace every consumed migration result, runtime mapping, expected count, and mapping rule to its producer.
+- Verify record counts/identity, mapped field values, transformations, runtime ID/value outcomes, duplicates, missing/unexpected records, and broken references.
+- Write validation_result / validation_failure using the existing model.
+- verification_failed_count = 0, missing_record_count = 0, unexpected_record_count = 0, duplicate_record_count = 0, broken_reference_count = 0, validation_failure_count = 0.
+- Verify every result required by FINAL_VERIFY exists.
+- SCRIPT_CONTRACT_GAP count = 0.
+- Final history/PASS is written only after complete validation succeeds.
 
 # Constraints
 - Verification only; do not repair migrated business data.
 - Do not reinterpret mapping rules or run FINAL_VERIFY.
-- Do not change database schema/workflow logic.
-- Protect control/evidence writes with transaction rollback or compensating cleanup using existing tables.
-- A failed validation run must not leave state that prevents the same VALIDATION_DATA step from being rerun after the cause is corrected.
+- Missing producer evidence is a contract defect, not permission to infer a value.
+- Use the Step 0 isolated environment during SQL generation/testing.
 
 # Output
 Create exactly two files:
-1. `50-validation-data-plan.md` — validation matrix, 100% checklist, PASS/FAIL formulas, rollback/cleanup strategy for validation evidence writes, and retry instructions.
-2. `50-validation-data.sql` — runnable MySQL with numbered comments, previous-step gate, validation queries, protected evidence writes, failure counters, COMMIT/final history only on success, and ROLLBACK/cleanup path on failure.
+1. `50-validation-data-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, validation matrix, table/field/record/reference coverage checklist, PASS/FAIL formulas, rollback/cleanup strategy for evidence writes, and blocking items.
+2. `50-validation-data.sql` — numbered runnable MySQL with previous-step gate, producer assertions, validation queries, validation_result/failure writes, failure counters, FINAL_VERIFY-output readiness checks, protected final history/PASS update, and rollback/cleanup path.
+Execute/fix/regenerate/reset/rerun until all validation checks PASS in the isolated environment. Return only the exact tested SQL.
 ```
 
 ### Prompt — `FINAL_VERIFY`
 
 ```text
 # Goal
-Build the FINAL_VERIFY step that proves the complete workflow chain executed in order, all previous required steps are PASS, all required data is accounted, and no unresolved migration/validation failure remains before marking the workflow PASS.
+Build FINAL_VERIFY to prove that the complete workflow chain executed in order, all required prior steps are PASS, all data/evidence is accounted, and no unresolved migration or validation failure remains before marking the workflow PASS.
 
 # Success criteria
 - Confirm VALIDATION_DATA history = PASS.
 - Confirm FINAL_VERIFY is the current first non-PASS step.
-- Confirm all required previous workflow steps have PASS history.
-- Confirm workflow snapshots/mapping release match prior evidence.
+- Confirm one valid PASS history row for every required previous step including TEST_DATABASE_SETUP.
+- Trace all final counts/statuses/snapshots/mapping releases/script evidence/validation evidence to their producers.
 - Reconcile workflow history with inventory, mapping, execute_log, migration_step_result, validation_result, and validation_failure detail.
-- All required failure/unaccounted counters must be zero.
-- Insert FINAL_VERIFY history and set workflow PASS only when every gate succeeds.
+- All required failed/unaccounted/missing/unexpected/duplicate/broken-reference/migration-error/validation-failure/SCRIPT_CONTRACT_GAP counts = 0.
+- Final history and workflow PASS are written only after every reconciliation check succeeds.
 
 # Constraints
 - Do not mutate migrated business data or repair earlier steps.
 - Do not alter earlier evidence, mapping logic, schema, or workflow.
 - Do not mark PASS from workflow_step status alone.
-- Protect final control-state updates in a transaction; if final assertions fail, rollback those current-step control writes so FINAL_VERIFY remains retryable.
+- Use the isolated Step 0 environment to test the generated final-verification SQL before returning it for manual use.
 
 # Output
 Create exactly two files:
-1. `60-final-verify-plan.md` — end-to-end reconciliation plan, history/detail checklist, zero-failure gate, rollback plan for final control writes, and retry instructions.
-2. `60-final-verify.sql` — runnable MySQL with numbered comments, complete history/detail reconciliation, transaction-protected final history/workflow updates, COMMIT only on complete PASS, and ROLLBACK on any failed assertion.
+1. `60-final-verify-plan.md` — include all seven mandatory checklist groups, complete end-to-end Producer/Consumer Matrix, history/detail reconciliation checklist, zero-failure gate, final control-write rollback plan, and blocking items.
+2. `60-final-verify.sql` — numbered runnable MySQL with complete history/detail/producer reconciliation, final zero-failure assertions, transaction-protected final history/workflow PASS updates, rollback on any failed assertion, and final PASS query.
+Execute/fix/regenerate/reset/rerun until every final check PASSes on the isolated environment. Return only the exact tested SQL for manual execution.
 ```
 
 ---
 
-## 15. Final Verification Rules
+## 16. Final Verification Rules
+
+### `TEST_DATABASE_SETUP` PASS
+
+```text
+isolated test database/environment available     = YES
+real source/target protected from test writes    = YES
+required schemas/baseline available              = YES
+required MySQL permissions confirmed             = YES
+reset/rebuild path proven                        = YES
+status                                           = PASS
+```
 
 ### `INVENTORY_VERIFY` PASS
 
@@ -741,7 +894,9 @@ actual source fields accounted       = 100%
 actual target tables accounted       = 100%
 actual target fields accounted       = 100%
 required inventory dependencies      = accounted
+required coverage states             = produced + verified
 missing/duplicate inventory evidence = 0
+SCRIPT_CONTRACT_GAP                  = 0
 status                               = PASS
 ```
 
@@ -755,6 +910,7 @@ unmapped mappings             = 0
 ambiguous mappings            = 0
 missing migration rules       = 0
 missing verification rules    = 0
+SCRIPT_CONTRACT_GAP           = 0
 contract_verification         = PASS
 status                        = PASS
 ```
@@ -767,6 +923,7 @@ failed_field_count           = 0
 failed_record_count          = 0
 unaccounted_record_count     = 0
 migration_error_count        = 0
+SCRIPT_CONTRACT_GAP          = 0
 data_migration_verification  = PASS
 status                       = PASS
 ```
@@ -780,6 +937,7 @@ unexpected_record_count   = 0
 duplicate_record_count    = 0
 broken_reference_count    = 0
 validation_failure_count  = 0
+SCRIPT_CONTRACT_GAP       = 0
 status                    = PASS
 ```
 
@@ -788,11 +946,21 @@ status                    = PASS
 Required previous history:
 
 ```text
-INVENTORY_MAPPING.status = PASS
-INVENTORY_VERIFY.status  = PASS
-MAPPING_VERIFY.status    = PASS
-MIGRATION.status         = PASS
-VALIDATION_DATA.status   = PASS
+TEST_DATABASE_SETUP.status = PASS
+INVENTORY_MAPPING.status   = PASS
+INVENTORY_VERIFY.status    = PASS
+MAPPING_VERIFY.status      = PASS
+MIGRATION.status           = PASS
+VALIDATION_DATA.status     = PASS
+```
+
+And:
+
+```text
+all mandatory plan checklist items = checked with evidence
+all generated SQL files            = executed successfully on isolated test environment
+all producer/consumer contracts     = PASS
+all required failure counters       = 0
 ```
 
 Only then:
@@ -808,13 +976,13 @@ workflow.status     = PASS
 
 ```text
 workflow_enum
-    = unchanged 6 hard-coded top-down steps
+    = 7 top-down steps including explicitly requested Step 0 TEST_DATABASE_SETUP
 
 workflow
     = unchanged named migration flow
 
 workflow_step
-    = unchanged one row per step per workflow
+    = unchanged one row per enum step per workflow
 
 workflow_execution_history
     = unchanged one final result/evidence row per workflow_step
@@ -832,5 +1000,11 @@ validation_result / validation_failure
     = unchanged
 
 rollback
-    = prompt/SQL behavior only; no new workflow step, table, column, enum, status, or unique-key model
+    = prompt/SQL behavior only; no rollback workflow feature added
+
+producer/consumer contract
+    = prompt/plan validation rule; no new database table required
+
+Codex generation rule
+    = generate → execute on isolated test DB → diagnose/fix/regenerate → reset → rerun until PASS → return exact tested SQL for manual execution
 ```
