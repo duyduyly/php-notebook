@@ -577,7 +577,7 @@ field-mapping-migration.md
 
 ## Reference example
 
-- [Joomla core field mapping](../09-joomla-core-field-mapping-migration.md)
+- [Joomla core field mapping](../07-joomla-core-field-mapping-migration.md)
 
 The Joomla core example predates the scope-prefix convention; new generated files should use the scoped filename rule.
 
