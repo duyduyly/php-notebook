@@ -2,17 +2,7 @@
 
 ## Purpose
 
-> **Goal: generate a reusable, reviewable, database-ready field mapping that accounts for 100% of source physical fields and resolves 100% of required target physical fields.**
-
-This plan is reusable for:
-
-- Joomla core migrations;
-- Joomla third-party extensions;
-- custom Joomla extensions;
-- version-to-version application migrations;
-- database-platform migrations;
-- subsystem or module migrations;
-- any migration where a complete source and target field inventory can be produced.
+> **Goal: generate a reusable, reviewable, database-ready field mapping that accounts for 100% of source physical fields, resolves 100% of required target physical fields, and classifies every mapping row as `READY`, `SKIP`, or `MISSING`.**
 
 Use the companion template:
 
@@ -27,19 +17,13 @@ Recommended companion contract:
 
 - [`migration-contract-generation-plan.md`](./migration-contract-generation-plan.md)
 
-The central guarantee is:
-
-> **Every source physical field in the declared migration scope is explicitly accounted for, every required target physical field is explicitly resolved, and every mapping has enough schema, identity, reference, transformation, and verification metadata to be executed and audited.**
-
-This is a **field-mapping guarantee**, not a production-migration-success guarantee. Production PASS additionally requires runtime value mapping, row accounting, execution, and verification.
+This is a **definition-level field-mapping guarantee**. Production PASS still requires runtime ID/value mapping, record accounting, execution, and verification.
 
 ---
 
-# 1. Required Inputs and Hard Prerequisites
+# 1. Required Inputs
 
-Do not generate field mapping from table names alone.
-
-The following artifacts must exist first:
+The following must exist before field mapping is generated:
 
 | Input | Requirement |
 |---|---|
@@ -48,10 +32,9 @@ The following artifacts must exist first:
 | Target group manifest | `PASS` |
 | Target field inventory | `PASS` |
 | Table mapping document | `PASS` |
-| Migration contract | Recommended and normally required |
+| Migration contract | Recommended / normally required |
 | Source schema authority | Explicit |
 | Target schema authority | Explicit |
-| Production reconciliation | Required before production execution |
 
 Hard prerequisite gate:
 
@@ -66,32 +49,13 @@ Unknown target schema objects          = 0
 Unclassified schema deviations         = 0
 ```
 
-If the table-mapping gate is not complete, field mapping must not guess target tables independently.
+Do not generate field mapping from field-name similarity alone.
 
 ---
 
-# 2. Define the Correct Meaning of 100% Field Mapping
+# 2. Correct Meaning of 100% Field Mapping
 
-Do **not** define 100% as:
-
-```text
-mapping rows = source field count
-```
-
-That is only valid for a strict one-source-field-to-one-mapping-row design.
-
-A reusable migration framework must support:
-
-```text
-ONE_TO_ONE
-ONE_TO_MANY
-MANY_TO_ONE
-MANY_TO_MANY
-ONE_TO_NONE
-NONE_TO_ONE
-```
-
-Therefore the correct coverage definition is:
+Coverage is based on distinct physical field identities, not raw mapping-row count.
 
 ```text
 SOURCE COVERAGE
@@ -103,192 +67,61 @@ TARGET COVERAGE
 Required target physical fields resolved   = 100%
 Unresolved required target fields          = 0
 Unknown target strategy                    = 0
+
+FIELD STATUS
+Rows classified                            = 100%
+Allowed values                              = READY / SKIP / MISSING
+Invalid/null field status                  = 0
 ```
 
-Mapping action count may be greater than the source field count.
-
-Example:
+Reusable mapping must support:
 
 ```text
-source field: full_name
-
-full_name → first_name
-full_name → last_name
-
-source fields covered = 1 / 1
-mapping actions        = 2
-coverage               = 100%
+ONE_TO_ONE
+ONE_TO_MANY
+MANY_TO_ONE
+MANY_TO_MANY
+ONE_TO_NONE
+NONE_TO_ONE
 ```
 
 ---
 
-# 3. Separate Generic Mapping Rules From Platform Profiles
+# 3. Build Source and Target Field Universes
 
-The reusable field-mapping engine must not embed Joomla-specific assumptions into its core logic.
-
-Use two layers.
-
-## 3.1 Generic core
-
-The generic core understands:
+Canonical identities:
 
 ```text
-schema metadata
-field identity
-mapping cardinality
-mapping decisions
-key roles
-references
-structured payloads
-source-only fields
-target-only fields
-verification
+SOURCE_FIELD_KEY = (source_version, source_table, source_field)
+TARGET_FIELD_KEY = (target_version, target_table, target_field)
 ```
 
-## 3.2 Migration profile
+Every physical field must be explicit. Wildcards such as `all *_id fields`, `other fields`, or `...` are forbidden in final mapping output.
 
-A migration profile contains platform/application-specific semantics.
+Physical schema metadata remains authoritative in `migration_inventory.field_inventory`.
 
-Examples:
-
-```text
-Joomla profile
-- Registry/JSON fields
-- ACL structures
-- nested-set trees
-- menu sentinel IDs
-- asset relationships
-- UCM/Finder/workflow rules
-
-Custom CRM profile
-- UUID identities
-- JSONB metadata
-- customer polymorphic references
-- legacy status translation
-```
-
-Recommended profile artifact:
+At minimum preserve/query:
 
 ```text
-<scope>-field-mapping-profile.md
-```
-
-or a structured YAML/JSON equivalent.
-
-The field-mapping template remains unchanged when the platform changes; only the profile and explicit overrides change.
-
----
-
-# 4. Build Independent Source and Target Field Universes
-
-Create two canonical sets before matching anything.
-
-## Source field key
-
-```text
-(source_version, source_table, source_field)
-```
-
-## Target field key
-
-```text
-(target_version, target_table, target_field)
-```
-
-Required invariants:
-
-```text
-source_field_universe_count
-=
-COUNT(DISTINCT source field key)
-
-
-target_field_universe_count
-=
-COUNT(DISTINCT target field key)
-```
-
-No wildcard entries are allowed in the final universe.
-
-Invalid examples:
-
-```text
-all *_id fields
-all params fields
-other fields
-...
-```
-
-Every physical field must be explicit.
-
----
-
-# 5. Require Complete Physical Metadata for Every Field
-
-Every source and target field must be queryable with physical schema facts.
-
-Minimum metadata:
-
-```text
-database_side
-database_dialect
 table_name
 column_name
 ordinal_position
 DATA_TYPE
 COLUMN_TYPE
-canonical_type_family
-character_length
-numeric_precision
-numeric_scale
+length / precision / scale
 nullable
 default
-auto_increment / identity
-generated
-generated_expression
-charset
-collation
-key_role
-index_memberships
-physical_fk_target
-constraint metadata
-comment
+generated / identity semantics
+charset / collation
+key role
+index memberships
+physical FK metadata
 schema evidence/source
-```
-
-Recommended canonical type families:
-
-```text
-STRING
-INTEGER
-DECIMAL
-FLOAT
-BOOLEAN
-TEMPORAL
-BINARY
-JSON
-XML
-UUID
-ENUM
-ARRAY
-OTHER
-```
-
-Keep the original/raw database type as the authority. Canonical type family is only a comparison aid.
-
-Example:
-
-```text
-MySQL BIGINT UNSIGNED
-PostgreSQL bigint
-
-raw types differ
-canonical family = INTEGER
 ```
 
 ---
 
-# 6. Join Every Source Field to the Table Mapping
+# 4. Join Source Fields to Table Mapping
 
 For every source physical field:
 
@@ -310,25 +143,19 @@ Distinct source fields with table mapping
 Distinct source fields in source universe
 ```
 
-If a source field belongs to a table with no table-mapping decision:
+Table-level inheritance applies where appropriate:
 
 ```text
-FIELD MAPPING = BLOCKED
-```
-
-Field mapping must inherit table-level decisions where appropriate:
-
-```text
-Table IGNORE  → field IGNORE unless explicit approved exception
-Table ARCHIVE → field ARCHIVE unless explicit approved exception
-Table REBUILD → field REBUILD unless explicit approved exception
+Table IGNORE  → field IGNORE unless approved exception
+Table ARCHIVE → field ARCHIVE unless approved exception
+Table REBUILD → field REBUILD unless approved exception
 ```
 
 ---
 
-# 7. Define Allowed Final Field Decisions
+# 5. Allowed Final Field Decisions
 
-Use the canonical decisions from the field-mapping template:
+Canonical decisions:
 
 ```text
 DIRECT
@@ -364,115 +191,35 @@ Any invalid final decision blocks PASS.
 
 ---
 
-# 8. Apply Deterministic Mapping Precedence
+# 6. Deterministic Mapping Precedence
 
-Apply the first matching rule:
+Apply the first valid rule:
 
 ```text
-1. Explicit field override exists
-   → use explicit override
-
-2. Source table inherits IGNORE / ARCHIVE / REBUILD
-   → apply inherited decision unless an approved exception exists
-
-3. Field is an identity or reference requiring remap
-   → LOOKUP
-
-4. Field contains structured/embedded references
-   → STRUCTURED
-
-5. Target field is generated/derived/recreated
-   → GENERATED / REBUILD / RECREATE
-
-6. Explicit rename/semantic transform exists
-   → TRANSFORM
-
-7. Same-purpose scalar target exists and every compatibility check passes
-   → DIRECT
-
-8. Source field has no active target representation
-   → explicit ARCHIVE / IGNORE / TRANSFORM / REFERENCE_ONLY
-
-9. Nothing matches
-   → CONTRACT ERROR
+1. Explicit evidence-backed field override
+2. Parent-table IGNORE / ARCHIVE / REBUILD inheritance
+3. Identity/reference requiring remap → LOOKUP
+4. Structured/embedded references → STRUCTURED
+5. Generated/derived/recreated target state → GENERATED / REBUILD / RECREATE
+6. Explicit rename/semantic transform → TRANSFORM
+7. Same-purpose scalar + all compatibility checks PASS → DIRECT
+8. Source field has no active target representation → ARCHIVE / IGNORE / TRANSFORM elsewhere / REFERENCE_ONLY / REBUILD
+9. Nothing matches → CONTRACT ERROR
 ```
 
 Hard rules:
 
 ```text
-same name != DIRECT
-same SQL type != DIRECT
-same numeric ID != same identity
+same name != DIRECT proof
+same SQL type != semantic compatibility proof
+same numeric ID != identity equivalence proof
 ```
 
 ---
 
-# 9. Generate Candidate Mappings, But Do Not Treat Candidates as Final
+# 7. Mapping Cardinality
 
-Candidate matching may use:
-
-```text
-same table + same field
-mapped table + same field
-known field rename
-semantic identity
-compatible type family
-migration profile rule
-explicit migration contract rule
-```
-
-Candidate mapping must then pass:
-
-```text
-semantic compatibility
-schema compatibility
-identity/reference analysis
-constraint analysis
-structured-data analysis
-source-only/target-only analysis
-```
-
-Only after validation may a candidate become a final field decision.
-
-Recommended metadata:
-
-```text
-rule_origin
-```
-
-Allowed origins:
-
-```text
-GENERIC
-PROFILE
-EXPLICIT
-TABLE_INHERITED
-```
-
-Also preserve short evidence:
-
-```text
-evidence
-```
-
-Examples:
-
-```text
-same semantic + compatible type
-official rename
-logical dependency
-migration profile rule
-production data-range check
-table contract
-```
-
-This prevents unexplained or AI-guessed final mappings.
-
----
-
-# 10. Support Mapping Cardinality Explicitly
-
-Every mapping action or mapping group must classify cardinality.
+Supported cardinalities:
 
 ```text
 ONE_TO_ONE
@@ -483,64 +230,20 @@ ONE_TO_NONE
 NONE_TO_ONE
 ```
 
-## ONE_TO_ONE
-
-```text
-old.title → new.title
-```
-
-## ONE_TO_MANY
-
-```text
-old.full_name
-→ new.first_name
-→ new.last_name
-```
-
-## MANY_TO_ONE
-
-```text
-old.address_1
-old.address_2
-old.city
-old.country
-→ new.address_json
-```
-
-## ONE_TO_NONE
-
-```text
-old.runtime_token
-→ IGNORE
-```
-
-## NONE_TO_ONE
-
-```text
-no source field
-→ new.created_at = DEFAULT
-```
-
-## Mapping group
-
-Use a stable grouping key when one transformation spans multiple source or target fields:
-
-```text
-mapping_group_key
-```
+Use a stable `mapping_group_key` for grouped transformations.
 
 Example:
 
 ```text
-MG_CUSTOMER_DISPLAY_NAME
-cardinality = MANY_TO_ONE
+mapping_group_key = MG_CUSTOMER_DISPLAY_NAME
+mapping_cardinality = MANY_TO_ONE
 ```
 
-Do not flag multiple rows sharing a mapping group as duplicates merely because the transformation is multi-field.
+Legitimate grouped rows are not duplicate mapping errors.
 
 ---
 
-# 11. Add Row Kind for Two-Way Coverage
+# 8. Row Kind
 
 Recommended row kinds:
 
@@ -549,343 +252,164 @@ SOURCE_MAPPING
 TARGET_RESOLUTION
 ```
 
-`SOURCE_MAPPING` means a source field is being accounted for.
+`SOURCE_MAPPING` accounts for a physical source field.
+
+`TARGET_RESOLUTION` resolves a target-only field without inventing a fake source field.
+
+Examples:
+
+```text
+old.title → new.title → SOURCE_MAPPING
+no source → new.created_at DEFAULT → TARGET_RESOLUTION
+```
+
+---
+
+# 9. Field Readiness Status
+
+Every generated row must contain exactly one:
+
+```text
+field_status
+```
+
+Allowed values are exactly:
+
+```text
+READY
+SKIP
+MISSING
+```
+
+`field_status` is separate from:
+
+```text
+mapping_type
+row_kind
+mapping_cardinality
+lifecycle status such as DRAFT / FINAL
+coverage_status
+```
+
+## 9.1 READY
+
+Use `READY` only when:
+
+```text
+source physical field exists
+AND target physical field exists
+AND final mapping decision exists
+AND required transform/reference/parser rules exist
+AND verification rule exists
+```
+
+Examples:
+
+```text
+title    → title    | READY | DIRECT
+asset_id → asset_id | READY | LOOKUP
+params   → params   | READY | STRUCTURED
+```
+
+`READY` does not mean `DIRECT`; transformed, lookup, and structured mappings can also be READY.
+
+## 9.2 SKIP
+
+Use `SKIP` when migration intentionally performs no active mapping/copy for a known field pair.
+
+Required:
+
+```text
+explicit reason
+explicit accounting behavior
+approved final mapping decision
+```
+
+Typical case:
+
+```text
+mapping_type = IGNORE
+```
 
 Example:
 
 ```text
-old.title → new.title → DIRECT
+legacy_cache → legacy_cache | SKIP | IGNORE
 ```
 
-`TARGET_RESOLUTION` means a target field has no direct source field but still requires a strategy.
-
-Example:
+Never use `SKIP` to hide:
 
 ```text
-source = NULL
-target = new.created_at
-mapping = DEFAULT
+unknown mapping
+missing field
+failed lookup
+missing transform rule
 ```
 
-This allows one field-mapping store to answer both questions:
+## 9.3 MISSING
+
+Use `MISSING` when exactly one physical side does not exist.
 
 ```text
-Have all source fields been accounted for?
-Have all required target fields been resolved?
+source exists + target absent = MISSING
+source absent + target exists = MISSING
+```
+
+`MISSING` is a physical-presence classification. It does **not** automatically mean failed or unresolved.
+
+Source-only examples:
+
+```text
+otpKey → — | MISSING | ARCHIVE
+legacy_state → — | MISSING | TRANSFORM elsewhere
+runtime_token → — | MISSING | IGNORE
+```
+
+Target-only examples:
+
+```text
+— → created_at  | MISSING | DEFAULT
+— → workflow_id | MISSING | GENERATED
+— → new_config  | MISSING | TARGET_OWNED
+```
+
+Every MISSING row still requires an explicit outcome and reason.
+
+## 9.4 Deterministic status precedence
+
+Generate `field_status` in this order:
+
+```text
+1. Exactly one physical side is absent
+   → MISSING
+
+2. Both sides exist and approved rule intentionally skips active mapping/copy
+   → SKIP
+
+3. Both sides exist and mapping is executable + verifiable
+   → READY
+
+4. Otherwise
+   → CONTRACT ERROR
+```
+
+Do not generate a fourth persisted status such as `UNKNOWN` or `PENDING`.
+
+Consistency gate:
+
+```text
+field_status classified                  = 100%
+invalid/null field_status                = 0
+READY with missing physical side         = 0
+MISSING with both physical sides present = 0
+MISSING with both physical sides absent  = 0
+SKIP without explicit reason             = 0
+SKIP used to hide unresolved mapping     = 0
 ```
 
 ---
 
-# 12. Key and Identity Analysis
-
-Canonical key roles:
-
-```text
-PK
-COMPOSITE_PK
-UNIQUE
-INDEX
-NONE
-```
-
-For every entity identity determine:
-
-```text
-identity_role
-identity_strategy
-identity_domain
-```
-
-Recommended strategies:
-
-```text
-ID_MAP
-SEMANTIC_LOOKUP
-NATURAL_KEY_LOOKUP
-GENERATED_ID
-PRESERVE_ID_WITH_COLLISION_GATE
-NONE
-```
-
-Hard rules:
-
-- do not assume source PK equals target PK;
-- primary-key preservation requires explicit approval and collision checks;
-- composite identities are verified as tuples;
-- unique constraints are tested after transformation/remapping;
-- auto-increment does not prove identity equivalence;
-- natural keys must be proven unique before use.
-
-Gate:
-
-```text
-Required identity mappings              = 100%
-Missing identity strategies             = 0
-Ambiguous natural-key matches           = 0
-PK collisions                           = 0
-UNIQUE collisions                       = 0
-Duplicate incompatible target identities = 0
-```
-
-Runtime source-value → target-value mappings belong in `value_mapping`, not in the static field mapping definition.
-
----
-
-# 13. Reference / FK Analysis
-
-Do not reduce relationships to `FK = YES/NO`.
-
-Canonical reference types:
-
-```text
-PHYSICAL_FK
-LOGICAL_FK
-POLYMORPHIC
-EMBEDDED_REFERENCE
-SEMANTIC_REFERENCE
-NONE
-```
-
-Rules:
-
-```text
-SQL-declared FK
-→ PHYSICAL_FK
-
-reference to another entity without SQL constraint
-→ LOGICAL_FK
-
-referenced entity determined by context/type/discriminator
-→ POLYMORPHIC
-
-reference inside JSON/XML/URL/HTML/serialized payload
-→ EMBEDDED_REFERENCE
-
-stable semantic key used to reconcile target-owned metadata
-→ SEMANTIC_REFERENCE
-```
-
-Required metadata:
-
-```text
-reference_type
-reference_domain
-referenced_table when fixed
-referenced_field when fixed
-context/discriminator rule when polymorphic
-```
-
-Gate:
-
-```text
-Declared physical FKs inventoried       = 100%
-Logical references classified           = 100%
-Polymorphic references classified       = 100%
-Embedded references classified          = 100%
-Semantic references classified          = 100%
-Missing required reference domains      = 0
-Broken required relationships           = 0
-Ambiguous polymorphic references        = 0
-```
-
----
-
-# 14. Structured Data Discovery and Mapping
-
-Scan fields for structured representations such as:
-
-```text
-JSON
-JSONB
-XML
-serialized PHP
-serialized Java
-CSV / delimited values
-ARRAY
-ACL payload
-Registry/key-value payload
-HTML
-URL
-query string
-file/media path
-custom encoded values
-plugin/type-dependent values
-```
-
-Every structured field must have:
-
-```text
-parser_rule
-serializer_rule
-embedded_reference_rule
-verification_rule
-```
-
-Required processing sequence:
-
-```text
-parse
-→ validate
-→ discover embedded references
-→ resolve IDs/values
-→ transform schema/keys
-→ serialize
-→ parse again
-→ verify semantics
-```
-
-Forbidden:
-
-```text
-blind raw string replacement of IDs
-silent parse failure
-silent fallback to original invalid payload
-```
-
-Gate:
-
-```text
-Structured fields discovered            = 100%
-Structured fields with parser/rule       = 100%
-Invalid structured payloads              = 0
-Unresolved embedded references           = 0
-Serialization/reparse failures           = 0
-```
-
----
-
-# 15. Type Compatibility Analysis
-
-A `DIRECT` decision must pass both schema-level and data-level compatibility.
-
-Schema checks:
-
-```text
-canonical type family
-raw DATA_TYPE
-COLUMN_TYPE
-signedness
-length
-precision
-scale
-nullable
-default
-charset
-collation
-generated/identity semantics
-```
-
-Examples of unsafe assumptions:
-
-```text
-VARCHAR(500) → VARCHAR(255)
-INT → UNSIGNED INT
-DECIMAL(18,6) → DECIMAL(10,2)
-nullable → NOT NULL
-case-insensitive collation → case-sensitive unique target
-```
-
-Actual data checks may prove a narrower target safe.
-
-Example:
-
-```sql
-SELECT MAX(CHAR_LENGTH(source_field))
-FROM source_table;
-```
-
-If target length is 255, `DIRECT` is permitted only if actual values and future migration contract safely fit the target.
-
-Required gate:
-
-```text
-Unsafe DIRECT mappings                  = 0
-Unresolved narrowing                    = 0
-Unresolved precision/scale loss         = 0
-Unresolved signedness mismatch          = 0
-Unresolved charset/collation collision  = 0
-Silent truncation/coercion paths         = 0
-```
-
----
-
-# 16. NULL, Default, Date, Enum, and Sentinel Rules
-
-Every migration must explicitly review semantic special values.
-
-Check:
-
-```text
-NULL
-empty string
-0
-negative IDs
-root/sentinel IDs
-booleans
-enums/states
-legacy invalid dates
-zero dates
-default values
-generated defaults
-```
-
-Never assume these values have the same meaning between versions.
-
-Rules:
-
-- target `NOT NULL` fields must have a valid source/default/generated value;
-- invalid/legacy dates require an explicit transform rule;
-- default substitution must preserve semantics;
-- sentinel values are interpreted before ID lookup;
-- enum/state changes require explicit value-domain mapping;
-- negative/reference sentinel semantics must be preserved intentionally.
-
-Gate:
-
-```text
-Unresolved NULL/default changes         = 0
-Unresolved legacy-date rules            = 0
-Unresolved enum/state mappings          = 0
-Unknown sentinel semantics              = 0
-```
-
----
-
-# 17. Constraint Analysis
-
-Check all applicable constraints:
-
-```text
-PRIMARY KEY
-COMPOSITE PRIMARY KEY
-UNIQUE
-INDEX
-FOREIGN KEY
-CHECK
-ENUM/domain
-NOT NULL
-DEFAULT
-generated constraints
-```
-
-Validation must occur **after** mapping/transformation, because two distinct source values may become one target value.
-
-Gate:
-
-```text
-PK collisions                           = 0
-Composite-PK collisions                 = 0
-UNIQUE collisions                       = 0
-CHECK violations                        = 0
-NOT NULL violations                     = 0
-FK/reference violations                 = 0
-```
-
-Do not automatically rename or alter conflicting values unless the business/migration rule explicitly permits it.
-
----
-
-# 18. Source-Only Field Anti-Join
+# 10. Source-Only Field Anti-Join
 
 Compute:
 
@@ -897,7 +421,13 @@ SOURCE FIELDS WITH ACTIVE TARGET REPRESENTATION
 SOURCE-ONLY FIELD SET
 ```
 
-Every source-only field must receive one explicit decision:
+Every source-only field must use:
+
+```text
+field_status = MISSING
+```
+
+and one explicit outcome:
 
 ```text
 ARCHIVE
@@ -916,7 +446,7 @@ destination/accounting rule
 verification rule
 ```
 
-Forbidden outcome:
+Forbidden:
 
 ```text
 silent DROP
@@ -927,12 +457,13 @@ Gate:
 ```text
 Source-only fields discovered           = 100%
 Source-only fields resolved             = 100%
+Source-only fields marked MISSING       = 100%
 Silent source-only drops                = 0
 ```
 
 ---
 
-# 19. Target-Only Field Anti-Join
+# 11. Target-Only Field Anti-Join
 
 Compute:
 
@@ -944,7 +475,13 @@ TARGET FIELDS POPULATED/RESOLVED FROM SOURCE
 TARGET-ONLY FIELD SET
 ```
 
-Every target-only field must receive one explicit resolution:
+Every target-only field must use:
+
+```text
+field_status = MISSING
+```
+
+and one explicit resolution:
 
 ```text
 DEFAULT
@@ -956,66 +493,123 @@ REBUILD
 NOT_REQUIRED_BY_SCOPE
 ```
 
-For every required target field:
-
-```text
-required source-derived value
-OR
-approved target resolution
-```
-
-must exist.
-
 Gate:
 
 ```text
 Target-only fields discovered           = 100%
 Target-only fields classified           = 100%
+Target-only fields marked MISSING       = 100%
 Required target fields resolved         = 100%
 Unresolved required target fields       = 0
 Unknown target strategy                 = 0
 ```
 
-This target anti-join is mandatory even when source coverage is already 100%.
+---
+
+# 12. Identity, References, and Structured Data
+
+For identities, determine:
+
+```text
+identity_strategy
+identity_domain
+```
+
+Recommended strategies:
+
+```text
+ID_MAP
+SEMANTIC_LOOKUP
+NATURAL_KEY_LOOKUP
+GENERATED_ID
+PRESERVE_ID_WITH_COLLISION_GATE
+NONE
+```
+
+Never assume source numeric IDs equal target numeric IDs.
+
+Reference types:
+
+```text
+PHYSICAL_FK
+LOGICAL_FK
+POLYMORPHIC
+EMBEDDED_REFERENCE
+SEMANTIC_REFERENCE
+NONE
+```
+
+Structured fields must define parser/serializer/reference/verification rules. Blind raw-string ID replacement and silent parse failure are forbidden.
 
 ---
 
-# 20. Canonical Mapping Record Model
+# 13. Type and Constraint Compatibility
 
-Recommended static mapping attributes:
+A `DIRECT` mapping is permitted only after validating:
+
+```text
+semantic purpose
+raw/full SQL type
+length
+precision / scale
+signedness
+NULLability
+default behavior
+charset / collation
+generated/identity semantics
+PK / UNIQUE / FK / CHECK constraints
+```
+
+Examples requiring review:
+
+```text
+VARCHAR(500) → VARCHAR(255)
+INT → UNSIGNED INT
+DECIMAL(18,6) → DECIMAL(10,2)
+nullable → NOT NULL
+case-insensitive → case-sensitive unique target
+```
+
+Required gate:
+
+```text
+Unsafe DIRECT mappings                 = 0
+Silent truncation/coercion paths       = 0
+PK collisions                          = 0
+UNIQUE collisions                      = 0
+Constraint violations                  = 0
+```
+
+---
+
+# 14. Canonical Mapping Record
+
+Recommended attributes:
 
 ```text
 row_kind
-
 source_version
 source_table
 source_field
-
 target_version
 target_table
 target_field
-
 mapping_group_key
 mapping_cardinality
-
 mapping_type
+field_status
 identity_strategy
-
 reference_type
 reference_domain
-
 parser_rule
 transform_rule
 verification_rule
-
 rule_origin
 evidence
 reason
 execution_order
 status
 ```
-
-Physical schema facts remain in `field_inventory` and should normally be joined rather than copied manually into `field_mapping`.
 
 Recommended logical separation:
 
@@ -1024,7 +618,7 @@ migration_inventory.field_inventory
     = physical schema facts
 
 migration_mapping.field_mapping
-    = mapping decisions
+    = mapping decisions + field_status
 
 migration_mapping.value_mapping
     = runtime/design-time ID/value translations
@@ -1033,40 +627,27 @@ migration_inventory.table_dependency
     = dependency graph
 ```
 
-No additional contract table is required when these structures preserve all required facts.
-
 ---
 
-# 21. Recommended Display Table
+# 15. Recommended Display Table
 
-For reviewable Markdown, use:
+Generated Markdown should expose `Field Status` directly:
 
-| Source | S.Type | S.Key | Target | T.Type | T.Key | Card. | M | Ref | Domain | Rule | Verify |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `{{SOURCE_FIELD}}` | `{{SOURCE_TYPE}}` | `{{SOURCE_KEY}}` | `{{TARGET_FIELD}}` | `{{TARGET_TYPE}}` | `{{TARGET_KEY}}` | `{{CARDINALITY}}` | `{{MAPPING_TYPE}}` | `{{REFERENCE_TYPE}}` | `{{DOMAIN}}` | `{{RULE}}` | `{{VERIFY}}` |
+| Source | S.Type | S.Key | Target | T.Type | T.Key | Field Status | Card. | M | Ref | Domain | Rule | Verify |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `{{SOURCE_FIELD}}` | `{{SOURCE_TYPE}}` | `{{SOURCE_KEY}}` | `{{TARGET_FIELD}}` | `{{TARGET_TYPE}}` | `{{TARGET_KEY}}` | `{{FIELD_STATUS}}` | `{{CARDINALITY}}` | `{{MAPPING_TYPE}}` | `{{REFERENCE_TYPE}}` | `{{DOMAIN}}` | `{{RULE}}` | `{{VERIFY}}` |
 
-For large migrations, keep the Markdown readable but ensure the underlying mapping dataset also contains:
+For compact generated documents it is acceptable to use:
 
 ```text
-nullable
-default
-charset/collation
-identity strategy
-mapping group
-rule origin
-evidence
-reason
-parser rule
-execution order
+Source | Target | Status | M | X
 ```
 
-The document may be a generated/readable representation of a structured mapping dataset.
+where `Status` is always one of `READY`, `SKIP`, `MISSING`.
 
 ---
 
-# 22. Materialize Into the Mapping Database
-
-Recommended sequence:
+# 16. Generation and Materialization Sequence
 
 ```text
 source field inventory
@@ -1083,115 +664,68 @@ explicit overrides
       ↓
 candidate mappings
       ↓
-validated final mappings
+validate schema / type / key / references / structured data
       ↓
-field_mapping
+resolve cardinality
       ↓
-target anti-join
+resolve source-only fields
       ↓
-target resolution rows
+resolve target-only fields
+      ↓
+classify READY / SKIP / MISSING
+      ↓
+materialize field_mapping
+      ↓
+definition-level QA
 ```
 
-Use an idempotent seed process.
-
-Do not rely on manual copy/paste for large mappings.
-
-Recommended stable keys:
-
-```text
-SOURCE_MAPPING:
-(source_version, source_table, source_field, mapping_group_key, target_table, target_field)
-
-TARGET_RESOLUTION:
-(target_version, target_table, target_field, row_kind)
-```
-
-Exact database constraints may vary with implementation, but rerunning the seed must not create duplicate logical mappings.
+Use an idempotent seed/materialization process.
 
 ---
 
-# 23. Source Coverage QA
+# 17. Field Status QA
 
-Coverage must be based on distinct source-field identities, not total mapping action rows.
-
-Conceptual query:
+Allowed-value query:
 
 ```sql
-SELECT COUNT(DISTINCT CONCAT(source_table, '.', source_field)) AS covered_source_fields
+SELECT
+    field_status,
+    COUNT(*) AS mapping_rows
 FROM migration_mapping.field_mapping
 WHERE migration_run_id = :migration_run_id
-  AND row_kind = 'SOURCE_MAPPING';
+GROUP BY field_status
+ORDER BY field_status;
 ```
 
-Compare with:
+Invalid/null query:
 
 ```sql
-SELECT COUNT(*) AS source_fields
-FROM migration_inventory.field_inventory
+SELECT *
+FROM migration_mapping.field_mapping
 WHERE migration_run_id = :migration_run_id
-  AND database_side = 'SOURCE';
+  AND (
+      field_status IS NULL
+      OR field_status NOT IN ('READY', 'SKIP', 'MISSING')
+  );
 ```
 
-Required:
+Expected result: **0 rows**.
+
+Required semantic QA:
 
 ```text
-covered_source_fields = source_fields
-uncovered_source_fields = 0
+READY + missing source/target side      = 0
+MISSING + both sides present            = 0
+MISSING + both sides absent             = 0
+SKIP + missing reason                   = 0
+MISSING + missing resolution/reason     = 0
 ```
-
-### Detect source fields with no mapping
-
-```sql
-SELECT
-    fi.table_name,
-    fi.column_name
-FROM migration_inventory.field_inventory AS fi
-LEFT JOIN migration_mapping.field_mapping AS fm
-  ON fm.migration_run_id = fi.migration_run_id
- AND fm.row_kind = 'SOURCE_MAPPING'
- AND fm.source_table = fi.table_name
- AND fm.source_field = fi.column_name
-WHERE fi.migration_run_id = :migration_run_id
-  AND fi.database_side = 'SOURCE'
-  AND fm.source_field IS NULL
-ORDER BY fi.table_name, fi.ordinal_position;
-```
-
-Expected result: **0 rows**.
 
 ---
 
-# 24. Target Resolution QA
+# 18. Decision Quality QA
 
-Every required target field must either receive source data or an explicit target resolution.
-
-Conceptually:
-
-```sql
-SELECT
-    tf.table_name,
-    tf.column_name
-FROM migration_inventory.field_inventory AS tf
-LEFT JOIN migration_mapping.field_mapping AS fm
-  ON fm.migration_run_id = tf.migration_run_id
- AND fm.target_table = tf.table_name
- AND fm.target_field = tf.column_name
-WHERE tf.migration_run_id = :migration_run_id
-  AND tf.database_side = 'TARGET'
-  AND tf.required_for_scope = 1
-  AND fm.target_field IS NULL
-ORDER BY tf.table_name, tf.ordinal_position;
-```
-
-Expected result: **0 rows**.
-
-If `required_for_scope` is not stored directly, derive it from the target contract/profile before running this gate.
-
----
-
-# 25. Decision Quality QA
-
-Reject unresolved decisions:
+Reject unresolved mapping decisions:
 
 ```sql
 SELECT *
@@ -1222,36 +756,9 @@ RECREATE without recreation rule        = 0
 
 ---
 
-# 26. Mapping-Group / Cardinality QA
-
-For every non-`ONE_TO_ONE` mapping:
-
-```text
-mapping_group_key must exist
-cardinality must be explicit
-all group members must exist
-group transform rule must be deterministic
-verification rule must cover the whole group
-```
-
-Gate:
-
-```text
-Invalid mapping groups                  = 0
-Orphan mapping-group members            = 0
-Unknown cardinality                     = 0
-Conflicting group transforms            = 0
-```
-
-Do not count legitimate multi-row mapping groups as duplicate field mappings.
-
----
-
-# 27. Verification Rule Contract
+# 19. Verification Rule Contract
 
 Every final mapping must be verifiable.
-
-Recommended minimum verification semantics:
 
 ```text
 DIRECT
@@ -1267,7 +774,7 @@ STRUCTURED
 → parse/remap/reparse succeeds; unresolved refs = 0
 
 GENERATED
-→ deterministic generation + target constraint validation
+→ deterministic generation + target validation
 
 REBUILD
 → target rebuild/integrity verification
@@ -1276,7 +783,7 @@ REFERENCE_ONLY
 → semantic identity uniquely resolves
 
 ARCHIVE
-→ source field/value accounting and archive evidence
+→ source value accounting + archive evidence
 
 IGNORE
 → reason + source accounting
@@ -1285,264 +792,62 @@ DEFAULT
 → approved target default verified
 
 TARGET_OWNED
-→ target value/state retained and validated
+→ target-owned value/state validated
 
 RECREATE
 → recreated target state verified
 ```
 
-Gate:
-
-```text
-Mappings with verification rule         = 100%
-Unverifiable final mappings             = 0
-```
-
 ---
 
-# 28. Reuse Strategy for Future Migrations
+# 20. Definition-Level Checklist
 
-The reusable process should be:
+## Coverage
 
-```text
-1. Generate source group inventory
-2. Generate source field inventory
-3. Generate target group inventory
-4. Generate target field inventory
-5. Generate table mapping
-6. Select/create migration profile
-7. Generate candidate field mappings
-8. Apply explicit overrides
-9. Validate schema/type/key/reference rules
-10. Resolve source-only fields
-11. Resolve target-only fields
-12. Validate mapping cardinality
-13. Materialize field_mapping
-14. Materialize runtime value_mapping during migration
-15. Run definition-level QA
-16. Run production reconciliation
-17. Execute migration
-18. Run runtime verification
-```
-
-The reusable core should never contain hard-coded product-specific rules.
-
-Use profiles and overrides for system-specific semantics.
-
----
-
-# 29. Full 100% Field Mapping Checklist
-
-## A. Prerequisites
-
-- [ ] Source group manifest PASS
-- [ ] Source field inventory PASS
-- [ ] Target group manifest PASS
-- [ ] Target field inventory PASS
-- [ ] Table mapping PASS
-- [ ] Migration scope explicit
-- [ ] Source/target versions explicit
-- [ ] Source/target schema authority explicit
-- [ ] Production deviations classified before production execution
-
-## B. Field universes
-
-- [ ] Source field universe generated
-- [ ] Target field universe generated
-- [ ] Source field identities unique
-- [ ] Target field identities unique
-- [ ] Wildcard field entries = 0
-- [ ] Missing inventory fields = 0
-
-## C. Physical schema metadata
-
-- [ ] Raw data type available
-- [ ] Full column type available
-- [ ] Canonical type family available
-- [ ] Length available where applicable
-- [ ] Precision/scale available where applicable
-- [ ] Nullability available
-- [ ] Default available
-- [ ] Generated/identity semantics available
-- [ ] Charset/collation available where applicable
-- [ ] Key role available
-- [ ] Index membership available
-- [ ] Physical FK metadata available where declared
-
-## D. Source coverage
-
-- [ ] Every source physical field has >= 1 accounting/mapping decision
-- [ ] Distinct source coverage = 100%
-- [ ] Unmapped source fields = 0
+- [ ] Source fields inventoried = 100%
+- [ ] Target fields inventoried = 100%
+- [ ] Source field mapping/accounting = 100%
+- [ ] Required target field resolution = 100%
 - [ ] Silent source drops = 0
-- [ ] Source-only field set processed = 100%
 
-## E. Target coverage
+## Field status
 
-- [ ] Target anti-join executed
-- [ ] Target-only field set processed = 100%
-- [ ] Every required target field has >= 1 resolution
-- [ ] Required target resolution = 100%
-- [ ] Unresolved required target fields = 0
-- [ ] Unknown target strategy = 0
+- [ ] Every row has exactly one `field_status`
+- [ ] Allowed values only: READY / SKIP / MISSING
+- [ ] READY rows have both physical sides present
+- [ ] READY rows have complete executable + verification rules
+- [ ] SKIP rows have explicit reasons
+- [ ] MISSING rows have exactly one physical side absent
+- [ ] MISSING rows have explicit mapping/accounting outcomes
+- [ ] MISSING is not automatically treated as failure
+- [ ] Invalid/null field status = 0
 
-## F. Mapping decision quality
+## Mapping quality
 
-- [ ] Allowed final decisions only
-- [ ] UNKNOWN = 0
-- [ ] PENDING = 0
-- [ ] REVIEW = 0
-- [ ] OPTIONAL = 0
-- [ ] UNMAPPED = 0
-- [ ] AMBIGUOUS = 0
-- [ ] Mapping reason/evidence exists where needed
-- [ ] Rule origin recorded
-
-## G. Cardinality
-
-- [ ] ONE_TO_ONE supported
-- [ ] ONE_TO_MANY supported
-- [ ] MANY_TO_ONE supported
-- [ ] MANY_TO_MANY supported
-- [ ] ONE_TO_NONE supported
-- [ ] NONE_TO_ONE supported
-- [ ] Mapping group key used for grouped transforms
+- [ ] Invalid mapping decisions = 0
+- [ ] Unknown cardinality = 0
 - [ ] Invalid mapping groups = 0
-- [ ] Orphan group members = 0
+- [ ] Missing required rule evidence = 0
 
-## H. Type compatibility
+## Schema / identity / relationships
 
-- [ ] DIRECT schema compatibility checked
-- [ ] Actual data-range/length checks performed where required
-- [ ] Signed/unsigned changes checked
-- [ ] Precision/scale changes checked
-- [ ] Charset/encoding changes checked
-- [ ] Collation/case changes checked
-- [ ] Nullable changes checked
-- [ ] Default changes checked
-- [ ] Silent truncation/coercion forbidden
-- [ ] Unsafe DIRECT mappings = 0
+- [ ] Unsafe DIRECT = 0
+- [ ] Ambiguous identity matches = 0
+- [ ] PK/UNIQUE collisions = 0
+- [ ] Missing required reference domains = 0
+- [ ] Broken required relationships = 0
+- [ ] Structured fields without parser/rule = 0
 
-## I. Keys and identity
+## Materialization
 
-- [ ] PK classified
-- [ ] Composite PK classified
-- [ ] UNIQUE classified
-- [ ] Indexes classified
-- [ ] Identity strategy explicit
-- [ ] Numeric ID equality never assumed without proof
-- [ ] Natural-key uniqueness proven where used
-- [ ] PK collisions = 0
-- [ ] UNIQUE collisions = 0
-- [ ] Ambiguous identities = 0
-
-## J. Reference coverage
-
-- [ ] Physical FKs inventoried
-- [ ] Logical FKs classified
-- [ ] Polymorphic references classified
-- [ ] Embedded references classified
-- [ ] Semantic references classified
-- [ ] Required reference domains present
-- [ ] Missing reference domains = 0
-- [ ] Broken required references = 0
-- [ ] Ambiguous polymorphic references = 0
-
-## K. Structured data
-
-- [ ] Structured fields discovered = 100%
-- [ ] Parser rule exists for every structured field
-- [ ] Serializer rule exists where required
-- [ ] Embedded references explicitly handled
-- [ ] Invalid payloads = 0
-- [ ] Unresolved embedded refs = 0
-- [ ] Reparse failures = 0
-- [ ] Raw string ID replacement forbidden
-
-## L. Special values
-
-- [ ] NULL semantics checked
-- [ ] Empty-string semantics checked
-- [ ] Zero/sentinel semantics checked
-- [ ] Negative-ID semantics checked where applicable
-- [ ] Legacy/invalid dates checked
-- [ ] Enum/state mappings checked
-- [ ] Default semantics checked
-- [ ] Generated values checked
-
-## M. Constraints
-
-- [ ] PK constraints checked after mapping
-- [ ] Composite PK checked after mapping
-- [ ] UNIQUE checked after mapping
-- [ ] CHECK/domain constraints checked
-- [ ] NOT NULL checked
-- [ ] FK/reference integrity checked
-- [ ] Constraint violations = 0
-
-## N. Source-only fields
-
-- [ ] Source-only discovery = 100%
-- [ ] Every source-only field has final decision
-- [ ] Archive rules explicit where used
-- [ ] Ignore reason explicit where used
-- [ ] Transform destination explicit where used
-- [ ] Silent source-only drops = 0
-
-## O. Target-only fields
-
-- [ ] Target-only discovery = 100%
-- [ ] Every target-only field classified
-- [ ] DEFAULT validated
-- [ ] GENERATED rule explicit
-- [ ] TARGET_OWNED rule explicit
-- [ ] RECREATE rule explicit
-- [ ] NOT_REQUIRED_BY_SCOPE explicit where used
-- [ ] Unresolved target-only required fields = 0
-
-## P. Database materialization
-
+- [ ] `field_mapping` includes `field_status`
 - [ ] `field_inventory` remains physical schema source of truth
-- [ ] `field_mapping` remains static mapping-decision source of truth
-- [ ] `value_mapping` remains runtime/design-time value/ID translation store
-- [ ] Row kind available
-- [ ] Cardinality available
-- [ ] Mapping group available
-- [ ] Rule origin/evidence available
-- [ ] Seed process idempotent
-- [ ] Duplicate logical mappings = 0
-- [ ] Enriched source→target mapping SELECT available
-
-## Q. Verification readiness
-
-- [ ] Every final mapping has verification rule
-- [ ] DIRECT equality verification defined
-- [ ] TRANSFORM expected-result verification defined
-- [ ] LOOKUP orphan/ambiguity verification defined
-- [ ] STRUCTURED parse/remap/reparse verification defined
-- [ ] GENERATED/REBUILD integrity verification defined
-- [ ] ARCHIVE accounting verification defined
-- [ ] IGNORE accounting/reason verification defined
-- [ ] DEFAULT/TARGET_OWNED/RECREATE verification defined
-- [ ] Unverifiable mappings = 0
-
-## R. Reuse / operational safety
-
-- [ ] Generic rules separated from platform profile
-- [ ] Profile rules versioned
-- [ ] Explicit overrides versioned
-- [ ] Mapping decisions version-scoped
-- [ ] Mapping generation deterministic
-- [ ] Production source remains immutable
-- [ ] Errors never auto-converted to IGNORE
-- [ ] Rerun does not create duplicate mappings
-- [ ] Rerun does not create conflicting value mappings
+- [ ] `value_mapping` remains ID/value mapping store
+- [ ] Seed/materialization is idempotent
 
 ---
 
-# 30. Final Definition-Level Gate
-
-The field mapping may claim definition-level PASS only when all following conditions are true:
+# 21. Final Definition-Level Gate
 
 ```text
 BASELINE / INVENTORY
@@ -1552,22 +857,23 @@ Source fields inventoried                   = 100%
 Target tables inventoried                   = 100%
 Target fields inventoried                   = 100%
 Unknown schema objects                      = 0
-Unclassified schema deviations              = 0
 
-SOURCE COVERAGE
+SOURCE / TARGET COVERAGE
 --------------------------------------------------
 Distinct source fields accounted            = 100%
 Unmapped source fields                      = 0
 Silent source-field drops                   = 0
-Source-only fields resolved                 = 100%
-
-TARGET COVERAGE
---------------------------------------------------
-Target anti-join processed                  = 100%
-Target-only fields classified               = 100%
 Required target fields resolved             = 100%
 Unresolved required target fields           = 0
-Unknown target strategy                     = 0
+
+FIELD STATUS
+--------------------------------------------------
+Field status classified                     = 100%
+Invalid/null field status                   = 0
+READY with missing physical side            = 0
+MISSING with both physical sides present    = 0
+MISSING with both physical sides absent     = 0
+SKIP without explicit reason                = 0
 
 MAPPING QUALITY
 --------------------------------------------------
@@ -1575,66 +881,37 @@ Final mapping decisions                     = 100%
 Invalid/unknown/pending decisions            = 0
 Unknown cardinality                         = 0
 Invalid mapping groups                      = 0
-Missing rule origin/evidence where required = 0
 
-SCHEMA COMPATIBILITY
+SCHEMA / IDENTITY / REFERENCES
 --------------------------------------------------
-Field metadata resolved                     = 100%
 Unsafe DIRECT mappings                      = 0
-Unresolved type conversions                 = 0
-Unresolved narrowing/truncation             = 0
-Unresolved NULL/default changes             = 0
-Unresolved collation collisions             = 0
-
-IDENTITY / CONSTRAINTS
---------------------------------------------------
-Required identity strategies defined        = 100%
 Ambiguous identity matches                  = 0
-PK collisions                               = 0
-UNIQUE collisions                           = 0
-Constraint violations                       = 0
-
-REFERENCES
---------------------------------------------------
-Required reference classification           = 100%
+PK/UNIQUE collisions                        = 0
 Missing required reference domains          = 0
 Broken required relationships               = 0
-Ambiguous polymorphic references            = 0
-
-STRUCTURED DATA
---------------------------------------------------
-Structured fields discovered                = 100%
-Structured fields with parser/rule          = 100%
-Invalid structured payloads                 = 0
 Unresolved embedded references              = 0
 
-DATABASE MATERIALIZATION
---------------------------------------------------
-Actual static field mappings materialized   = 100%
-Duplicate logical mappings                  = 0
-Missing materialized source coverage        = 0
-Missing materialized target resolution      = 0
-
-VERIFICATION READINESS
+VERIFICATION / MATERIALIZATION
 --------------------------------------------------
 Mappings with verification rule             = 100%
 Unverifiable final mappings                 = 0
-Unresolved dependencies                     = 0
+Missing materialized source coverage        = 0
+Missing materialized target resolution      = 0
 
 ==================================================
 FIELD MAPPING CONTRACT                       = PASS
 ==================================================
 ```
 
-Required wording for a successful definition-level result:
+Required successful wording:
 
-> **100% of source physical fields in the declared migration scope are explicitly accounted for, and 100% of required target physical fields have an explicit resolution. No source field is silently dropped, no required target field remains unresolved, and every final mapping is supported by schema, identity/reference, rule, and verification metadata.**
+> **100% of source physical fields are explicitly accounted for, 100% of required target physical fields have an explicit resolution, and every mapping row is classified as READY, SKIP, or MISSING. MISSING identifies a physical source/target asymmetry and does not itself imply failure when an explicit resolution exists.**
 
 ---
 
-# 31. Production Boundary
+# 22. Production Boundary
 
-Definition-level PASS does **not** mean the production migration has already succeeded.
+Definition-level PASS does not mean production migration has already succeeded.
 
 Production PASS additionally requires:
 
@@ -1653,11 +930,9 @@ migration execution errors                = 0
 rerun/idempotency checks                  = PASS
 ```
 
-Only after these runtime checks pass may the wider migration process claim that all database data in scope has been accounted for and verified.
-
 ---
 
-# 32. End-to-End Reusable Flow
+# 23. End-to-End Reusable Flow
 
 ```mermaid
 flowchart TD
@@ -1665,24 +940,22 @@ flowchart TD
     C[Target Group Inventory PASS] --> D[Target Field Inventory PASS]
     B --> E[Table Mapping PASS]
     D --> E
-    E --> F[Load Generic Field Rules]
-    F --> G[Load Migration Profile]
-    G --> H[Apply Explicit Overrides]
-    H --> I[Generate Candidate Mappings]
-    I --> J[Validate Schema / Type / Key]
-    J --> K[Validate Identity / References]
-    K --> L[Validate Structured Data]
-    L --> M[Resolve Mapping Cardinality]
-    M --> N[Resolve Source-Only Fields]
-    N --> O[Resolve Target-Only Fields]
-    O --> P[Materialize field_mapping]
-    P --> Q[Definition-Level QA Gate]
-    Q -->|FAIL| H
-    Q -->|PASS| R[Runtime value_mapping + Migration Execution]
-    R --> S[Record / Field / Relationship Verification]
-    S --> T{Runtime Errors = 0?}
-    T -->|NO| H
-    T -->|YES| U[Production Migration PASS]
+    E --> F[Generate Candidate Mappings]
+    F --> G[Validate Schema / Type / Key]
+    G --> H[Validate Identity / References]
+    H --> I[Validate Structured Data]
+    I --> J[Resolve Cardinality]
+    J --> K[Resolve Source-Only Fields]
+    K --> L[Resolve Target-Only Fields]
+    L --> M[Classify READY / SKIP / MISSING]
+    M --> N[Materialize field_mapping]
+    N --> O[Definition-Level QA Gate]
+    O -->|FAIL| F
+    O -->|PASS| P[Runtime value_mapping + Migration Execution]
+    P --> Q[Record / Field / Relationship Verification]
+    Q --> R{Runtime Errors = 0?}
+    R -->|NO| F
+    R -->|YES| S[Production Migration PASS]
 ```
 
-This flow is the recommended reusable standard for future field-mapping migrations.
+This is the reusable standard for future field-mapping migrations.
