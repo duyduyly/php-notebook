@@ -1,5 +1,7 @@
 # Joomla Core Table Mapping — Joomla 3.10.12 → Joomla 6.1.2
 
+> **Workflow authority:** This is a static table-mapping reference. New workflow materialization, verification, reporting, and PASS rules are governed by [`../migration-workflow.md`](../migration-workflow.md) and the 2026-08-14 overlay below.
+
 ## Mapping-report synchronization — 2026-08-12
 
 This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
@@ -21,6 +23,24 @@ Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VA
 The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
 
 The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+## Canonical workflow usage overlay — 2026-08-14
+
+This file is a static table-mapping reference consumed under [`../migration-workflow.md`](../migration-workflow.md); its five groups and historical counts are not workflow steps or reusable live PASS counters.
+
+For every new seven-step workflow:
+
+1. Step 1 freezes the selected source and clean-target inventories, creates exactly one DRAFT `mapping_release`, and only then creates complete table mappings bound to that release.
+2. The live table denominator comes from the frozen included-source scope. A documented reference row is `SKIP_ABSENT_SOURCE` only when the bound source snapshot proves the physical table is absent and has zero rows/fields; a present table cannot be skipped.
+3. Third-party rows stored in Joomla Core tables are classified by data ownership. `DEFERRED_OUT_OF_SCOPE` requires preserved source evidence, exact row/cell accounting, and a named later extension workflow.
+4. Step 2 independently verifies table coverage, uniqueness, classifications, dependencies, baselines, release binding, and snapshot fingerprints. It does not repair Step 1 or inspect field mappings.
+5. Step 3 expands every included table mapping into exact per-field executable producer semantics. A table row in this reference does not by itself prove an executable writer exists.
+6. Step 4's embedded Migration Disposition Report must reconcile every table and its rows/cells to one approved outcome. `MISSING_EXPECTED`, unexplained skip, duplicate disposition, missing archive evidence, and missing deferred evidence must all be zero.
+7. Step 5 independently recalculates the table outcomes through the Post-Migration No-Data-Loss Tutorial; it never trusts Step 4 totals as expected values and never repairs data.
+
+The `ARCHIVE`, `IGNORE`, `REBUILD`, `REFERENCE_ONLY`, and absent-source rows below are candidate contract decisions, not permission for silent loss. Each requires the executable producer/no-write/rebuild rule, accounting, and verification frozen by the current release.
 
 ---
 
@@ -54,6 +74,19 @@ Definition-level coverage    = 100%
 
 ## Canonical Decisions
 
+### Selected-source override — `honda_corp` Joomla 3.8 lineage
+
+The following entries superseded the corresponding canonical rows only for workflow `JOOMLA_CORE` / `j3-to-j6-20260813-01`. Its bound `ty08n_` snapshot lacked all six physical tables, so Step 1 persisted each as `SKIP_ABSENT_SOURCE` with zero fields and rows and no field/migration/validation denominator. That workflow's physical mapping denominator was 72 tables / 672 fields, while the 78-row document baseline remained intact. A later workflow must re-prove these absences from its own snapshot; it cannot inherit this override or skip a table that is now present.
+
+| # | Source | Target / Destination | Mapping Type | Reason |
+|---:|---|---|---|---|
+| 42 | `#__privacy_requests` | `#__privacy_requests` | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+| 43 | `#__privacy_consents` | `#__privacy_consents` | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+| 44 | `#__action_logs_extensions` | `#__action_logs_extensions` | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+| 45 | `#__action_log_config` | `#__action_log_config` | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+| 46 | `#__action_logs_users` | `#__action_logs_users` | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+| 74 | `#__action_logs` | migration archive | `SKIP_ABSENT_SOURCE` | Selected source table absent. |
+
 Allowed final `Mapping Type` values:
 
 ```text
@@ -68,6 +101,7 @@ REFERENCE_ONLY
 TARGET_OWNED
 ARCHIVE
 IGNORE
+SKIP_ABSENT_SOURCE
 ```
 
 The final table mapping must contain none of:
@@ -92,7 +126,7 @@ A / B
 | `GENERATED` | Joomla 6 generates/rebuilds the target identity/state. |
 | `NONE` | This table does not produce an entity ID map. |
 
-`value_mapping` is the runtime/design-time value/ID mapping store. This document does not introduce a separate contract or ID-map table.
+`value_mapping` is the shared value/ID mapping store. Step 3 may persist only contract-defined `STATIC` mappings; Step 4 creates and verifies `RUNTIME` mappings at the frozen producer persistence points. A temporary map does not satisfy the handoff. This document does not introduce a separate contract or ID-map table.
 
 ## Verification Codes
 
@@ -106,8 +140,10 @@ A / B
 | `V_REBUILD` | Source rows are accounted as REBUILD and regenerated target structures pass integrity checks. |
 | `V_HISTORY` | Every preserved history row resolves type/item/user identity or is explicitly archived; silent loss = 0. |
 | `V_FINDER` | Source search-index rows are accounted as REBUILD and Joomla 6 index rebuild passes integrity checks. |
-| `V_ARCHIVE` | Archived row count = source row count and archive evidence contains source identity/reason. |
-| `V_IGNORE` | Ignored row count = source row count and the non-business/runtime/install-state reason is explicit. |
+| `V_ARCHIVE` | Archived identities/counts equal expected source evidence; payload/value read-back, hash equality, duplicate prevention, and accounting all pass. |
+| `V_IGNORE` | Ignored row/cell count equals the frozen expectation and the non-business/runtime/install-state reason and accounting are explicit. |
+| `V_DEFER` | Third-party/out-of-scope row/cell evidence is preserved with ownership, reason, and named later-workflow owner; missing evidence = 0. |
+| `V_ABSENT` | The bound snapshot proves the source table is physically absent with zero rows/fields; a present table fails. |
 
 ---
 
@@ -309,20 +345,29 @@ Every production source row must end in exactly one accounting bucket compatible
 source_rows
 = transformed/migrated_rows
 + rebuilt_source_rows
-+ reference_only_rows
++ target_owned_rows
 + archived_rows
-+ ignored_rows
-+ error_rows
++ deferred_out_of_scope_rows
++ intentionally_ignored_rows
++ rejected_rows
 ```
+
+The same invariant is required at cell level. `ID_MAP`, `VALUE_MAP`, and `TRANSFORM` are migrated subtypes and may not create a second disposition. `SKIP_ABSENT_SOURCE` contributes zero physical rows/cells and is proven separately from snapshot evidence.
 
 Final production PASS requires:
 
 ```text
-error_rows       = 0
-unaccounted_rows = 0
+rejected_rows             = 0
+rejected_cells            = 0
+unaccounted_rows           = 0
+unaccounted_cells          = 0
+missing_expected           = 0
+unexplained_skip           = 0
+duplicate_disposition      = 0
+missing_deferred_evidence  = 0
 ```
 
-`REBUILD`, `REFERENCE_ONLY`, `ARCHIVE`, and `IGNORE` are valid explicit accounting outcomes; they are not silent data loss.
+`REBUILD`, `TARGET_OWNED`/reference-only, `ARCHIVE`, `DEFERRED_OUT_OF_SCOPE`, and `INTENTIONAL_IGNORE` are valid explicit accounting outcomes only when their frozen evidence and verification rules pass; they are not silent data loss. Step 4 renders them in the Migration Disposition Report, and Step 5 independently reconciles them through the Post-Migration No-Data-Loss Tutorial.
 
 ---
 
@@ -484,6 +529,10 @@ ACCOUNTING / VERIFICATION
 Record strategies              = 78 / 78
 Verification strategies        = 78 / 78
 Unverifiable mappings          = 0
+Missing expected               = 0
+Unexplained skip               = 0
+Duplicate disposition          = 0
+Archive/deferred evidence gaps = 0
 
 DATABASE SEED
 --------------------------------------
@@ -495,4 +544,4 @@ TABLE MAPPING CONTRACT          = PASS
 ======================================
 ```
 
-> This is a **definition-level PASS** against the official Joomla 3.10.12 / Joomla 6.1.2 baselines. Production PASS still requires actual-schema reconciliation, runtime `value_mapping`, record accounting, and zero verification errors.
+> This is a **definition-level PASS** against the official Joomla 3.10.12 / Joomla 6.1.2 baselines. Production PASS still requires current-snapshot reconciliation, the compiled executable Step 3 release, persisted Step 4 RUNTIME mappings and Migration Disposition Report, and the independently executed Step 5 Post-Migration No-Data-Loss Tutorial with zero verification errors.

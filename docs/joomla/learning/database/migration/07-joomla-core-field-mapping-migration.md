@@ -1,5 +1,7 @@
 # Joomla Core Field Mapping — Joomla 3.10.12 → Joomla 6.1.2
 
+> **Workflow authority:** This is a static field-decision reference. A new release cannot freeze from these rows alone; executable compilation, reporting, and PASS rules are governed by [`../migration-workflow.md`](../migration-workflow.md) and the 2026-08-14 overlay below.
+
 ## Mapping-report synchronization — 2026-08-12
 
 This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
@@ -21,6 +23,42 @@ Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VA
 The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
 
 The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+## Canonical executable-contract overlay — 2026-08-14
+
+This file is the static field-decision reference. [`../migration-workflow.md`](../migration-workflow.md) is authoritative for Step 3 materialization/compilation, Step 4 execution/reporting, and Step 5 independent no-data-loss validation. The 711/832/168/206 figures below remain reference-manifest observations; a new workflow uses the denominators derived from its frozen physical scope and may not claim PASS from these documentation counts.
+
+Step 3 must expand each active included source-field decision into a complete executable contract bound to the actual DRAFT release and persisted mapping IDs. Every executable field defines the exact source/target fields and SQL expression, dependency, named runtime-map domain and persistence point where applicable, FK/reference rewrite, NULL/default/reset behavior, archive/defer/rebuild/target-owned disposition, row/cell accounting, and post-write verification. It must also bind every external Joomla rebuild to the validated reusable operator command, workflow/release/hash/target/domain inputs, expected effects, reset behavior, and continuation verifier.
+
+The release remains DRAFT until all relevant gates are zero:
+
+```text
+GENERIC_COPY_TEMPLATES = 0
+GENERIC_RUNTIME_MAP_TEMPLATES = 0
+UNQUALIFIED_RUNTIME_MAP_TEMPLATES = 0
+UNRESOLVED_CONTRACT_TABLE_MARKERS = 0
+UNBOUND_PSEUDO_CALLS = 0
+MISSING_FIELD_SQL_EXPRESSIONS = 0
+MISSING_NAMED_MAP_LOOKUPS = 0
+MISSING_FK_REWRITES = 0
+MISSING_VALUE_MAP_IMPLEMENTATIONS = 0
+MISSING_NEUTRAL_USER_IMPLEMENTATIONS = 0
+MISSING_ARCHIVE_IMPLEMENTATIONS = 0
+MISSING_NO_WRITE_ACCOUNTING = 0
+MISSING_EXTERNAL_REBUILD_BINDINGS = 0
+ARCHIVE_SQL_PLACEHOLDERS = 0
+ARCHIVE_SQL_PARSE_ERRORS = 0
+EXECUTABLE_ARCHIVE_PRODUCERS = REQUIRED / REQUIRED
+ARCHIVE_CONTRACT_GAPS = 0
+RUNTIME_COMPILATION_ERRORS = 0
+AMBIGUOUS_WRITER_SEMANTICS = 0
+```
+
+Every archive mapping must persist a complete Step 4 `INSERT ... SELECT` contract with physical columns/expressions, deterministic source identity, workflow/release binding, reason, payload/value hash, duplicate prevention, accounting, read-back, and hash verification. Step 3 parses the exact persisted SQL without executing the archive write. Step 4 executes it and embeds the resulting disposition evidence in its plan. Step 5 independently reads it back and rehashes it.
+
+`field_status = SKIP` in the legacy readiness vocabulary below means an explicitly justified no-active-copy physical-field state; it is not a workflow waiver. `field_status = MISSING` describes schema-side absence; it does not authorize missing migration evidence. At workflow accounting level, `MISSING_EXPECTED` and unexplained skips are blocking failures. Approved no-write outcomes must use the frozen `TARGET_OWNED`, `REBUILD`, `ARCHIVE`, `DEFERRED_OUT_OF_SCOPE`, `INTENTIONAL_IGNORE`, or snapshot-proven `SKIP_ABSENT_SOURCE` disposition and must appear in the Step 4 Migration Disposition Report and Step 5 Post-Migration No-Data-Loss Tutorial.
 
 ---
 
@@ -1821,12 +1859,31 @@ mapping_type-driven target NULL       = FORBIDDEN
 MATERIALIZATION / PRODUCTION
 ----------------------------------------------
 Actual schema reconciliation          = REQUIRED
-Materialized 711 source coverage      = REQUIRED
+Materialized active source coverage   = active included / active included
 Materialized target resolution        = REQUIRED
 Invalid field status                  = MUST BE 0
 Canonical-decision mismatches         = MUST BE 0
-Runtime ID/value mapping              = REQUIRED
-Record/value verification             = REQUIRED
+
+STEP 3 EXECUTABLE COMPILATION
+----------------------------------------------
+Generic/unqualified templates         = 0
+Unbound pseudo-calls                  = 0
+Missing exact field SQL               = 0
+Missing named map/FK rewrites         = 0
+Missing archive/no-write/rebuild bind = 0
+Archive placeholders/parse errors     = 0
+Executable archive producers          = required / required
+Runtime compilation errors            = 0
+Normalized executable hash recheck    = EQUAL
+
+STEP 4 / STEP 5 PRODUCTION PROOF
+----------------------------------------------
+Persisted RUNTIME ID/value mappings   = required / required
+Migration Disposition Report          = complete
+Missing expected/unexplained skip     = 0
+Archive/deferred evidence failures    = 0
+Post-Migration No-Data-Loss Tutorial  = 11 / 11 PASS
+Independent record/value verification = PASS
 ```
 
-> **Definition-level field mapping coverage is 100% (711/711 source physical fields and 832/832 declared target physical fields accounted by the source/target inventory contract). Production correctness must not be reported as 100% until the actual J3/J6 schemas, materialized `field_mapping`, runtime value mappings, and migrated data all pass their zero-failure gates.**
+> **Definition-level field mapping coverage remains the 711/711 source and 832/832 target reference manifest. Production correctness must not be reported as 100% until the selected live scope is frozen, every active field is compiled into the executable Step 3 contract, Step 4 persists its runtime maps and complete disposition evidence, and Step 5 independently passes all no-data-loss gates.**

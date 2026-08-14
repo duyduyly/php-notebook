@@ -1,163 +1,101 @@
-# End-to-End Database Migration Workflow Tutorial
+# End-to-End Joomla Database Migration Workflow
 
-> Controlled top-down database migration with an isolated test-database preflight, explicit producer/consumer contracts, checklist-driven Codex planning, prompt-only rollback, execution-until-PASS testing, centralized workflow history, and final MySQL files for manual execution.
+> Canonical seven-step specification for every workflow version created after this revision. Existing workflow rows, artifacts, and PASS history are immutable legacy evidence.
 
-## Migration Guarantee and Honest Meaning of 100%
+## 1. Guarantee and scope
 
-This workflow is bound to the reviewed Joomla core contract in [`../05-joomla-core-j3-j6-migration-contract.md`](../05-joomla-core-j3-j6-migration-contract.md) and [`../../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md`](../../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
-
-The pinned definition-level baseline is mandatory:
+This workflow is bound to [`docs/05-joomla-core-j3-j6-migration-contract.md`](docs/05-joomla-core-j3-j6-migration-contract.md), [`docs/06-joomla-core-table-mapping-migration.md`](docs/06-joomla-core-table-mapping-migration.md), and [`docs/07-joomla-core-field-mapping-migration.md`](docs/07-joomla-core-field-mapping-migration.md).
 
 | Gate | Required result |
 |---|---:|
-| Joomla 3 source inventory | 78 tables / 711 fields |
-| Joomla 6 target inventory | 76 tables / 832 fields |
-| Unique source fields in primary mapping | 711 |
-| Missing or duplicate source mappings | 0 |
-| Resolved source decisions | 711 / 711 = 100.00% |
-| Relationships resolved | 168 / 168 = 100.00% |
-| Unresolved fields / relationships | 0 / 0 |
-| Required target fields with population strategy | 832 / 832 = 100.00% |
-
-The authoritative decision reconciliation is:
+| Source inventory | 100% of physical objects in the frozen included-source scope |
+| Clean-target inventory | 100% of physical objects in the frozen Joomla 6 installer baseline |
+| Unique source-field decisions | Active included source fields / active included source fields |
+| Missing, duplicate, or unresolved source decisions | 0 |
+| Resolved relationships | Required relationships / required relationships |
+| Required target population strategies | Required target fields / required target fields |
+| Executable field contracts | Executable fields / executable fields |
+| Unbound templates, pseudo-calls, or producer gaps | 0 |
 
 ```text
-DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VALUE_MAP 81
-+ SPLIT 0 + MERGE 0 + DERIVED 1 + REBUILD 206
-+ ARCHIVE 6 + IGNORE 14 + UNSUPPORTED 0 = 711
-
+DIRECT + TRANSFORM + ID_MAP + VALUE_MAP + SPLIT + MERGE
++ DERIVED + REBUILD + ARCHIVE + IGNORE + UNSUPPORTED
+  = ACTIVE_INCLUDED_SOURCE_FIELDS
 UNRESOLVED = 0
 ```
 
-`mapping_release` must store or reference a deterministic SHA-256 fingerprint of the normalized 78 table mappings, 711 primary field mappings, 168 relationship mappings, target-population strategies, and their rules. The fingerprint verified in testing must equal the fingerprint used during manual migration and final verification.
+Counts such as 78/711 source objects, 76/832 target objects, 168 relationships, or 206 rebuild decisions are legacy/reference observations, not reusable PASS constants. Every new workflow derives its denominators from its own frozen scope and snapshots. Table/field dispositions such as `IGNORE`, `REBUILD`, `DERIVED`, `ARCHIVE`, or third-party deferral must be explicitly persisted and accounted by that workflow's contract; they are never inherited merely because an earlier workflow used them. A source table explicitly named in the frozen contract but physically absent from the selected version may be persisted only as `SKIP_ABSENT_SOURCE`: Step 1 records the exact absence and reason; the entry has zero fields/rows and is excluded from Steps 2–6 field, migration, and validation denominators. No present table may be skipped.
 
-The 14 `IGNORE` fields are exactly all seven fields in `#__session` and all seven fields in `#__user_keys`. They are deliberately invalidated because copying active sessions or authentication tokens would be unsafe. `#__postinstall_messages` is `REBUILD`, `#__utf8_conversion.converted` is `DERIVED`, checkout state is reset by `TRANSFORM`, and `#__ucm_history` transforms to `#__history`.
+Here, 100% means complete source-field decisions, row/cell dispositions, eligible business-data preservation, required target population, and zero unexplained loss, rejection, orphan, duplicate, or failed verification. Pinned counts are expectations, never substitutes for live inventory. This specification does not mutate existing databases or workflow history.
 
-Therefore, “100% data migrated” in this workflow means:
+## 2. Canonical architecture
 
-```text
-100% source field accounting
-+ 100% source row/cell disposition accounting
-+ 100% eligible business-data preservation
-+ 100% required target population
-+ zero unexplained loss, rejection, orphan, duplicate, or failed verification
-```
-
-It does **not** mean that unsafe runtime/security data is copied into active Joomla 6 tables. No production percentage may be claimed until an executed migration proves the formulas in Section 16.
-
----
-
-## 1. Final Architecture
-
-This revision defines the complete gated workflow, including the isolated Step 0 environment and the executable 100% accounting/preservation controls required by every later step:
+Every new workflow version has exactly seven steps:
 
 ```text
-TEST_DATABASE_SETUP
-    ↓ PASS
-INVENTORY_MAPPING
-    ↓ PASS
-INVENTORY_VERIFY
-    ↓ PASS
-MAPPING_VERIFY
-    ↓ PASS
-MIGRATION
-    ↓ PASS
-VALIDATION_DATA
-    ↓ PASS
-FINAL_VERIFY
-    ↓ PASS
-WORKFLOW PASS
-```
-
-`TEST_DATABASE_SETUP` exists to provide an isolated MySQL environment in which Codex can execute the generated SQL before returning the final files for manual use.
-
-The runtime model remains:
-
-```text
-workflow_enum                       hard-coded step definition/order
-        ↓
-workflow                            one named migration flow, e.g. JOOMLA_CORE
-        ↓
-workflow_step                       one row for every step in that workflow
-        ↓
-workflow_execution_history          one final evidence row for every workflow_step
-```
-
-Rollback remains SQL/prompt behavior only. No rollback workflow step, attempt model, rollback table, or new rollback status is introduced.
-
----
-
-## 2. Core Responsibility
-
-### `migration_inventory`
-
-```text
-migration_inventory
-│
-├── INVENTORY DETAIL
-│   ├── database_list
-│   ├── inventory_snapshot
-│   ├── table_list
-│   ├── field_inventory
-│   ├── table_dependency
-│   └── record_inventory
-│
-├── WORKFLOW CONTROL
-│   ├── workflow
-│   ├── workflow_step
-│   └── workflow_execution_history
-│
-├── EXECUTION DETAIL
-│   ├── migration_script
-│   ├── execute_log
-│   ├── migration_step_result
-│   └── migration_error
-│
-└── VALIDATION DETAIL
-    ├── validation_result
-    └── validation_failure
-```
-
-### `migration_mapping`
-
-```text
-migration_mapping
-├── mapping_release
-├── table_mapping
-├── field_mapping
-└── value_mapping
-```
-
-The existing inventory, mapping, execution, validation, and workflow data models remain unchanged.
-
----
-
-## 3. Hard-Coded Workflow Enum
-
-`workflow_enum` is hard-coded in source code and is not a database table.
-
-Canonical order:
-
-```text
- 0 TEST_DATABASE_SETUP
+00 TEST_DATABASE_SETUP
+        ↓ PASS
 10 INVENTORY_MAPPING
-20 INVENTORY_VERIFY
-30 MAPPING_VERIFY
-40 MIGRATION
+        ↓ PASS
+20 INVENTORY_MAPPING_VERIFY
+        ↓ PASS
+30 FIELD_MAPPING
+        ↓ PASS
+40 MIGRATION_DATA
+        ↓ PASS
 50 VALIDATION_DATA
+        ↓ PASS
 60 FINAL_VERIFY
+        ↓ PASS
+   WORKFLOW PASS
 ```
 
-Recommended PHP enum:
+1. `TEST_DATABASE_SETUP` prepares and proves the isolated environment.
+2. `INVENTORY_MAPPING` inventories both schemas, classifies drift, creates one draft release, and maps tables.
+3. `INVENTORY_MAPPING_VERIFY` independently verifies inventory and table contracts without repair.
+4. `FIELD_MAPPING` creates, compiles, and self-verifies every field decision, named map/value implementation, archive/no-write operation, target strategy, and external rebuild handoff before freezing the executable contract fingerprint.
+5. `MIGRATION_DATA` executes only that frozen contract, persists runtime mappings, and migrates SQL-owned target data atomically; application rebuilds use the explicit prepared/external/continuation barrier in Section 9.
+6. `VALIDATION_DATA` independently validates migrated data without repair.
+7. `FINAL_VERIFY` reconciles the complete history and marks the workflow PASS.
+
+No rollback step, repair step, attempt table, or new status is introduced.
+
+## 3. Failure retrospective
+
+| Observed failure | Root cause | Binding correction |
+|---|---|---|
+| Wrong first non-PASS step | Scripts used copied workflow IDs/stale statuses | Resolve immutable workflow name/version at runtime, lock it, then calculate the first non-PASS step |
+| Duplicate keys on rerun | Partial/non-idempotent writes without scoped cleanup | One DML transaction and deterministic current-step cleanup/upsert |
+| Coverage mismatches | Stale snapshots and mixed clean-target, test-target, and live-drift counts | Immutable environment-bound snapshots; label every count and reject mismatched bindings |
+| MySQL error 1175 | `@@SESSION.sql_safe_updates` was not managed | Save, temporarily set, and restore it on success and exception |
+| Step 0 failures | Unproven grants, target drift from the installer baseline, unequal clone structure, missing backup proof | Prove grants, the exact installer baseline, equality, backups, restore, and reset before PASS |
+| Empty-baseline failure on rerun | Successful migration was rerun without resetting disposable target | Keep the correct guard; reset the target from its immutable baseline |
+| File proliferation | Candidates, variants, reset scripts, manifests, helpers, and executed copies became deliverables | Keep one plan and one exact tested SQL per step; iterate ephemerally |
+| Corrupted `08/09` files | Target identifiers were textually substituted after testing | Bind exact names before testing; never edit tested bytes |
+| Backtracking | Downstream producer needs were discovered after upstream PASS | Freeze producer/consumer contracts before execution; correct forward by default |
+| Frozen but non-executable field contracts | Generic `COPY`, generic runtime-map templates, pseudo-functions, or missing writer bodies passed semantic-only checks | Compile every executable field against actual persisted release/mapping IDs and require all compilation gates to be zero before freeze |
+| Abbreviated archive producers | Stored `...`, `(...)`, symbolic column lists, or reconstructed test SQL was treated as executable | Persist the complete `INSERT ... SELECT`, parse the exact stored text, and require complete duplicate/read-back/hash/accounting contracts |
+| External rebuild rebinding | A workflow-specific command/helper was copied or text-rebound to a newer release | Use one reusable operator-owned tool with explicit validated workflow/release/hash/target/domain inputs and reject every mismatch |
+
+The correction model is mandatory intake, frozen contracts, exact environment binding, deterministic retries, and objective upstream invalidation only.
+
+## 4. Model, enum, and seed
+
+```text
+workflow enum (source code only)
+  → workflow (immutable name/version identity)
+  → workflow_step (seven rows)
+  → workflow_execution_history (zero or one immutable PASS certificate per step)
+```
 
 ```php
 enum MigrationWorkflowStep: string
 {
     case TEST_DATABASE_SETUP = 'TEST_DATABASE_SETUP';
     case INVENTORY_MAPPING = 'INVENTORY_MAPPING';
-    case INVENTORY_VERIFY = 'INVENTORY_VERIFY';
-    case MAPPING_VERIFY = 'MAPPING_VERIFY';
-    case MIGRATION = 'MIGRATION';
+    case INVENTORY_MAPPING_VERIFY = 'INVENTORY_MAPPING_VERIFY';
+    case FIELD_MAPPING = 'FIELD_MAPPING';
+    case MIGRATION_DATA = 'MIGRATION_DATA';
     case VALIDATION_DATA = 'VALIDATION_DATA';
     case FINAL_VERIFY = 'FINAL_VERIFY';
 
@@ -166,9 +104,9 @@ enum MigrationWorkflowStep: string
         return match ($this) {
             self::TEST_DATABASE_SETUP => 0,
             self::INVENTORY_MAPPING => 10,
-            self::INVENTORY_VERIFY => 20,
-            self::MAPPING_VERIFY => 30,
-            self::MIGRATION => 40,
+            self::INVENTORY_MAPPING_VERIFY => 20,
+            self::FIELD_MAPPING => 30,
+            self::MIGRATION_DATA => 40,
             self::VALIDATION_DATA => 50,
             self::FINAL_VERIFY => 60,
         };
@@ -179,1088 +117,624 @@ enum MigrationWorkflowStep: string
         return match ($this) {
             self::TEST_DATABASE_SETUP => null,
             self::INVENTORY_MAPPING => self::TEST_DATABASE_SETUP,
-            self::INVENTORY_VERIFY => self::INVENTORY_MAPPING,
-            self::MAPPING_VERIFY => self::INVENTORY_VERIFY,
-            self::MIGRATION => self::MAPPING_VERIFY,
-            self::VALIDATION_DATA => self::MIGRATION,
+            self::INVENTORY_MAPPING_VERIFY => self::INVENTORY_MAPPING,
+            self::FIELD_MAPPING => self::INVENTORY_MAPPING_VERIFY,
+            self::MIGRATION_DATA => self::FIELD_MAPPING,
+            self::VALIDATION_DATA => self::MIGRATION_DATA,
             self::FINAL_VERIFY => self::VALIDATION_DATA,
-        };
-    }
-
-    public function next(): ?self
-    {
-        return match ($this) {
-            self::TEST_DATABASE_SETUP => self::INVENTORY_MAPPING,
-            self::INVENTORY_MAPPING => self::INVENTORY_VERIFY,
-            self::INVENTORY_VERIFY => self::MAPPING_VERIFY,
-            self::MAPPING_VERIFY => self::MIGRATION,
-            self::MIGRATION => self::VALIDATION_DATA,
-            self::VALIDATION_DATA => self::FINAL_VERIFY,
-            self::FINAL_VERIFY => null,
         };
     }
 }
 ```
 
----
+Use `UNIQUE (workflow_name, workflow_version)`, `UNIQUE (workflow_id, step_code)`, and `UNIQUE (workflow_id, step_order)`. Step statuses remain `PENDING`, `RUNNING`, and `PASS`. Failure rolls back to `PENDING`. Current step is the single RUNNING step, otherwise the lowest-order non-PASS step.
 
-## 4. Workflow
-
-One `workflow` row represents one complete named migration flow.
-
-Recommended columns remain:
-
-```text
-id
-workflow_name
-workflow_version
-source_snapshot_id
-target_snapshot_id
-mapping_release_id
-status
-created_at
-started_at
-completed_at
-```
-
-Recommended identity:
-
-```text
-UNIQUE (workflow_name, workflow_version)
-```
-
-Example:
-
-```text
-workflow_name    = JOOMLA_CORE
-workflow_version = j3-to-j6-20260812-02
-```
-
----
-
-## 5. Workflow Step
-
-Each enum step is a separate row.
-
-| step_order | step_code | Initial status |
-|---:|---|---|
-| 0 | `TEST_DATABASE_SETUP` | `PENDING` |
-| 10 | `INVENTORY_MAPPING` | `PENDING` |
-| 20 | `INVENTORY_VERIFY` | `PENDING` |
-| 30 | `MAPPING_VERIFY` | `PENDING` |
-| 40 | `MIGRATION` | `PENDING` |
-| 50 | `VALIDATION_DATA` | `PENDING` |
-| 60 | `FINAL_VERIFY` | `PENDING` |
-
-Allowed `workflow_step.status` values are `PENDING`, `RUNNING`, and `PASS`. Failure is represented by detail/error evidence plus return to `PENDING`; `FAIL` is not a terminal step status in this retry-safe contract.
-
-Recommended keys remain:
-
-```text
-UNIQUE (workflow_id, step_code)
-UNIQUE (workflow_id, step_order)
-```
-
-Current step is:
-
-```text
-1. the RUNNING step if one exists;
-2. otherwise the lowest step_order whose status is not PASS.
-```
-
----
-
-## 6. Workflow Execution History
-
-`workflow_execution_history` is the immutable PASS certificate for one workflow step. Failed attempts are evidence in `execute_log`, `migration_error`, and/or `validation_failure`; they never consume the one-row PASS certificate.
-
-```text
-workflow
-   1
-   │
-   N
-workflow_step
-   1
-   │
-   0..1
-workflow_execution_history
-```
-
-Recommended uniqueness remains:
-
-```text
-UNIQUE (workflow_step_id)
-```
-
-No `attempt_no`, rollback status, retry status, or alternative history lifecycle is introduced.
-
-Canonical history result is:
-
-```text
-status = PASS
-```
-
-`FAIL` must not be inserted into `workflow_execution_history`. On failure, record diagnostic evidence in the existing detail/error tables, roll back or compensate the failed writes, return `workflow_step.status` to `PENDING`, and leave the PASS-history row absent. This resolves retry semantics while preserving `UNIQUE (workflow_step_id)` and the no-attempt-table constraint.
-
-The next workflow step is allowed only from a previous `PASS` history row. A PASS history row is append-only and must never be updated or deleted by a normal retry.
-
----
-
-## 7. Step 0 — Test Database Contract
-
-`TEST_DATABASE_SETUP` creates or prepares an isolated MySQL test environment before any generated migration SQL is accepted as final.
-
-### Bootstrap prerequisite
-
-Step 0 cannot record evidence until its control schema exists. Before Step 0 runs, execute only the versioned control-schema bootstrap DDL to create the isolated `migration_inventory` and `migration_mapping` schemas, seed the `workflow` row, and seed all seven `workflow_step` rows as `PENDING`. This bootstrap is a prerequisite, not a hidden workflow step, and it must not inspect or migrate Joomla business data.
-
-The bootstrap must verify its own schema version/checksum and refuse to reuse a control schema containing an unrelated workflow. Step 0 then validates that bootstrap and may write its PASS certificate.
-
-### Purpose
-
-```text
-Production / real migration databases
-            │
-            │ must not be used for Codex trial-and-error
-            ▼
-Isolated test database/environment
-            │
-            ├── run generated SQL
-            ├── verify assertions
-            ├── rollback/reset when needed
-            ├── fix script
-            └── rerun until PASS
-```
-
-### Required behavior
-
-Codex must:
-
-1. Detect the databases/schemas referenced by the migration workflow.
-2. Create or select an isolated test database environment using names clearly marked as test-only and protected by a dedicated least-privilege account.
-3. Never overwrite or mutate the real source/target databases during the generation/test loop.
-4. Reproduce the complete schema baseline and either a sanitized full data clone or documented boundary-value fixtures covering zero dates, NULL/empty/sentinel values, invalid and valid structured payloads, ID remaps, orphan candidates, duplicate candidates, maximum lengths, and every value-map domain.
-5. Enforce the real source database as read-only by using a dedicated account with `SELECT` only; “application discipline” alone is not evidence.
-6. If the workflow spans multiple MySQL schemas (`source`, `target`, `migration_inventory`, `migration_mapping`), create corresponding isolated test copies rather than pretending one schema is sufficient.
-7. Record the exact test database names in `00-test-database-setup-plan.md`.
-8. Do not mark Step 0 PASS until connectivity, schema availability, required permissions, and reset/rebuild capability have all been proven.
-9. Never copy active `#__session` or `#__user_keys` values into the test target; account for their row/field counts and invalidate them.
-10. Protect cloned personal/security data with access restrictions, encryption appropriate to the environment, sanitization where semantic testing permits, a documented retention deadline, and verified destruction after completion.
-11. Record server version, SQL mode, storage engines, lower-case table-name behavior, character sets, collations, and time zone; the manual environment must be compatible or the workflow must fail preflight.
-12. Prefer a separate MySQL instance/container where the isolated schemas can use the exact production-bound schema identifiers. This permits the final rendered SQL to be tested byte-for-byte without touching the real databases.
-
-Step 0 does not change the existing migration table model. It prepares the environment in which the generated SQL is proven before manual execution.
-
----
-
-## 7A. Decision and Materialization Status Contract
-
-`mapping_type` and `field_status` are independent and must never be conflated.
-
-| Dimension | Allowed values | Gate |
-|---|---|---|
-| Primary source decision | `DIRECT`, `TRANSFORM`, `ID_MAP`, `VALUE_MAP`, `SPLIT`, `MERGE`, `DERIVED`, `REBUILD`, `ARCHIVE`, `IGNORE`, `UNSUPPORTED` | Exactly one per each of 711 J3 fields |
-| Analysis-only decision | `UNRESOLVED` | Must be 0 before migration |
-| Physical target status | `READY`, `MISSING`, `NOT_REQUIRED` | Must agree with the target inventory and decision |
-
-`SKIP` may be retained as a legacy display label only; executable rows must normalize it to an explicit primary decision plus a physical target status. A same-name target field does not imply `DIRECT`, and `IGNORE`, `ARCHIVE`, or `REBUILD` does not by itself imply that the physical target field is missing.
-
-Every primary row must also contain a deterministic rule, verification rule, relationship/ID strategy where applicable, and evidence reference. `REBUILD` requires an executable rebuild owner, timing, dependencies, and post-rebuild verification.
-
----
-
-## 8. Cross-Step Producer / Consumer Contract
-
-This rule is mandatory for every plan and every SQL-generation step.
-
-Before Codex generates final executable SQL, it must identify every value consumed by the current step and every value that the next step will consume.
-
-For every required value, record:
-
-```text
-consumer step
-required value/state
-producer step
-storage table.column
-expected value/state
-exact producer SQL block
-verification query
-```
-
-Required decision rule:
-
-```text
-required value has a valid producer + verification
-    → continue
-
-required value has no producer
-or producer SQL does not populate it
-or expected state does not match
-    → SCRIPT_CONTRACT_GAP
-    → do not finalize SQL
-    → fix the producer/current plan and SQL first
-```
-
-Example:
-
-| Consumer | Required value | Producer | Storage | Producer SQL exists? |
-|---|---|---|---|---|
-| `INVENTORY_VERIFY` | source `coverage_status = PASS` | `INVENTORY_MAPPING` | `table_list.coverage_status` | must be PASS |
-| `INVENTORY_VERIFY` | target `coverage_status = PASS` | `INVENTORY_MAPPING` | `table_list.coverage_status` | must be PASS |
-| `MAPPING_VERIFY` | mapping release identity | `INVENTORY_MAPPING` | `workflow.mapping_release_id` | must be PASS |
-| `MIGRATION` | contract verification PASS | `MAPPING_VERIFY` | `workflow_execution_history.status` | must be PASS |
-| `VALIDATION_DATA` | migration accounting | `MIGRATION` | `migration_step_result` + history | must be PASS |
-| `FINAL_VERIFY` | validation PASS | `VALIDATION_DATA` | `workflow_execution_history.status` | must be PASS |
-
-A step cannot PASS only because its own SQL executed successfully. It can PASS only when:
-
-```text
-its own success criteria are satisfied
-AND
-all outputs required by the next step are actually persisted and verified
-```
-
----
-
-## 9. Mandatory Plan Checklist Format
-
-Every `*-plan.md` must contain explicit Markdown checklists. A prose-only plan is not acceptable.
-
-Each plan must contain these sections exactly or equivalently:
-
-### A. Input and evidence checklist
-
-```markdown
-- [ ] Workflow identity resolved.
-- [ ] Current workflow step resolved.
-- [ ] Previous-step PASS evidence resolved where applicable.
-- [ ] Source database/schema confirmed.
-- [ ] Target database/schema confirmed.
-- [ ] Required migration documents/mapping evidence loaded.
-- [ ] No required input is assumed without evidence.
-```
-
-### B. Scope coverage checklist
-
-```markdown
-- [ ] 100% in-scope tables enumerated.
-- [ ] 100% in-scope physical fields enumerated where applicable.
-- [ ] 100% required record/accounting scope identified.
-- [ ] Required dependencies/ordering identified.
-- [ ] Explicit SKIP/IGNORE/ARCHIVE/REBUILD cases accounted where applicable.
-- [ ] No unknown or silently omitted object remains.
-```
-
-### C. Producer / consumer checklist
-
-```markdown
-- [ ] Every value consumed by the current step has a producer.
-- [ ] Every producer identifies exact table.column storage.
-- [ ] Every producer identifies the SQL block that writes the value.
-- [ ] Every consumed value has a verification query.
-- [ ] Every output required by the next step is listed.
-- [ ] Current SQL persists every required next-step output.
-- [ ] SCRIPT_CONTRACT_GAP count = 0.
-```
-
-### D. SQL safety and rollback checklist
-
-```markdown
-- [ ] Write blocks identified.
-- [ ] Transaction-safe blocks use START TRANSACTION/COMMIT/ROLLBACK where safe.
-- [ ] Non-transaction-safe operations have compensating rollback/cleanup using existing structures only.
-- [ ] Failed run cannot leave a final PASS history row.
-- [ ] Failed run leaves the current step retryable.
-- [ ] Real production/source data is not modified during Codex testing.
-```
-
-### E. Test execution checklist
-
-```markdown
-- [ ] Step 0 test environment is available.
-- [ ] Generated SQL executed against the isolated test environment.
-- [ ] SQL syntax/runtime errors = 0.
-- [ ] Workflow gate errors = 0.
-- [ ] Producer/consumer contract failures = 0.
-- [ ] Required accounting assertions PASS.
-- [ ] Rollback/reset tested when a failure path is relevant.
-- [ ] Script rerun after correction succeeds from a clean/reset test baseline.
-```
-
-### F. PASS gate checklist
-
-```markdown
-- [ ] All Success criteria are proven.
-- [ ] All required failure counters = 0.
-- [ ] Required next-step outputs exist and are verified.
-- [ ] Final history/status updates happen only on PASS.
-- [ ] No later workflow step is executed automatically.
-```
-
-### G. Manual-run readiness checklist
-
-```markdown
-- [ ] Final SQL is byte-for-byte the environment-bound version that passed isolated test execution.
-- [ ] SQL SHA-256 and workflow/snapshot/mapping fingerprints are recorded and independently verified.
-- [ ] No raw placeholder, TODO, FIXME, or unbound database identifier remains.
-- [ ] Source connection account is technically restricted to SELECT.
-- [ ] Restorable backups and a tested restore procedure exist for every mutable schema.
-- [ ] Application writes are stopped for the frozen-source/manual-execution window.
-- [ ] Manual execution order is documented by numbered SQL comments.
-- [ ] Required pre-run database names/variables are clearly listed at the top of the SQL file.
-- [ ] Rollback instructions are present.
-- [ ] Expected PASS result/check query is present at the end of the SQL file.
-- [ ] Batch execution stops at the first SQL error and captures output, warnings, exit code, and server identity.
-- [ ] Final SQL prints exact coverage numerators/denominators and every required zero-failure counter.
-```
-
-Checklist rules:
-
-```text
-- Codex may mark [x] only when it has concrete evidence.
-- Every failed item remains [ ] and is listed in Blocking Items.
-- Final SQL must not be returned as ready-for-manual-use while any blocking checklist item remains unchecked.
-```
-
----
-
-## 10. Generate → Execute → Fix → Regenerate Rule
-
-For every workflow step, Codex must use this loop before returning the final SQL:
-
-```text
-Build/update plan + checklist
-        ↓
-Generate candidate SQL
-        ↓
-Execute candidate SQL on Step 0 test environment
-        ↓
-All required checks PASS?
-   ┌────┴────┐
-   NO       YES
-   │          │
-   ↓          ↓
-Analyze       Finalize exact tested SQL
-root cause        ↓
-   ↓          Return plan + SQL for manual execution
-Fix plan/SQL
-   ↓
-Reset/rollback test DB to required baseline
-   ↓
-Execute again
-```
-
-Codex must not stop at “SQL generated”.
-
-Codex stops only when either:
-
-```text
-A. all required checks PASS in the test environment
-   → return the exact tested SQL for manual execution
-
-OR
-
-B. a real external blocker prevents testing
-   → do not claim success
-   → list the blocker and the unchecked checklist items
-```
-
-A successful generation cycle requires:
-
-```text
-SQL parses and executes
-workflow gates PASS
-producer/consumer contract PASS
-step-specific accounting PASS
-rollback/reset safety PASS where applicable
-next-step required outputs PASS
-manual-run readiness checklist PASS
-```
-
----
-
-## 11. Prompt-Only Rollback Rule
-
-Rollback remains prompt/SQL behavior only.
-
-For transactional writes, prefer:
+The following is an illustrative seed shape. Before this block, the final Step 0 artifact assigns every named variable to a validated literal from the completed intake; no variable is accepted from an untrusted caller and no placeholder remains when testing begins:
 
 ```sql
 START TRANSACTION;
-
--- prechecks
--- current-step writes
--- detail evidence
--- assertions
-
+INSERT INTO migration_inventory.workflow
+    (workflow_name, workflow_version, bootstrap_version, bootstrap_checksum,
+     source_database_name, target_database_name, test_target_database_name,
+     status, created_at)
+VALUES
+    (@workflow_name, @workflow_version, @bootstrap_version, @bootstrap_checksum,
+     @source_database_name, @target_database_name, @test_target_database_name,
+     'PENDING', UTC_TIMESTAMP());
+SET @workflow_id := LAST_INSERT_ID();
+INSERT INTO migration_inventory.workflow_step
+    (workflow_id, step_code, step_order, status)
+VALUES
+    (@workflow_id, 'TEST_DATABASE_SETUP',       0, 'PENDING'),
+    (@workflow_id, 'INVENTORY_MAPPING',        10, 'PENDING'),
+    (@workflow_id, 'INVENTORY_MAPPING_VERIFY', 20, 'PENDING'),
+    (@workflow_id, 'FIELD_MAPPING',            30, 'PENDING'),
+    (@workflow_id, 'MIGRATION_DATA',           40, 'PENDING'),
+    (@workflow_id, 'VALIDATION_DATA',          50, 'PENDING'),
+    (@workflow_id, 'FINAL_VERIFY',             60, 'PENDING');
 COMMIT;
 ```
 
-This transaction pattern is valid only for transactional DML on supported engines. MySQL DDL and other implicit-commit statements must be placed in separately numbered nontransactional blocks with preconditions, deterministic idempotency keys, compensating cleanup, and postcondition checks. A comment saying “ROLLBACK” is not a rollback implementation.
+Step 0 owns the versioned control bootstrap, schema upgrade, workflow insert, and seven-row seed inside `00-test-database-setup.sql`; there is no third bootstrap artifact or hidden prerequisite. Before seeding, it must install or upgrade the control schemas to the canonical seven-step model. It verifies all required columns, constraints, keys and checksums and ensures the `workflow_step.step_code` constraint accepts exactly the seven canonical names. Existing workflow/release/history rows are immutable evidence and must be preserved. A compatible non-empty control schema is normal: Step 0 resolves or creates only the requested immutable workflow name/version and its seven rows, rejecting conflicting duplicates. If a required schema upgrade cannot preserve non-empty control data, Step 0 stops before destructive DDL and requires an operator-approved compatible upgrade or new isolated control schema; it never rewrites prior workflow evidence.
 
-Executable scripts must use one of these failure mechanisms:
+## 5. Mandatory information gate
 
-```text
-stored procedure with EXIT HANDLER FOR SQLEXCEPTION
-or a batch-client execution mode that aborts on the first SQL error
+No runnable SQL may be generated until its plan has a completed intake. Unknown required facts become named blockers; the agent must not invent them.
+
+Step 0 gathers:
+
+- Workflow name/version and migration scope.
+- Source/target database names, prefixes, Joomla versions, and ownership classification.
+- Exact isolated MySQL instance/container where those same schema names are safe.
+- Source read-only and target/control write credential identities.
+- Clean Joomla 6.1.2 installer baseline and immutable reset source.
+- Charset, collation, engine, SQL mode, time zone, lower-case-name behavior, and safe-update mode.
+- Source/target table, field, FK, and baseline-record expectations.
+- Included/excluded core, custom, and third-party tables.
+- Required mapping documents and approved unresolved decisions.
+- Backup locations, hashes, restore proof, retention policy, and maintenance window.
+- Manual client and stop-on-first-error behavior.
+
+For new workflows, schema identity and server identity are separate facts. `workflow.source_database_name` and `workflow.target_database_name` store the exact schema identifiers embedded in every final SQL artifact. The isolated test instance must expose those same identifiers. The legacy-required `workflow.test_target_database_name` column is set equal to `target_database_name` for the canonical workflow; isolation is proven by the server fingerprint, not by appending `_test` to a schema name. The immutable reset-source schema/dump identity is stored in Step 0 evidence. Final SQL must never be tested under one schema name and later rewritten for another.
+
+Later steps ask only for changed and step-specific facts.
+
+Every plan begins with:
+
+```markdown
+## Intake and blockers
+- Workflow name/version:
+- Step code/order:
+- Exact isolated MySQL server identity:
+- Exact manual MySQL server identity:
+- Exact source/target databases and prefixes:
+- Control databases:
+- Credential identities and proven grants:
+- Source/target snapshot IDs and fingerprints:
+- Mapping release ID/status/fingerprint, if applicable:
+- Required predecessor PASS certificate:
+- Changed facts since predecessor:
+- Step-specific inputs and expected counters:
+- Backup/hash/restore evidence:
+- Reset source and reset proof:
+- Execution client and stop-on-error setting:
+- Maintenance-window/write-freeze evidence, if applicable:
+- External Joomla rebuild owner/command, if applicable:
+- Named blockers: None | BLOCKER-<name>: <missing fact and owner>
+- Intake complete: YES | NO
 ```
 
-The handler/path must roll back the open transaction, persist failure diagnostics only in existing error/detail structures when safe, restore the step to `PENDING`, omit the PASS-history row, and return a non-success result to the caller. Assertions must terminate execution; returning a result row named `FAIL` while continuing is forbidden.
+If intake is incomplete, a blocker plan is allowed but runnable SQL is not.
 
-On failure before successful finalization:
+## 6. Frozen producer/consumer contract
+
+Resolve and freeze this producer/consumer matrix progressively at the owning step.
+
+Before Step 0, freeze only the workflow architecture and required producer/consumer schema.
+Step 0 freezes environment and database bindings.
+Step 1 freezes physical source/target snapshots, inventories, dependencies, and the DRAFT release/table mappings.
+Step 3 freezes the complete executable field producer/consumer contract against the actual persisted release and mapping IDs.
+Step 4 freezes execution/runtime-map/disposition evidence.
+A missing, stale, ambiguous, or differently bound required producer causes SCRIPT_CONTRACT_GAP before its consumer writes.
+
+| Producer | Persisted output | Consumer | Assertion |
+|---|---|---|---|
+| Step 0 bootstrap block | Canonical control schema version/checksum, workflow row, and seven step rows | Step 0 finalization block | Exact checksum, required columns/constraints, and canonical list |
+| Step 0 | Environment fingerprint, bindings, grants, Joomla 6.1.2 baseline, reset identity, backup/restore proof | Steps 1–6 | Exact isolated, resettable match |
+| Step 1 | Immutable source/target snapshots | Steps 2–6 | IDs, fingerprints, environment match |
+| Step 1 | Physical inventory, classifications, baselines, dependencies | Step 2 | Complete and unique live reconciliation |
+| Step 1 | One draft release and complete table mappings | Steps 2–3 | One draft, 100% table coverage |
+| Step 2 | Inventory/table verification PASS | Step 3 | Correct predecessor and bindings |
+| Step 3 | Field decisions, STATIC value mappings, relationships, target strategies, named runtime-map lookups, executable per-field SQL operations, archive/no-write accounting, and verification rules | Steps 4–6 | Complete, unique, executable, and compiled against actual persisted IDs |
+| Step 3 | Exact external rebuild bindings for every approved Joomla-owned rebuild domain | Step 4 | Reusable operator validates workflow/release/hash/target/domain inputs; command and continuation contract are complete |
+| Step 3 | Normalized executable contract SHA-256 and PASS release | Steps 4–6 | Independent recalculation matches only after every semantic/compilation gate is zero |
+| Step 4 | Runtime maps, target writes, dispositions, migration evidence | Steps 5–6 | Complete; no failure/unaccounted rows |
+| Step 5 | Independent validation PASS evidence | Step 6 | No repair; all counters reconcile |
+| Step 6 | Complete reconciliation | Workflow | Seven canonical PASS certificates |
+
+Step 2 owns only inventory/table verification. Step 3 owns all field-contract creation and verification. Step 0's bootstrap block precedes its finalization block inside the same SQL artifact. No producer occurs after its consumer.
+
+```text
+Contract version:
+Workflow name/version:
+Resolved physical outputs/types:
+Normalized contract hash:
+Operator approval/timestamp:
+Generator acknowledgement/timestamp:
+Status: FROZEN | BLOCKED
+```
+
+## 7. Universal SQL and retry contract
+
+Every SQL file must:
+
+1. Bind the literal workflow name/version and canonical step code from the completed plan, never copied numeric IDs. Steps 1–6 resolve the existing IDs at runtime. Step 0 acquires the name/version lock first, installs/upgrades the control schema, creates the workflow, and then resolves its IDs.
+2. Acquire and prove ownership of a workflow-scoped advisory lock with `GET_LOCK`; release it with `RELEASE_LOCK` on every exit path. The lock name is derived from workflow name/version and therefore exists before the Step 0 row.
+3. Inside the lock, prove the current-step rule. Step 0 is the sole no-predecessor exception and must prove that no canonical step has PASS history before finalization. Steps 1–6 must be the first non-PASS step and must have exactly one predecessor PASS certificate.
+4. Save/restore `foreign_key_checks`, `sql_safe_updates`, and every modified session setting on success and exception.
+5. Use a stored procedure for guarded DML with `EXIT HANDLER FOR SQLEXCEPTION`, `ROLLBACK`, durable post-rollback diagnostics where the control schema exists, session restoration, lock release, and `RESIGNAL`.
+6. Keep successful transactional DML, detail evidence, execution logs, PASS history, and status changes in one transaction. Never insert PASS or a successful guard outside that transaction. The only deliberate non-PASS commit is Step 4's prepared external-rebuild phase: its one transaction contains the SQL-owned maps/writes, prepared evidence, and `RUNNING` status, but no PASS certificate or successful guard.
+7. After a failed Steps 1–6 transaction, the handler may open a separate diagnostic transaction containing only an `ERROR` execution/error record with no successful guard. Step 0 failures before the control schema exists are captured by the stop-on-error client and embedded in the plan test history; failures after bootstrap use the same durable diagnostic rule.
+8. Deterministically clean/upsert only current-step non-PASS detail before rebuilding it. Never edit PASS history. Retried diagnostic inserts must use a deterministic error identity or tolerate an existing identical diagnostic.
+9. Leave no PASS certificate, successful execution guard, or partial transactional target DML after failure. Durable `ERROR` diagnostics are allowed and are not predecessor evidence.
+10. Business/control-schema DDL is permitted only in Step 0 after exact isolated-server and allowlisted-schema checks; compensate/reset implicit commits. Ephemeral `DROP PROCEDURE IF EXISTS` / `CREATE PROCEDURE` / final `DROP PROCEDURE` statements are a narrow routine-DDL exception for every step and may not alter application or control tables.
+11. Begin every invocation with deterministic `DROP PROCEDURE IF EXISTS`, then create and call the uniquely workflow/step-named routine. A failed stop-on-error invocation may leave the routine behind; the next invocation removes it before doing work. A successful invocation removes it at the end.
+12. Stop with `SCRIPT_CONTRACT_GAP` before business-data or mapping writes when a producer is missing.
+13. Preserve the Joomla installer-baseline guard. A normal second migration requires resetting the disposable target; the only allowed populated-target re-entry is the exact Step 4 external-rebuild continuation described in Section 9, bound to its persisted prepared-phase evidence.
+14. Prove a complete baseline-reset-and-rerun cycle before finalization.
+15. Never run the next step automatically.
+
+Required Steps 1–6 control shape (Step 0 uses the specialized bootstrap sequence in Section 9):
 
 ```sql
-ROLLBACK;
+DELIMITER $$
+CREATE PROCEDURE run_current_step()
+main: BEGIN
+    DECLARE v_old_fk INT DEFAULT @@SESSION.foreign_key_checks;
+    DECLARE v_old_safe INT DEFAULT @@SESSION.sql_safe_updates;
+    DECLARE v_lock_name VARCHAR(255);
+    DECLARE v_lock_owned INT DEFAULT 0;
+    DECLARE v_step_id BIGINT UNSIGNED;
+    DECLARE v_sqlstate CHAR(5);
+    DECLARE v_message TEXT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 v_sqlstate = RETURNED_SQLSTATE,
+            v_message = MESSAGE_TEXT;
+        ROLLBACK;
+        SET SESSION foreign_key_checks = v_old_fk;
+        SET SESSION sql_safe_updates = v_old_safe;
+        BEGIN
+            DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+            IF v_step_id IS NOT NULL THEN
+                START TRANSACTION;
+                /* Insert/upsert deterministic ERROR-only diagnostic; no PASS guard. */
+                COMMIT;
+            END IF;
+        END;
+        IF v_lock_owned = 1 THEN DO RELEASE_LOCK(v_lock_name); END IF;
+        RESIGNAL;
+    END;
+    /* Resolve immutable identity, lock, and assert step/predecessor contracts. */
+    SET SESSION foreign_key_checks = 0;
+    SET SESSION sql_safe_updates = 0;
+    START TRANSACTION;
+    /* Scoped cleanup, producer checks, writes, evidence, status, PASS. */
+    COMMIT;
+    SET SESSION foreign_key_checks = v_old_fk;
+    SET SESSION sql_safe_updates = v_old_safe;
+    DO RELEASE_LOCK(v_lock_name);
+    SET v_lock_owned = 0;
+END$$
+DELIMITER ;
 ```
 
-If an operation cannot be safely transaction-rolled back, Codex must document compensating rollback/cleanup SQL using the existing data model only.
+Final scripts replace every comment with executable, schema-compatible assertions. They use a unique routine name derived from workflow version and step code, clean it at invocation start, and remove it after success. Step 0 documents compensating cleanup after DDL failure in its plan and performs all possible cleanup in its one SQL artifact.
 
-Do not add:
+## 8. Artifact and integrity standard
+
+Each step folder contains exactly:
 
 ```text
-rollback workflow step
-attempt table
-rollback table
-backup table as a new workflow feature
-attempt_no
-rollback_status
-new workflow statuses
+<order>-<step>-plan.md
+<order>-<step>.sql
 ```
-
-After rollback/reset, the same current step must be testable again from a known baseline.
-
----
-
-## 12. Top-Down Step Gate
-
-For requested step `X`:
 
 ```text
-1. Acquire a workflow-scoped MySQL advisory lock using a deterministic key derived from workflow_id; failure to acquire blocks execution.
-2. Load workflow and lock its control row for the control transaction.
-3. Load workflow_step rows ordered by step_order.
-4. Determine first non-PASS step.
-5. Requested step must equal that step.
-6. Resolve previous enum step.
-7. Previous workflow_execution_history.status must be PASS, except Step 0.
-8. Current workflow_step must not already have PASS history.
-9. Validate producer/consumer contract and the immutable script/mapping fingerprints.
-10. Mark only the current step RUNNING and execute only that step.
-11. Write required detail evidence.
-12. Insert PASS-only workflow_execution_history after all current-step checks PASS.
-13. Mark current workflow_step PASS only when its PASS certificate exists.
-14. On failure, roll back/compensate and return the step to PENDING without a PASS certificate.
-15. Release the advisory lock on both success and handled failure; connection termination remains the safety fallback.
-16. Never execute the next workflow step automatically as part of the current step SQL.
+00-test-database-setup-plan.md       00-test-database-setup.sql
+10-inventory-mapping-plan.md         10-inventory-mapping.sql
+20-inventory-mapping-verify-plan.md  20-inventory-mapping-verify.sql
+30-field-mapping-plan.md             30-field-mapping.sql
+40-migration-data-plan.md            40-migration-data.sql
+50-validation-data-plan.md           50-validation-data.sql
+60-final-verify-plan.md              60-final-verify.sql
 ```
 
----
+Iterations live in an ephemeral workspace. Deliverables exclude checksum sidecars, candidate/test/environment variants, executed copies, reset helpers, standalone manifests, manual-order reports, and application helper scripts. Diagnostics go in the final plan test history.
 
-## 13. JOOMLA_CORE Seed Example
+The plan embeds the final SQL SHA-256; workflow identity; database bindings; MySQL server/compatibility facts; snapshot, release, and contract fingerprints; every SQL invocation and external rebuild command with timestamps, exit codes, and warnings; reset proof; prepared/continuation evidence when applicable; PASS counters/evidence IDs; and concise failed-candidate diagnoses. The Step 4 plan also embeds the complete migration-disposition report, and the Step 5 plan embeds the independently executed post-migration no-data-loss tutorial and its results. These are plan sections, not additional artifacts.
 
-```sql
-INSERT INTO migration_inventory.workflow (
-    workflow_name,
-    workflow_version,
-    status
-) VALUES (
-    'JOOMLA_CORE',
-    'j3-to-j6-20260812-02',
-    'PENDING'
-);
+Test byte-identical final SQL on a separate isolated instance using the exact manual schema identifiers. Bind identifiers before testing. After hashing, do not substitute targets or edit bytes. Placeholders and TODOs are forbidden.
 
-SET @workflow_id = LAST_INSERT_ID();
+Application Joomla rebuilds are numbered blocks owned and verified by Step 4. If MySQL cannot invoke one, Step 3 freezes the complete handoff semantics and the Step 4 plan renders the operator-owned exact command, working directory/runtime, required inputs, expected output/evidence fingerprint, idempotency/reset rule, and stop condition without interpreting new semantics. The reusable operator-owned tool must require and validate explicit workflow name/version, mapping-release identity, normalized contract SHA-256, exact target database, and approved rebuild domains; it must reject mismatches and must not silently rebind an older workflow. The command is an execution instruction in the plan, not a workflow-specific canonical helper artifact. The two-phase continuation protocol in Section 9 applies; Step 4 cannot PASS merely because the external command returned exit code zero. Do not silently add PHP or PowerShell helper files.
 
-INSERT INTO migration_inventory.workflow_step (
-    workflow_id,
-    step_code,
-    step_order,
-    status
-) VALUES
-    (@workflow_id, 'TEST_DATABASE_SETUP', 0,  'PENDING'),
-    (@workflow_id, 'INVENTORY_MAPPING',   10, 'PENDING'),
-    (@workflow_id, 'INVENTORY_VERIFY',    20, 'PENDING'),
-    (@workflow_id, 'MAPPING_VERIFY',      30, 'PENDING'),
-    (@workflow_id, 'MIGRATION',           40, 'PENDING'),
-    (@workflow_id, 'VALIDATION_DATA',     50, 'PENDING'),
-    (@workflow_id, 'FINAL_VERIFY',        60, 'PENDING');
-```
+## 9. Step contracts
 
-Check current allowed step:
+### Step 0 — `TEST_DATABASE_SETUP`
 
-```sql
-SELECT id, workflow_id, step_code, step_order, status
-FROM migration_inventory.workflow_step
-WHERE workflow_id = @workflow_id
-  AND status <> 'PASS'
-ORDER BY step_order
-LIMIT 1;
-```
+One SQL file owns and verifies the canonical control-schema install/upgrade and seven-row seed, then proves isolated exact-name schemas; clean Joomla 6.1.2 baseline; restricted accounts; compatibility; backup hashes and restore; immutable reset source; structural/data clone equality; destructive reset allowlisting; and reset-and-rerun. It proves the target has the exact installer-owned baseline rows and no migrated business data. Step 0 alone may use business/control-schema DDL, restricted to validated test and control schemas. Its sequence is: acquire the name/version lock; prove server/schema allowlists; preserve all unrelated workflow evidence; reject only an incompatible schema or conflicting immutable identity; install/upgrade and checksum the canonical schema; seed or deterministically resolve the one requested workflow and seven steps; run environment proofs; transactionally write Step 0 evidence/PASS; restore settings; release the lock.
 
-Initially:
+### Step 1 — `INVENTORY_MAPPING`
+
+Capture immutable source/clean-target snapshots; exact tables, fields, indexes and FKs; frozen record baselines; core/custom/third-party ownership and inclusion; drift; dependencies; exactly one draft `mapping_release`; and complete included-source table mappings. Label source snapshot, clean target, disposable target, and live drift counts separately. Do not create field mappings, value mappings, relationships, target strategies, runtime maps, or business data.
+
+### Step 2 — `INVENTORY_MAPPING_VERIFY`
+
+Independently compare live bound schemas to Step 1 snapshots. Verify inventory coverage, classifications, dependencies, counts, table mappings, duplicates, and snapshot/release binding. Do not repair Step 1. Do not create or verify field-level contracts.
+
+### Step 3 — `FIELD_MAPPING`
+
+Consume the one existing DRAFT release created by Step 1. Create exactly one decision per active included source field, all required `STATIC` value mappings, every relationship, one strategy per required target field, and deterministic migration/verification rules. The current five-table mapping model persists each relationship on its owning `field_mapping.relationship_strategy`; Step 3 derives the required relationship denominator from the frozen Step 1/Step 2 inventory and table scope, then requires every identified relationship row to contain a nonempty normalized strategy. Step 2 still performs no field-contract verification.
+
+`mapping_type` and physical target status are independent. Executable decisions are `DIRECT`, `TRANSFORM`, `ID_MAP`, `VALUE_MAP`, `SPLIT`, `MERGE`, `DERIVED`, `REBUILD`, `ARCHIVE`, `IGNORE`, and `UNSUPPORTED`; `UNRESOLVED` must be zero. `SKIP` is legacy display only.
+
+Step 3 is the complete executable-contract boundary. For every SQL-owned field it persists the exact source and target fields, exact SQL expression, dependency order, preserved-ID or named runtime-map behavior, map lookup and persistence point, FK/reference rewrite, NULL/default/reset handling, insert/update behavior, archive/defer/rebuild/target-owned disposition, row/cell accounting, and post-write verification. Generic `COPY`, generic or unqualified `RUNTIME_ID_MAP`, `CONTRACT_TABLE:*`, symbolic functions, ellipses, and equivalent placeholders are forbidden. Semantic identities and named map domains must be deterministic and must define uniqueness, zero-match, multi-match, persistence, and every dependent rewrite without numeric-ID fallback unless that fallback is explicitly approved and evidenced.
+
+Compile expressions against the actual persisted DRAFT `mapping_release.id`, `table_mapping.id`, and `field_mapping.id` values. Former pseudo-calls are resolved before freeze: value mapping becomes an exact SQL expression or named persisted value-map implementation; neutral-user handling becomes the approved USER runtime-map plus archive/neutral behavior; archive handling becomes the exact executable archive-write contract; no-write behavior becomes an explicit accounted disposition; and Joomla rebuild behavior becomes the exact reusable external-operator handoff. MySQL-owned SQL and external-command-owned work must be separable without Step 4 interpreting or inventing producer semantics.
+
+For every archive producer, persist the complete Step 4 `INSERT ... SELECT` statement with the physical insert column list, physical select expression list, exact source table and alias, deterministic source identity everywhere it is used, workflow/release binding, reason/disposition, payload or value, hash, duplicate-prevention predicate, accounting contribution, read-back query, and hash verification. Parse/syntax-check the exact persisted SQL text, not a reconstructed equivalent, without executing the archive write in Step 3. A frozen zero-row archive producer must assert its bound snapshot count remains zero and stop with `SCRIPT_CONTRACT_GAP` if it changes; it may not invent a synthetic identity.
+
+For every approved external rebuild domain, Step 3 persists the reusable operator identity and executable owner; exact command contract; workflow name/version, release ID, normalized contract hash, target database and approved-domain inputs; expected database effects and deterministic evidence; failure/reset behavior; and continuation verifier. Step 4's plan may render those frozen inputs into the command, but may not add semantics.
+
+The DRAFT release must pass this pre-freeze audit:
 
 ```text
-CURRENT STEP = TEST_DATABASE_SETUP
+GENERIC_COPY_TEMPLATES = 0
+GENERIC_RUNTIME_MAP_TEMPLATES = 0
+UNQUALIFIED_RUNTIME_MAP_TEMPLATES = 0
+UNRESOLVED_CONTRACT_TABLE_MARKERS = 0
+UNBOUND_PSEUDO_CALLS = 0
+MISSING_FIELD_SQL_EXPRESSIONS = 0
+MISSING_NAMED_MAP_LOOKUPS = 0
+MISSING_FK_REWRITES = 0
+MISSING_VALUE_MAP_IMPLEMENTATIONS = 0
+MISSING_NEUTRAL_USER_IMPLEMENTATIONS = 0
+MISSING_ARCHIVE_IMPLEMENTATIONS = 0
+MISSING_NO_WRITE_ACCOUNTING = 0
+MISSING_EXTERNAL_REBUILD_BINDINGS = 0
+ARCHIVE_SQL_PLACEHOLDERS = 0
+ARCHIVE_SQL_PARSE_ERRORS = 0
+EXECUTABLE_ARCHIVE_PRODUCERS = REQUIRED_ARCHIVE_PRODUCERS / REQUIRED_ARCHIVE_PRODUCERS
+ARCHIVE_CONTRACT_GAPS = 0
+RUNTIME_COMPILATION_ERRORS = 0
+AMBIGUOUS_WRITER_SEMANTICS = 0
 ```
 
----
+All semantic coverage counters and every compilation counter above must independently be zero (or exact numerator/denominator equality) before freeze. While any gate is non-zero, keep the release DRAFT, fix and recompile Step 3 transactionally, and do not generate Step 4. Only then normalize the complete executable SQL/external-handoff contract, calculate and independently recalculate its SHA-256, freeze the release, mark it PASS, and write the Step 3 PASS certificate. A defect found while the release is still DRAFT is corrected in the same workflow/release; an objective defect found after freeze follows Section 11 and never rewrites the frozen evidence.
 
-## 14. Codex Output Convention
+### Step 4 — `MIGRATION_DATA`
 
-Every workflow-step prompt generates two primary files and one integrity manifest:
+Step 4 is execution only: it introduces no field, identity, mapping, archive, accounting, or rebuild semantics. Consume only the exact PASS release/snapshots and independently recompute the normalized contract hash before writes. The plan embeds the SHA-256 of the byte-identical final SQL and renders the exact external operator command from Step 3's frozen binding; pre-execution tooling verifies that file hash because an SQL file cannot derive its own source-file bytes. Execution evidence records the verified hash and the SQL rechecks the bound persisted evidence.
+
+Persist every runtime ID/value resolution in `migration_mapping.value_mapping` with `mapping_scope = 'RUNTIME'`; temporary maps may assist execution but never satisfy the handoff. Every RUNTIME row requires a non-NULL `field_mapping_id`, deterministic non-NULL `source_record_identity`, source-value hash, and the applicable resolved `target_record_identity` and/or `target_value`. Because nullable columns can weaken MySQL unique keys, Step 4 must independently reject duplicate logical runtime identities and verify the required one-to-one or many-to-one cardinality declared by each field contract. Runtime rows are bound to the exact release and must pass completeness, uniqueness, cardinality, unmapped-value, orphan, and target-resolution checks. In one guarded SQL transaction, construct these persisted maps at their frozen persistence points, perform dependency-ordered Joomla target writes, apply every frozen FK/reference rewrite and disposition, execute the complete archive producers, and record exact table/row/cell accounting.
+
+Step 4 must produce a complete human-readable **Migration Disposition Report** in `40-migration-data-plan.md`, backed by result sets from the exact `40-migration-data.sql`. The report lists every included source table and field and groups every source row/cell into exactly one frozen disposition: `MIGRATED`, `ARCHIVED`, `REBUILT`, `TARGET_OWNED`, `DEFERRED_OUT_OF_SCOPE`, `INTENTIONAL_IGNORE`, or `SKIP_ABSENT_SOURCE`. It records source and target identities, expected and actual counts, owning producer or external owner, runtime-map domain where applicable, archive evidence identity/hash, reason, verification result, and accounting contribution. `ARCHIVED` values require persisted payload read-back and hash equality. `DEFERRED_OUT_OF_SCOPE` requires preserved source evidence and a named later-workflow owner. `SKIP_ABSENT_SOURCE` requires snapshot-proven physical absence and zero rows/fields. `MISSING_EXPECTED`, an unexplained skip, a row/cell with no disposition, or two dispositions for the same source identity is a blocking failure and can never be relabelled as an approved skip merely to reach PASS.
+
+The baseline guard means **the exact immutable Joomla 6.1.2 installer baseline, including its required installer-owned rows, with zero migrated business rows**. It never means an all-tables-zero database. A populated target is rejected unless it is the exact prepared external-rebuild continuation below.
+
+If every required `REBUILD` decision is implementable and verifiable in MySQL, Step 4 completes atomically in one invocation. If Joomla application/CLI work is required, SQL-owned maps and base writes are atomic in a prepared phase, but the whole cross-process step cannot truthfully be one database transaction. The exact same `40-migration-data.sql` therefore implements two guarded invocations without adding files or statuses:
+
+1. **Prepare invocation:** require the installer baseline, perform and verify all SQL-owned maps/writes in one transaction, persist a content fingerprint and prepared evidence in existing execution/result evidence, leave `MIGRATION_DATA` as `RUNNING`, commit, restore settings, release the lock, and stop without PASS.
+2. **External barrier:** the operator runs only the exact command recorded in the plan and must validate the frozen workflow name/version, release identity, normalized contract hash, exact target database, and approved rebuild-domain set before Joomla bootstrap or writes. The command must be idempotent or require a documented full baseline reset after failure. Its command output is captured in the plan, while its database effects remain the authoritative input to SQL verification. A workflow-specific copied/rebound helper is forbidden; reusable operator-owned tooling is outside the two canonical Step 4 artifacts.
+3. **Continuation invocation:** invoke the same byte-identical `40-migration-data.sql`. Allow the populated target only when the current step is `RUNNING` and the persisted prepared fingerprint, workflow/release/snapshots, target fingerprint, SQL hash, operator inputs, and approved rebuild domains match. Do not trust an operator-supplied PASS flag and do not rebuild base data or runtime maps. Recalculate target state and invariants directly from the database, verify every required rebuild decision and continuation check, verify archive persistence/read-back/hashes, FK integrity, runtime maps, target population, and complete accounting, then transactionally insert the one PASS certificate and mark the step PASS.
+
+Any mismatch or failed external rebuild leaves Step 4 non-PASS. If safe idempotent retry cannot be proven, restore the immutable installer baseline, deterministically clear Step 4 non-PASS evidence, and rerun the complete Step 4 test. This continuation is not a weakened empty-target guard.
+
+### Step 5 — `VALIDATION_DATA`
+
+Independently derive expected results from frozen source and PASS contract; validate identities, hashes/values, transformations, counts, NULL/sentinel handling, distributions, payloads, archives, rebuilds, duplicates, orphans, required target population, and dispositions. Never repair target, runtime maps, rules, or prior evidence.
+
+`50-validation-data-plan.md` must include a reproducible **Post-Migration No-Data-Loss Tutorial** and the evidence from executing each numbered block with `50-validation-data.sql`. The tutorial is an operator procedure, not a separate report file, and must:
+
+1. Reconfirm workflow/release/contract/SQL/snapshot/target bindings and the Step 4 PASS certificate.
+2. Recalculate frozen source table, field, row, and cell denominators without using Step 4's totals as expected values.
+3. Reconcile every source identity to exactly one Migration Disposition Report entry and prove missing and duplicate dispositions are zero.
+4. Compare per-table source expectations to migrated, archived, rebuilt, target-owned, deferred, ignored, and absent-source outcomes.
+5. Recalculate full-field values or deterministic hashes for every migrated field; sampling alone cannot satisfy PASS.
+6. Verify every named runtime map for completeness, uniqueness, cardinality, target existence, and dependent FK/reference rewrites.
+7. Read back every archive identity and payload/value; recalculate hashes and detect missing or duplicate archive evidence.
+8. Verify every deferred/ignored/absent-source decision has its frozen reason, owner, source evidence, and exact accounting contribution.
+9. Detect unexpected target rows, duplicate business identities, broken relationships, invalid neutral/default values, and orphans.
+10. Verify every Joomla rebuild domain and its continuation evidence directly from target state.
+11. Print per-table/per-field exceptions and final integer numerators/denominators; PASS only when every failure counter is zero.
+
+The tutorial must tell the operator how to run the exact validation SQL, what result sets to inspect, the expected zero/equality gates, and that any failure stops the workflow at Step 5. It must never instruct the operator to repair data; a failure follows Section 11.
+
+### Step 6 — `FINAL_VERIFY`
+
+Verify exact seven-step order; one PASS certificate per predecessor; no extra/later history; all environment, snapshot, release, contract, and SQL fingerprints; all producer/consumer contracts; counters; and independent validation. Then atomically mark the step and workflow PASS. Do not migrate, repair, or waive gates.
+
+## 10. PASS formulas and history
 
 ```text
-1. <order>-<step-code>-plan.md
-2. <order>-<step-code>.sql
-3. <order>-<step-code>.sha256
+TEST_DATABASE_SETUP:
+  isolated exact names, grants, clean Joomla 6.1.2, equal clone,
+  backup/hash/restore, reset/rerun = proven
+
+INVENTORY_MAPPING:
+  frozen source and clean-target denominators = 100% live-reconciled
+  baselines/classifications/dependencies complete
+  exactly one draft release; table mappings = 100%
+
+INVENTORY_MAPPING_VERIFY:
+  live/snapshot mismatches, inventory duplicates/gaps,
+  unknown classifications, table-map/dependency/count mismatches = 0
+  field-contract checks performed = 0
+
+FIELD_MAPPING:
+  decisions = active included source fields / active included source fields, unique
+  relationships = required / required; strategies = required target fields / required
+  generic templates, unqualified maps, contract markers, pseudo-calls = 0
+  missing SQL/map/FK/value-map/neutral/archive/no-write/external bindings = 0
+  archive SQL placeholders/parse errors/contract gaps = 0
+  executable archive producers = required / required
+  runtime compilation errors and ambiguous writer semantics = 0
+  normalized executable contract hash recomputes equal; release = PASS
+
+MIGRATION_DATA:
+  persisted RUNTIME maps complete/unique and bound to the PASS release
+  prepared/external/continuation fingerprints = exact match when rebuild barrier applies
+  all required REBUILD decisions and domain continuation checks independently verified
+  unresolved/ambiguous/orphan/unaccounted/rejected = 0
+  archive missing/duplicate/read-back/hash failures = 0
+  disposition report tables/fields/rows/cells = frozen denominators / frozen denominators
+  missing expected, unexplained skip, duplicate disposition, deferred evidence gap = 0
+  row/cell accounting, eligible preservation, target population = 100.00%
+
+VALIDATION_DATA:
+  missing/unexpected/duplicate/broken/unmapped/invalid/hash/rebuild failures = 0
+  independently recalculated dispositions = frozen source identities / frozen source identities
+  post-migration no-data-loss tutorial blocks executed and PASS = 11/11
+  independent accounting/preservation = 100.00%; repairs = 0
+
+FINAL_VERIFY:
+  canonical predecessor PASS certificates = 6/6
+  every frozen fingerprint exact; gaps/failures = 0
+  all definition, relationship, row/cell, preservation, target coverage = 100.00%
+  step and workflow = PASS
 ```
 
-Examples:
+The final canonical history must contain exactly:
 
 ```text
-00-test-database-setup-plan.md
-00-test-database-setup.sql
-00-test-database-setup.sha256
-
-10-inventory-mapping-plan.md
-10-inventory-mapping.sql
-10-inventory-mapping.sha256
-
-20-inventory-verify-plan.md
-20-inventory-verify.sql
-20-inventory-verify.sha256
+TEST_DATABASE_SETUP.status       = PASS
+INVENTORY_MAPPING.status         = PASS
+INVENTORY_MAPPING_VERIFY.status  = PASS
+FIELD_MAPPING.status             = PASS
+MIGRATION_DATA.status            = PASS
+VALIDATION_DATA.status           = PASS
+FINAL_VERIFY.status              = PASS
+workflow.status                  = PASS
 ```
-
-The final `.sql` file must be byte-for-byte the candidate that passed isolated execution. Do not edit identifiers, SQL, comments, or variables afterward. Environment-specific identifiers must be bound by a deterministic renderer before the final test. Test the rendered artifact on a separate MySQL instance/container whose isolated schemas use those exact bound names, then hash it. Raw `${PLACEHOLDER}` tokens, TODOs, and unbound identifiers are forbidden in a ready artifact.
-
-The `.sha256` manifest must bind the SQL hash to the workflow ID/version, mapping release/fingerprint, source and target snapshot fingerprints, expected source/target database identities, MySQL compatibility facts, generation timestamp, and test execution evidence ID. Manual execution must recompute and compare the hash before connecting to the target.
-
-### Manual execution runbook
-
-The plan and SQL header must require this order:
 
 ```text
-1. Stop application writes and place the source site in maintenance/read-only mode.
-2. Take restorable source, target, migration_inventory, and migration_mapping backups; record hashes and prove restore in test.
-3. Verify server compatibility and dedicated account grants (source SELECT-only; target/control least privilege).
-4. Verify SQL SHA-256 and all workflow/snapshot/mapping fingerprints.
-5. Run the script with a batch client that stops on the first error; never use a continue-on-error option.
-6. Capture stdout, stderr, exit code, warnings, start/end timestamps, and connection/server identity.
-7. Require the script's final PASS query and process exit code 0.
-8. Do not run the next step automatically; review and execute it manually only after its previous-step gate passes.
-9. Keep the site blocked until FINAL_VERIFY passes; otherwise execute the documented restore/compensation procedure.
+TOTAL_SOURCE_CELLS = SUM(frozen owning-table row count for every source field)
+ACCOUNTED_SOURCE_CELLS = ACTIVE_TARGET_VERIFIED + REBUILD_VERIFIED
+  + ARCHIVE_VERIFIED + INTENTIONAL_IGNORE_VERIFIED + UNSUPPORTED_VERIFIED + REJECTED
+ELIGIBLE_SOURCE_CELLS = TOTAL_SOURCE_CELLS
+  - INTENTIONAL_IGNORE_VERIFIED - UNSUPPORTED_VERIFIED
+PRESERVED_ELIGIBLE_CELLS = ACTIVE_TARGET_VERIFIED + REBUILD_VERIFIED + ARCHIVE_VERIFIED
 ```
 
-The SQL file must use numbered comments, for example:
+Every cell has one disposition. `REJECTED` and current-contract `UNSUPPORTED` are zero for PASS. Print integer numerators/denominators.
 
 ```text
-00. required variables / database names
-01. workflow/current-step precheck
-02. previous-step PASS gate
-03. producer/consumer assertions
-04. START TRANSACTION where applicable
-05. current-step writes/checks
-06. detail evidence
-07. current-step verification
-08. next-step output verification
-09. final history/status update
-10. COMMIT on PASS
-11. ROLLBACK/cleanup instructions on failure
-12. final manual PASS verification query
+unaccounted_source_table_count = 0
+unaccounted_source_field_count = 0
+unaccounted_source_row_count = 0
+unaccounted_source_cell_count = 0
+duplicate_source_disposition_count = 0
+missing_expected_source_table_count = 0
+missing_expected_source_field_count = 0
+missing_expected_source_row_count = 0
+unexplained_skip_count = 0
+missing_deferred_evidence_count = 0
+rejected_source_row_count = 0
+rejected_source_cell_count = 0
+unresolved_count = 0
+ambiguous_count = 0
+unmapped_id_count = 0
+unmapped_value_count = 0
+orphan_count = 0
+unexpected_duplicate_count = 0
+invalid_structured_payload_count = 0
+archive_missing_count = 0
+archive_duplicate_identity_count = 0
+archive_read_back_failure_count = 0
+archive_hash_mismatch_count = 0
+rebuild_failure_count = 0
+required_target_population_failure = 0
+SCRIPT_CONTRACT_GAP = 0
 ```
 
----
+`workflow_execution_history` remains an immutable one-row PASS certificate (`UNIQUE (workflow_step_id)`). Failed attempts use existing detail/error evidence and rollback; no FAIL history or attempt number is introduced. Retries never edit PASS certificates.
 
-## 15. Codex Prompts Per Workflow Step
+## 11. Forward-only correction
 
-Every prompt below inherits the exact baseline, decision/status, concurrency, executed-data coverage, security, artifact-integrity, and manual-run contracts in this document. A generated plan or SQL file that omits those inherited gates is incomplete even if its step-specific text succeeds.
+Earlier PASS is revisited only when persisted output is objectively defective. Ordinary runtime failures are fixed and retried in the current step.
+
+| Finding | Action |
+|---|---|
+| Syntax, safe-update, duplicate retry evidence, transaction/handler bug | Fix current SQL; reset current state if required; retry current step |
+| Target non-empty because Step 4 already passed | Reset disposable target; keep guard |
+| Runtime map implementation fails but PASS rule is correct | Fix/retry Step 4 |
+| Producer row missing, duplicated, stale, ambiguous, or wrong fingerprint | Stop `SCRIPT_CONTRACT_GAP`; preserve evidence; use operator-controlled invalidation/new workflow |
+| Live schema changed after snapshot | Stop and create a new workflow/snapshot unless explicit controlled invalidation is approved |
+| Validation finds migration wrong but contract correct | Reset target; correct Step 4; rerun Steps 4–6 |
+| Validation proves persisted field decision wrong | Objective Step 3 defect; operator-approved invalidation/new workflow from Step 3 |
+| Desired business behavior changed | New workflow version and contract |
+
+Automatic PASS history deletion/rewriting is forbidden. Exceptional invalidation is operator governed and preserves old evidence.
+
+### Single-workflow convergence and new-workflow threshold
+
+The normal test cycle converges inside one workflow; a retry is not a new workflow version. While the current release is DRAFT and Step 3 has no PASS certificate, correct syntax, quoting, generated SQL, generic templates, pseudo-calls, map qualification, archive producers, accounting, operator bindings, and compiler/verifier defects transactionally in that same workflow/release. A DRAFT release created before canonical Step 1 is preparation-only state: it is not predecessor evidence, and Step 1 must deterministically resolve/reinitialize it to table-mapping-only state before PASS without changing the workflow identity.
+
+Use the same workflow for:
+
+- Step 0–2 script defects, retry cleanup, and evidence regeneration while their persisted PASS outputs remain objectively correct or do not yet exist;
+- any Step 3 semantic/compiler correction while its release is DRAFT;
+- Step 4 implementation/runtime failure when the frozen Step 3 contract remains correct, after resetting the disposable target when required;
+- Step 5 discovery that the migration implementation is wrong but the frozen contract is correct, by resetting and rerunning Steps 4–6;
+- repeated static, reset/run, and reset/rerun tests of the byte-identical candidate before the owning step PASS.
+
+Create a new workflow only when at least one objectively versioned input must change: a frozen/PASS Step 3 decision is defective; the live schema changed after its snapshot; migration scope or approved business policy changed; environment/schema identity changed; or an immutable predecessor PASS output must be invalidated. Before creating it, the current plan records the exact changed input, evidence, affected producer/consumers, operator authorization, and why a current-step retry cannot correct it. “A test failed,” “SQL has a bug,” or “a gate is non-zero” is never sufficient by itself.
+
+Before a step is finalized, prove one convergence cycle in the same workflow:
+
+1. **Static compiler pass:** exact persisted contract/SQL text parses and every producer/consumer/binding gate passes without target business writes.
+2. **Isolated execution pass:** reset the disposable target when applicable, execute the byte-identical candidate, and verify all owning-step counters.
+3. **Reset-and-rerun pass:** restore the immutable baseline, rerun the same bytes, and prove identical bindings, outcomes, hashes, and zero retry residue.
+
+Candidate iterations stay ephemeral. Only the final plan and exact tested SQL enter the active step folder. This convergence cycle adds no workflow step, status, attempt table, candidate artifact, or automatic next-step execution.
+
+## 12. Embedded step prompts
+
+Each prompt inherits Sections 5–11: complete intake, freeze physical contracts, test exact final SQL on the isolated instance, prove reset/rerun, embed integrity/test evidence, and never run the next step.
 
 ### Prompt — `TEST_DATABASE_SETUP`
 
 ```text
-# Goal
-Create and prove an isolated MySQL test database/environment for the selected migration workflow so every later generated SQL file can be executed, corrected, reset, and rerun safely before it is returned for manual execution.
-
-# Success criteria
-- Resolve all schemas/databases referenced by the workflow.
-- Create/select clearly named test-only equivalents without modifying real source/target data.
-- Confirm MySQL connectivity, required permissions, charset/collation expectations, and required engines.
-- Reproduce the minimum source/target/control baseline needed to execute later workflow SQL meaningfully.
-- Prove the environment can be reset/recreated after a failed test run.
-- Create the TEST_DATABASE_SETUP final history row only when all environment checks PASS.
-- Produce explicit test database names and reset instructions for later steps.
-
-# Constraints
-- Never use production/real target databases for Codex trial-and-error execution.
-- Prefer source data read-only; clone/copy only what is needed for isolated testing.
-- If the workflow references multiple schemas, create isolated test equivalents for all required schemas rather than collapsing incompatible schemas into one.
-- Do not change the existing workflow-control schema beyond the requested Step 0 row.
-- Do not run INVENTORY_MAPPING or any later workflow step.
-- Do not claim PASS unless the reset/rebuild path has been demonstrated.
-
-# Output
-Create exactly three files:
-1. `00-test-database-setup-plan.md` — include the mandatory Input/Evidence, Scope, Producer/Consumer, Safety/Rollback, Test Execution, PASS Gate, and Manual-Run Readiness checklists; list exact test database names, baseline strategy, permissions, reset procedure, and blocking items.
-2. `00-test-database-setup.sql` — copy/paste runnable MySQL with numbered comments to create/select the isolated test environment, verify permissions/schema availability, prepare the required baseline, verify reset readiness, and write final Step 0 history/PASS only when all checks succeed.
-3. `00-test-database-setup.sha256` — integrity manifest binding the tested SQL to workflow, environment, and bootstrap fingerprints.
-Execute this SQL against the test MySQL environment. If it fails, fix the plan/SQL and rerun until all required checks PASS before returning the final files.
+Goal: Create and prove the exact-name isolated MySQL environment.
+Require: Own and verify the canonical control-schema install/upgrade and seven-row seed;
+verify grants and negative write test, clean Joomla 6.1.2 installer baseline,
+compatibility, backups/hashes/restore, structural equality, DDL allowlist, reset/rerun.
+Output exactly:
+00-test-database-setup-plan.md
+00-test-database-setup.sql
 ```
 
 ### Prompt — `INVENTORY_MAPPING`
 
 ```text
-# Goal
-Build INVENTORY_MAPPING to inventory 100% of the defined source/target scope and materialize the reviewed mapping contract without migrating application business data.
-
-# Success criteria
-- Confirm TEST_DATABASE_SETUP history = PASS.
-- Confirm INVENTORY_MAPPING is the current first non-PASS step.
-- Account for exactly 78/78 Joomla 3 tables, 711/711 Joomla 3 fields, 76/76 Joomla 6 tables, and 832/832 Joomla 6 fields, plus explicitly classified live drift.
-- Capture record baselines and required dependencies.
-- Create mapping_release bound to the exact source/target snapshots.
-- Materialize reviewed table_mapping, field_mapping, and required STATIC value_mapping rows.
-- Materialize exactly one authoritative primary decision for every source field and preserve the independent READY/MISSING/NOT_REQUIRED physical status; normalize legacy SKIP labels through the decision/status crosswalk.
-- Populate every status/value consumed by INVENTORY_VERIFY and MAPPING_VERIFY, including source and target coverage state.
-- Update workflow source_snapshot_id, target_snapshot_id, and mapping_release_id.
-- Producer/consumer contract gap count = 0.
-- Final history and current-step PASS are written only after every check succeeds.
-
-# Constraints
-- Do not invent schema objects, dependencies, mappings, values, or counts.
-- Do not silently omit in-scope source or target objects.
-- Do not run later workflow steps.
-- Use prompt-only rollback/cleanup rules from this document.
-- Test only in the Step 0 isolated environment during generation.
-- If a downstream-required value has no producer, stop with SCRIPT_CONTRACT_GAP and fix the plan/SQL before finalizing.
-
-# Output
-Create exactly three files:
-1. `10-inventory-mapping-plan.md` — include all seven mandatory checklist groups, a complete Producer/Consumer Matrix, ordered implementation tasks, 100% scope accounting, rollback/reset strategy, blocking items, and PASS formulas.
-2. `10-inventory-mapping.sql` — numbered, copy/paste runnable MySQL with workflow gates, producer/consumer assertions, inventory/mapping writes, source+target coverage updates, accounting checks, rollback/cleanup, next-step output verification, and final history/PASS only on success.
-3. `10-inventory-mapping.sha256` — integrity manifest for the exact tested SQL and inventory/mapping fingerprints.
-Execute the candidate SQL on the Step 0 test environment. On any failure, identify root cause, update plan/checklist, fix/regenerate SQL, reset/rollback the test baseline, and rerun. Return only the exact SQL version that passes all checks.
+Goal: Freeze source/clean-target inventories and draft table-mapping release.
+Require: Confirm Step 0 PASS; inventory/classify all objects, baselines, drift,
+dependencies; create one draft release and complete table mappings; no field contract.
+Output exactly:
+10-inventory-mapping-plan.md
+10-inventory-mapping.sql
 ```
 
-### Prompt — `INVENTORY_VERIFY`
+### Prompt — `INVENTORY_MAPPING_VERIFY`
 
 ```text
-# Goal
-Build INVENTORY_VERIFY to independently prove that INVENTORY_MAPPING matches the actual selected source and target databases and that all inventory evidence required by mapping verification exists.
-
-# Success criteria
-- Confirm INVENTORY_MAPPING history = PASS.
-- Confirm INVENTORY_VERIFY is the current first non-PASS step.
-- Build a consumer list for every status/count/snapshot/table/field/dependency value used by this step.
-- Trace every consumed value to its producer table.column and exact producer SQL block.
-- Verify source/target snapshot identity, tables, physical fields, record baselines, dependencies, and required coverage statuses.
-- Missing, duplicate, unresolved, and SCRIPT_CONTRACT_GAP counts = 0.
-- Verify every output required by MAPPING_VERIFY exists.
-- Final history/PASS is written only after every verification succeeds.
-
-# Constraints
-- Do not repair INVENTORY_MAPPING silently inside the verifier.
-- If a required value was not produced by Step 10, report SCRIPT_CONTRACT_GAP and fix the producing plan/SQL rather than hiding the defect.
-- Do not change mapping decisions or application business data.
-- Do not run later steps.
-- Use the isolated Step 0 environment for execution testing.
-
-# Output
-Create exactly three files:
-1. `20-inventory-verify-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, evidence matrix, 100% verification checklist, PASS/FAIL formulas, rollback/cleanup plan, and blocking items.
-2. `20-inventory-verify.sql` — numbered runnable MySQL with previous-step gate, producer checks, source/target inventory reconciliation, coverage-status checks, failure counters, next-step output verification, protected final history/PASS update, and rollback/cleanup path.
-3. `20-inventory-verify.sha256` — integrity manifest for the exact tested verifier and snapshot fingerprints.
-Execute on the isolated test environment and keep fixing/regenerating until all required checks PASS. Return only the successfully tested SQL.
+Goal: Independently verify Step 1 inventory/table mapping against bound schemas.
+Require: Confirm Step 1 PASS; reconcile fingerprints, inventory, classification,
+dependencies, baselines, table coverage, duplicates, release and snapshot binding.
+Do not repair Step 1 or inspect/create field-contract content.
+Output exactly:
+20-inventory-mapping-verify-plan.md
+20-inventory-mapping-verify.sql
 ```
 
-### Prompt — `MAPPING_VERIFY`
+### Prompt — `FIELD_MAPPING`
 
 ```text
-# Goal
-Build MAPPING_VERIFY to prove that the mapping_release completely, uniquely, and executably covers the inventory already proven by INVENTORY_VERIFY.
-
-# Success criteria
-- Confirm INVENTORY_VERIFY history = PASS.
-- Confirm MAPPING_VERIFY is the current first non-PASS step.
-- Trace every consumed mapping/snapshot/status/fingerprint value to a valid producer.
-- Verify release snapshot binding; 78/78 table mappings; 711/711 unique field decisions; the exact decision reconciliation; 168/168 relationships; 832/832 target population strategies; decision/status validity; required migration/verification rules; and contract fingerprint.
-- Unmapped, ambiguous, duplicate, invalid, missing-rule, and SCRIPT_CONTRACT_GAP counts = 0.
-- Verify every contract/result required by MIGRATION is persisted.
-- Final history/PASS is written only when the complete contract verification succeeds.
-
-# Constraints
-- Do not alter mapping decisions simply to make verification pass.
-- Do not migrate application data or run later steps.
-- Do not invent a producer for missing mapping state.
-- Use the Step 0 isolated environment for all generated-SQL execution/testing.
-
-# Output
-Create exactly three files:
-1. `30-mapping-verify-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, coverage formulas, zero-tolerance failure checklist, rollback/cleanup plan, and blocking items.
-2. `30-mapping-verify.sql` — numbered runnable MySQL with workflow gate, producer assertions, exact decision reconciliation, independent physical-status checks, relationship/target-population coverage, fingerprint/contract checks, MIGRATION-output readiness checks, and final history/PASS only on complete success.
-3. `30-mapping-verify.sha256` — integrity manifest for the exact tested verifier and mapping release fingerprint.
-Execute, diagnose, fix/regenerate, reset, and rerun in the isolated test environment until all checks PASS; return only the tested SQL.
+Goal: Create and self-verify the complete executable field contract.
+Require: Confirm Step 2 PASS; create one decision/source field, STATIC value maps,
+relationships, target strategies and exact per-field SQL; bind every named runtime-map
+lookup, FK rewrite, value-map, neutral-user, archive, no-write, accounting and verification
+operation against actual persisted DRAFT IDs; bind every Joomla rebuild domain to the
+validated reusable operator command and continuation contract. Parse the exact persisted
+archive SQL and require all semantic, placeholder, producer and runtime-compilation gates
+to be zero before normalize/hash/independent rehash/freeze/PASS. Keep the release DRAFT
+and do not generate Step 4 while any gate is non-zero.
+Output exactly:
+30-field-mapping-plan.md
+30-field-mapping.sql
 ```
 
-### Prompt — `MIGRATION`
+### Prompt — `MIGRATION_DATA`
 
 ```text
-# Goal
-Build MIGRATION to execute the required MySQL migration operations from the verified mapping contract, record execution evidence, and fully account for migrated fields and records.
-
-# Success criteria
-- Confirm MAPPING_VERIFY history = PASS.
-- Confirm MIGRATION is the current first non-PASS step.
-- Trace every consumed mapping/ID/value/dependency input to its producer.
-- Determine all required migration scripts/blocks, stable script_id, hash/version, execution order, and dependencies.
-- Respect the existing one-time execute_log guard for successful committed execution.
-- Every required script/block has explicit source table, field, row, and cell disposition accounting using the Section 16 formulas.
-- failed_script_count = 0, failed_field_count = 0, failed_record_count = 0, unaccounted_record_count = 0, migration_error_count = 0.
-- Persist every migration result/runtime mapping/evidence required by VALIDATION_DATA, including exact accounting and eligible-preservation numerators/denominators.
-- Producer/consumer contract gap count = 0.
-- Final MIGRATION history/PASS is written only after all migration assertions succeed.
-
-# Constraints
-- Do not change verified mapping rules or database/workflow schema.
-- Do not run VALIDATION_DATA or FINAL_VERIFY.
-- Do not silently continue after a failed assertion.
-- Failed test runs must be rollback/reset so they do not consume the one-time execution guard.
-- Use only the Step 0 isolated environment while generating/testing.
-
-# Output
-Create exactly three files:
-1. `40-migration-plan.md` — include all seven mandatory checklist groups, complete script/block inventory, Producer/Consumer Matrix, dependency/order checklist, accounting formulas, one-time guard checks, rollback/reset plan per write block, and blocking items.
-2. `40-migration.sql` — numbered copy/paste runnable MySQL with previous-step gate, producer assertions, execution-order guards, migration blocks, execute_log/result/error handling, aggregate accounting, VALIDATION_DATA-output readiness checks, rollback/reset path, and final history/PASS only on success.
-3. `40-migration.sha256` — integrity manifest for the exact tested migration SQL, source/target snapshots, and mapping release.
-Execute the candidate on the isolated test environment. Any failure requires root-cause analysis, plan/checklist correction, SQL regeneration, baseline reset, and rerun. Return only the exact SQL that passes all checks.
+Goal: Execute the frozen contract, build runtime mappings, and migrate the target.
+Require: Confirm Step 3/release PASS; enforce the exact installer baseline; persist and
+verify all named RUNTIME maps; perform only the frozen dependency-ordered SQL writers,
+FK rewrites, archives/dispositions and accounting; introduce no new semantics. When
+external Joomla work is required, render the frozen validated operator binding in the plan
+and implement the exact prepared/external/continuation protocol with the same SQL, matching
+workflow/release/hash/target/domain fingerprints. Require unresolved, ambiguous, orphan,
+unaccounted and every archive/rebuild/continuation failure counter to be zero; stop on gaps
+and reset when required. Embed a complete Migration Disposition Report in the plan covering
+every source table, field, row and cell, including archived, rebuilt, target-owned, deferred,
+intentionally ignored and snapshot-proven absent-source items. Missing or unexplained skips
+are failures, not approved dispositions.
+Output exactly:
+40-migration-data-plan.md
+40-migration-data.sql
 ```
 
 ### Prompt — `VALIDATION_DATA`
 
 ```text
-# Goal
-Build VALIDATION_DATA to verify actual migrated target data against verified inventory, mapping, and migration evidence without repairing business data.
-
-# Success criteria
-- Confirm MIGRATION history = PASS.
-- Confirm VALIDATION_DATA is the current first non-PASS step.
-- Trace every consumed migration result, runtime mapping, expected count, and mapping rule to its producer.
-- Verify source row/cell disposition, eligible preservation, record counts/identity, mapped field values, transformations, runtime ID/value outcomes, structured payloads, archives, rebuilds, target-required population, duplicates, missing/unexpected records, and broken references.
-- Write validation_result / validation_failure using the existing model.
-- verification_failed_count = 0, missing_record_count = 0, unexpected_record_count = 0, duplicate_record_count = 0, broken_reference_count = 0, validation_failure_count = 0.
-- Verify every result required by FINAL_VERIFY exists.
-- SCRIPT_CONTRACT_GAP count = 0.
-- Final history/PASS is written only after complete validation succeeds.
-
-# Constraints
-- Verification only; do not repair migrated business data.
-- Do not reinterpret mapping rules or run FINAL_VERIFY.
-- Missing producer evidence is a contract defect, not permission to infer a value.
-- Use the Step 0 isolated environment during SQL generation/testing.
-
-# Output
-Create exactly three files:
-1. `50-validation-data-plan.md` — include all seven mandatory checklist groups, Producer/Consumer Matrix, validation matrix, table/field/record/reference coverage checklist, PASS/FAIL formulas, rollback/cleanup strategy for evidence writes, and blocking items.
-2. `50-validation-data.sql` — numbered runnable MySQL with previous-step gate, producer assertions, validation queries, validation_result/failure writes, failure counters, FINAL_VERIFY-output readiness checks, protected final history/PASS update, and rollback/cleanup path.
-3. `50-validation-data.sha256` — integrity manifest for the exact tested validator and migrated-data evidence set.
-Execute/fix/regenerate/reset/rerun until all validation checks PASS in the isolated environment. Return only the exact tested SQL.
+Goal: Independently validate the migrated target without repair.
+Require: Confirm Step 4 PASS; derive expectations from frozen evidence; verify IDs,
+values/hashes, transforms, counts, distributions, payloads, archives, rebuilds,
+relationships, duplicates, orphans, target population, and row/cell accounting. Embed and
+execute the numbered Post-Migration No-Data-Loss Tutorial in the plan using the exact SQL;
+independently reconcile every source identity to one disposition, fully verify migrated
+values/hashes and archives, and print all per-table/per-field exceptions. Do not sample,
+repair, waive, or convert a missing result into a skip.
+Output exactly:
+50-validation-data-plan.md
+50-validation-data.sql
 ```
 
 ### Prompt — `FINAL_VERIFY`
 
 ```text
-# Goal
-Build FINAL_VERIFY to prove that the complete workflow chain executed in order, all required prior steps are PASS, all data/evidence is accounted, and no unresolved migration or validation failure remains before marking the workflow PASS.
-
-# Success criteria
-- Confirm VALIDATION_DATA history = PASS.
-- Confirm FINAL_VERIFY is the current first non-PASS step.
-- Confirm one valid PASS history row for every required previous step including TEST_DATABASE_SETUP.
-- Trace all final counts/statuses/snapshots/mapping releases/script evidence/validation evidence to their producers.
-- Reconcile workflow history with inventory, mapping, execute_log, migration_step_result, validation_result, and validation_failure detail; print all Section 16 numerators, denominators, percentages, and zero-failure counters.
-- All required failed/unaccounted/missing/unexpected/duplicate/broken-reference/migration-error/validation-failure/SCRIPT_CONTRACT_GAP counts = 0.
-- Final history and workflow PASS are written only after every reconciliation check succeeds.
-
-# Constraints
-- Do not mutate migrated business data or repair earlier steps.
-- Do not alter earlier evidence, mapping logic, schema, or workflow.
-- Do not mark PASS from workflow_step status alone.
-- Use the isolated Step 0 environment to test the generated final-verification SQL before returning it for manual use.
-
-# Output
-Create exactly three files:
-1. `60-final-verify-plan.md` — include all seven mandatory checklist groups, complete end-to-end Producer/Consumer Matrix, history/detail reconciliation checklist, zero-failure gate, final control-write rollback plan, and blocking items.
-2. `60-final-verify.sql` — numbered runnable MySQL with complete history/detail/producer reconciliation, final zero-failure assertions, transaction-protected final history/workflow PASS updates, rollback on any failed assertion, and final PASS query.
-3. `60-final-verify.sha256` — integrity manifest for the exact tested final verifier and complete workflow evidence chain.
-Execute/fix/regenerate/reset/rerun until every final check PASSes on the isolated environment. Return only the exact tested SQL for manual execution.
+Goal: Reconcile the canonical workflow and mark it PASS.
+Require: Confirm Step 5 PASS; verify six predecessor PASS certificates, order,
+fingerprints, contracts, formulas, zero failures, reset and manual-run evidence;
+atomically mark this step/workflow PASS only when complete; perform no repair.
+Output exactly:
+60-final-verify-plan.md
+60-final-verify.sql
 ```
 
----
+## 13. Operator run order
 
-## 16. Executed Data Coverage Contract
+1. Complete global intake and sign the frozen contract.
+2. Run `00-test-database-setup.sql`; it owns the control bootstrap/upgrade, workflow seed, environment proof, and Step 0 PASS. Confirm the canonical schema checksum, seven step rows, and one Step 0 PASS certificate.
+3. For `10` and `20`, verify the embedded SQL hash/binding, run with the approved stop-on-first-error client, capture evidence, and stop unless the current step reaches its documented gate.
+4. Run `30-field-mapping.sql` only against its bound DRAFT release. Do not freeze or mark Step 30 PASS until every semantic and runtime-compilation gate is independently zero and the normalized executable contract hash matches.
+5. Before Step 40, prove backup/restore, freeze application/cron/CLI writes, recheck fingerprints, prove the exact Joomla 6.1.2 installer baseline, verify the final SQL file hash externally, and validate the frozen reusable-operator workflow/release/hash/target/domain binding. Step 40 may intentionally stop at its persisted prepared barrier and require that exact external command plus a second invocation of the same SQL before PASS.
+6. Before leaving Step 40, inspect the embedded Migration Disposition Report. Confirm every frozen source table, field, row and cell has exactly one approved disposition and that missing, unexplained-skip, duplicate-disposition, archive and deferred-evidence failure counters are zero.
+7. Run `50-validation-data.sql` and follow all eleven blocks in the Post-Migration No-Data-Loss Tutorial. Stop at Step 50 on any exception; never repair during validation.
+8. Run `60` only after Step 50 PASS; capture evidence and stop on the first failed gate.
+9. Never auto-run, skip, or satisfy a gate using an older workflow.
 
-Field-count design proxies (`97.19%` migration/rebuild and `98.03%` preservation) must not be reported as executed data coverage. Execution uses the actual frozen source snapshot.
+No separate manual-order report is required.
 
-### Counting units
+## 14. Legacy compatibility and preserved evidence
 
-For each of the 711 source fields, persist its owning table's frozen source row count in `record_inventory`. A **source cell** is one field position for one frozen source row, including `NULL`, empty, zero, and sentinel values.
+Workflow 8 and older step names `INVENTORY_VERIFY`, `MAPPING_VERIFY`, `MIGRATION_MAPPING`, or `MIGRATION` keep their original meaning in archived evidence. Their former live control-table rows were intentionally cleared on 2026-08-13 after a safety dump. The control schemas are no longer assumed empty: newer workflow/release rows may coexist and remain immutable audit evidence. The Workflow 8 archive and dump are never renamed, rewritten, restored into a new workflow, or used to seed, satisfy, or bypass a new seven-step gate.
 
-```text
-TOTAL_SOURCE_CELLS
-    = SUM(source_table_frozen_row_count for each of 711 source fields)
+Verified 2026-08-13 legacy evidence:
 
-ACCOUNTED_SOURCE_CELLS
-    = ACTIVE_TARGET_VERIFIED
-    + REBUILD_VERIFIED
-    + ARCHIVE_VERIFIED
-    + INTENTIONAL_IGNORE_VERIFIED
-    + UNSUPPORTED_VERIFIED
-    + REJECTED
-
-ELIGIBLE_SOURCE_CELLS
-    = TOTAL_SOURCE_CELLS
-    - INTENTIONAL_IGNORE_VERIFIED
-    - UNSUPPORTED_VERIFIED
-
-PRESERVED_ELIGIBLE_CELLS
-    = ACTIVE_TARGET_VERIFIED
-    + REBUILD_VERIFIED
-    + ARCHIVE_VERIFIED
-```
-
-Each source cell must contribute to exactly one primary disposition; double counting is a failure. `REJECTED` must be zero for PASS. The current pinned contract has zero `UNSUPPORTED`; if live/custom drift introduces one, the mapping gate returns to NOT READY until explicitly approved and reconciled.
-
-### Required execution percentages
-
-```text
-Source cell accounting coverage
-    = ACCOUNTED_SOURCE_CELLS / TOTAL_SOURCE_CELLS × 100
-    = 100.00%
-
-Eligible data preservation coverage
-    = PRESERVED_ELIGIBLE_CELLS / ELIGIBLE_SOURCE_CELLS × 100
-    = 100.00%
-
-Source row disposition coverage
-    = source rows with exactly one valid table/record outcome
-      / frozen source rows
-      × 100
-    = 100.00%
-
-Required target population coverage
-    = valid populated/defaulted/generated/rebuilt required target cells
-      / required target cells
-      × 100
-    = 100.00%
-```
-
-Counts alone are not proof of value correctness. For applicable decisions, validation must also reconcile mapped identities, canonical per-row/per-field hashes, NULL counts, sentinel conversions, min/max lengths and ranges, enum distributions, JSON/serialized parsing, archive SHA-256 values, rebuild invariants, duplicates, and orphans.
-
-### Per-decision execution evidence
-
-| Decision | Required PASS evidence |
+| Item | Value |
 |---|---|
-| `DIRECT` | Mapped-row value/hash equality after canonical encoding |
-| `TRANSFORM` | Independently calculated expected value equals target value; rejected transformations = 0 |
-| `ID_MAP` | Every nonsentinel source ID resolves with required cardinality; orphan count = 0 |
-| `VALUE_MAP` | Every observed source value resolves; unmapped values = 0; distributions reconcile |
-| `SPLIT` / `MERGE` / `DERIVED` | Deterministic expected-output comparison and provenance |
-| `REBUILD` | Source cells accounted, rebuild executed after dependencies, subsystem invariants and semantic tests PASS |
-| `ARCHIVE` | Byte-preserving archive count/hash reconciliation and retrievable source identity |
-| `IGNORE` | Only approved session/token fields; source counts recorded; active target copies = 0 |
-| `UNSUPPORTED` | Must be zero for this pinned workflow |
+| Workflow | ID `8`, `JOOMLA_CORE`, `j3-to-j6-20260813-05` |
+| Source/reference/test target | `honda_corp` / `honda_v6_fresh` / `honda_v6_test` |
+| Source snapshot | ID `19`, `f87ffc6160aa7a87f41d5acab63cd5446859ad4c7919adc410216e5d3547b49c` |
+| Target snapshot | ID `20`, `2408ca6377deb5cba43771b20f13b1d2a35da75a671897103397381d5af62dad` |
+| Mapping release | ID `12`, `j3-core-to-j6-test-20260813-06`, PASS |
+| Contract fingerprint | `fe958c82f8847f8f049fb787fcaccac1a3435bd0e5f136f907871ab4c96c0182` |
+| Relationship fingerprint | `838bf4c7bdd66e43e26eb5cc652b9571ebd4bb023549e7b70a822bcca60a941e` |
+| Target-population fingerprint | `b17f8b3ee5b5a6df19569b3c7a744e3bb7fe5c37ef69f72b0cae7f9d37203d7f` |
+| Environment fingerprint | `cb454bae241020a9a9c0d98dbf49778cf9adccf5c86f8c7de9e01c626a200a6c` |
+| Coverage | 78 tables, 711 fields, 168 relationships, 832 target strategies |
+| Migration | 3,742 runtime maps; 78/78 tables; 6,217/6,217 rows; 72,451/72,451 cells; 49,578/49,578 eligible cells; zero errors |
+| Clean baseline | Joomla 6.1.2; 434 total/76 official tables; 5,079 columns; 36 FKs; 888 installer rows; zero clone count mismatches |
 
-### Required final counters
+Workflow 8 used its legacy single migration history. It remains auditable in `.codex/reports/v6/database/joomla-core/old/step-legacy-20260813/` and `mysql/dump/legacy-migration-control-20260813-before-clear.sql` (SHA-256 `BB52B37678F55A6442C8407F6013D00DA611878D103BA69B59CAAA7C81EE1D4B`). Every new workflow resolves one new immutable identity in the active control schemas, creates exactly seven workflow-step rows for that identity, and creates a fresh signed contract without altering earlier workflows.
 
-```text
-unaccounted_source_table_count       = 0
-unaccounted_source_field_count       = 0
-unaccounted_source_row_count         = 0
-unaccounted_source_cell_count        = 0
-duplicate_source_disposition_count   = 0
-rejected_source_row_count            = 0
-rejected_source_cell_count           = 0
-unmapped_id_count                    = 0
-unmapped_value_count                 = 0
-orphan_count                         = 0
-unexpected_duplicate_count           = 0
-invalid_structured_payload_count     = 0
-archive_hash_mismatch_count          = 0
-rebuild_failure_count                = 0
-required_target_population_failure   = 0
-```
-
-The final report must print the integer numerators and denominators, not only rounded percentages. A zero-row table is valid only when the frozen source inventory also proves zero rows.
-
----
-
-## 17. Final Verification Rules
-
-### `TEST_DATABASE_SETUP` PASS
+## 15. Final design check
 
 ```text
-isolated test database/environment available     = YES
-real source/target protected from test writes    = YES
-required schemas/baseline available              = YES
-required MySQL permissions confirmed             = YES
-reset/rebuild path proven                        = YES
-status                                           = PASS
-```
-
-### `INVENTORY_VERIFY` PASS
-
-```text
-actual source tables accounted       = 78 / 78 = 100.00%
-actual source fields accounted       = 711 / 711 = 100.00%
-actual target tables accounted       = 76 / 76 = 100.00%
-actual target fields accounted       = 832 / 832 = 100.00%
-source row baselines frozen          = 78 / 78
-required inventory dependencies      = accounted
-required coverage states             = produced + verified
-missing/duplicate inventory evidence = 0
-unknown core/extension/custom objects = 0 after classification
-SCRIPT_CONTRACT_GAP                  = 0
-status                               = PASS
-```
-
-### `MAPPING_VERIFY` PASS
-
-```text
-required table mappings       = 78 / 78 = 100.00% explicit
-required field mappings       = 711 / 711 = 100.00% explicit
-decision reconciliation       = 163+134+106+81+0+0+1+206+6+14+0 = 711
-resolved relationships        = 168 / 168 = 100.00%
-required target strategies    = 832 / 832 = 100.00%
-invalid decision/status pairs = 0
-unmapped mappings             = 0
-ambiguous mappings            = 0
-duplicate source decisions    = 0
-UNRESOLVED                    = 0
-missing migration rules       = 0
-missing verification rules    = 0
-SCRIPT_CONTRACT_GAP           = 0
-contract_verification         = PASS
-status                        = PASS
-```
-
-### `MIGRATION` PASS
-
-```text
-failed_script_count          = 0
-failed_field_count           = 0
-failed_record_count          = 0
-unaccounted_record_count     = 0
-unaccounted_source_cell_count = 0
-duplicate_source_disposition_count = 0
-rejected_source_cell_count   = 0
-migration_error_count        = 0
-SCRIPT_CONTRACT_GAP          = 0
-source cell accounting       = 100.00% with exact numerator/denominator
-eligible data preservation   = 100.00% with exact numerator/denominator
-source row disposition       = 100.00% with exact numerator/denominator
-data_migration_verification  = PASS
-status                       = PASS
-```
-
-### `VALIDATION_DATA` PASS
-
-```text
-verification_failed_count = 0
-missing_record_count      = 0
-unexpected_record_count   = 0
-duplicate_record_count    = 0
-broken_reference_count    = 0
-validation_failure_count  = 0
-unmapped_id_count          = 0
-unmapped_value_count       = 0
-invalid_payload_count      = 0
-archive_hash_mismatch      = 0
-rebuild_failure_count      = 0
-required_target_failure    = 0
-eligible preservation      = 100.00%
-SCRIPT_CONTRACT_GAP       = 0
-status                    = PASS
-```
-
-### `FINAL_VERIFY` PASS
-
-Required previous history:
-
-```text
-TEST_DATABASE_SETUP.status = PASS
-INVENTORY_MAPPING.status   = PASS
-INVENTORY_VERIFY.status    = PASS
-MAPPING_VERIFY.status      = PASS
-MIGRATION.status           = PASS
-VALIDATION_DATA.status     = PASS
-```
-
-And:
-
-```text
-all mandatory plan checklist items = checked with evidence
-all generated SQL files            = executed successfully on isolated test environment
-all producer/consumer contracts     = PASS
-all required failure counters       = 0
-definition field coverage           = 711 / 711 = 100.00%
-relationship coverage               = 168 / 168 = 100.00%
-executed source cell accounting     = 100.00%
-executed eligible data preservation = 100.00%
-required target population          = 100.00%
-SQL artifact hashes                 = verified
-manual environment fingerprints     = compatible
-```
-
-Only then:
-
-```text
-FINAL_VERIFY.status = PASS
-workflow.status     = PASS
-```
-
----
-
-## 18. Final Design Check
-
-```text
-workflow_enum
-    = 7 top-down steps including explicitly requested Step 0 TEST_DATABASE_SETUP
-
-workflow
-    = unchanged named migration flow
-
-workflow_step
-    = unchanged one row per enum step per workflow
-
-workflow_execution_history
-    = one immutable PASS certificate per workflow_step; failures stay in existing detail/error evidence
-
-inventory detail tables
-    = unchanged
-
-mapping tables
-    = unchanged
-
-execute_log / migration_step_result / migration_error
-    = unchanged
-
-validation_result / validation_failure
-    = unchanged
-
-rollback
-    = prompt/SQL behavior only; no rollback workflow feature added
-
-producer/consumer contract
-    = prompt/plan validation rule; no new database table required
-
-Codex generation rule
-    = generate → render environment-bound artifact → execute on isolated test DB → diagnose/fix/regenerate → reset → rerun until PASS → hash → return exact tested SQL for manual execution
-
-Joomla definition gate
-    = 78/711 source, 76/832 target, 711 decisions, 168 relationships, 0 unresolved
-
-executed data gate
-    = 100.00% source row/cell accounting + 100.00% eligible preservation + 100.00% required target population
-
-manual execution
-    = advisory lock + frozen read-only source + proven backups/restore + exact SQL hash + stop-on-error batch execution + captured evidence
+new workflow steps = 7
+inventory/table verification = Step 2 only
+field creation and verification = Step 3 only
+executable SQL/archive/no-write/external-handoff compilation = Step 3 only
+persisted runtime maps and SQL target writes = Step 4 SQL-owned transaction only
+external application rebuilds = frozen reusable operator binding plus Step 4 prepared/external/continuation barrier, same two canonical files
+human-readable migration disposition report = embedded in Step 4 plan, no extra artifact
+post-migration no-data-loss tutorial and results = embedded in Step 5 plan, no extra artifact
+independent no-repair validation = Step 5
+history reconciliation = Step 6
+artifacts/step = one plan + one byte-identical tested SQL
+integrity evidence = embedded in plan
+retry = deterministic current-step cleanup and target reset when required
+rollback = SQL behavior only; no new status/table/step
+legacy = immutable evidence, never a new-workflow gate
 ```

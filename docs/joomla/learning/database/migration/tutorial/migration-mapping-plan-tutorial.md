@@ -2,6 +2,8 @@
 
 > Build a complete, reusable migration-mapping package from an **ERD and/or database schema**, then materialize table and field mappings for the migration inventory and mapping database.
 
+> **Scope notice:** The five “steps” in this tutorial are documentation-construction phases, not database workflow steps. They do not replace or renumber the canonical seven-step workflow in [`migration-workflow.md`](migration-workflow.md). Under that workflow, these static outputs are reference inputs: table mapping is materialized in `INVENTORY_MAPPING`, executable field mapping is compiled and frozen in `FIELD_MAPPING`, migration dispositions are reported in `MIGRATION_DATA`, and the post-migration no-data-loss tutorial is executed in `VALIDATION_DATA`.
+
 ## Overview
 
 - [Input Data](#input-data)
@@ -838,9 +840,29 @@ Invalid mapping groups/cardinality         = 0
 Unresolved constraint collisions           = 0
 Unverifiable field mappings                = 0
 
+EXECUTABLE CONTRACT READINESS
+--------------------------------------------------
+Generic copy/map templates                 = 0
+Unbound pseudo-calls                       = 0
+Missing exact field SQL                    = 0
+Missing named map/FK rewrites              = 0
+Missing archive/no-write implementations   = 0
+Archive SQL placeholders/parse errors      = 0
+Executable archive producers               = required / required
+Missing external rebuild bindings          = 0
+Runtime compilation errors                 = 0
+
+POST-MIGRATION ACCOUNTING REQUIREMENTS
+--------------------------------------------------
+Step 4 Migration Disposition Report        = required in plan
+Missing expected / unexplained skip        = 0
+Duplicate source dispositions              = 0
+Archive/deferred evidence gaps              = 0
+Step 5 No-Data-Loss Tutorial               = 11 / 11 PASS
+
 ==================================================
 MIGRATION MAPPING PACKAGE                  = PASS
 ==================================================
 ```
 
-> **Definition-level PASS means the complete declared source and target schema scope is explicitly inventoried and mapped. Production migration success still requires actual database reconciliation, runtime `value_mapping`, record accounting, execution, and post-migration verification.**
+> **Definition-level PASS means the declared source and target schema scope is explicitly inventoried, mapped, and compilable into the canonical Step 4 operations without new semantics. Production migration success still requires actual database reconciliation, persisted runtime `value_mapping`, the Step 4 Migration Disposition Report, archive/rebuild verification, and the independently executed Step 5 Post-Migration No-Data-Loss Tutorial.**

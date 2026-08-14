@@ -1,5 +1,7 @@
 # Joomla Core Database Migration Groups — Joomla 3
 
+> **Workflow authority:** This is the static Joomla 3 reference inventory. Its 78-table / 711-field counts are not live workflow PASS denominators. Every new workflow derives included source tables, fields, and absent-source exceptions from its bound Step 1 snapshot under [`../migration-workflow.md`](../migration-workflow.md).
+
 ## Mapping-report synchronization — 2026-08-12
 
 This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).

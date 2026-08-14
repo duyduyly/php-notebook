@@ -1,5 +1,7 @@
 # Joomla Core Migration Field Inventory — Joomla 6
 
+> **Workflow authority:** This is the static Joomla 6 field inventory. It provides physical target metadata for the executable contract, but it does not itself prove target population or migration success. The active target denominator comes from the current workflow's clean-baseline snapshot under [`../migration-workflow.md`](../migration-workflow.md).
+
 ## Mapping-report synchronization — 2026-08-12
 
 This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).

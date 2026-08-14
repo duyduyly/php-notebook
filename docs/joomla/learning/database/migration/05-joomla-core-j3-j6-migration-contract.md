@@ -1,5 +1,7 @@
 # Joomla Core J3 → J6 Migration Contract
 
+> **Workflow authority:** This is a static reference contract. New workflow execution, live denominators, executable compilation, reporting, and PASS rules are governed by [`../migration-workflow.md`](../migration-workflow.md) and the 2026-08-14 overlay below.
+
 ## Mapping-report synchronization — 2026-08-12
 
 This document is synchronized with the [Joomla 3 → Joomla 6 field mapping report](../joomla-gap-3_6/joomla-3-to-6-field-mapping-report.md).
@@ -21,6 +23,24 @@ Canonical decision reconciliation: `DIRECT 163 + TRANSFORM 134 + ID_MAP 106 + VA
 The only intentionally ignored fields are all seven fields in `#__session` and all seven fields in `#__user_keys`; active sessions and remember-me/authentication tokens must be invalidated and recreated. `#__postinstall_messages` is **REBUILD**, `#__utf8_conversion.converted` is **DERIVED**, and ordinary `checked_out` / `checked_out_time` values are **TRANSFORM** fields reset to Joomla 6's not-checked-out state. Joomla 3 `#__ucm_history` is a separate 10-field table and transforms to Joomla 6 `#__history`; it is not part of `#__ucm_content`.
 
 The two percentages are design proxies based on field decisions, not proof that the same percentage of production rows, values, or bytes migrated. Production coverage requires executed reconciliation.
+
+---
+
+## Canonical seven-step workflow overlay — 2026-08-14
+
+This file is the static Joomla Core reference contract. [`../migration-workflow.md`](../migration-workflow.md) is authoritative for workflow order, artifact ownership, retry behavior, executable compilation, PASS gates, and current-workflow evidence. The reference counts above describe the documented Joomla 3.10.12/Joomla 6.1.2 manifests; they must not be copied into a new workflow as live PASS denominators. Each workflow freezes its own physical source/clean-target snapshots and derives all active denominators from its approved scope.
+
+The seven-step ownership boundary is mandatory:
+
+- Step 1 creates one DRAFT release before inserting table mappings bound to it. It records ownership, absent-source evidence, row baselines, dependencies, and the selected physical scope.
+- Step 2 independently verifies only inventory and table-mapping outputs; it creates, inspects, or repairs no field contract.
+- Step 3 materializes and compiles the complete executable migration contract against the actual DRAFT release/table/field mapping IDs. Generic copy rules, unqualified runtime-map lookups, pseudo-functions, abbreviated archive SQL, and unresolved producer semantics cannot freeze or PASS.
+- Step 4 executes only the frozen contract, persists RUNTIME maps, performs canonical writes and archives, runs approved external rebuild handoffs, and embeds the complete Migration Disposition Report in its plan.
+- Step 5 independently executes the Post-Migration No-Data-Loss Tutorial and reconciles every source identity without repair.
+
+Every source table, field, row, and cell must have exactly one applicable disposition at its accounting grain: `MIGRATED`, `ARCHIVED`, `REBUILT`, `TARGET_OWNED`, `DEFERRED_OUT_OF_SCOPE`, `INTENTIONAL_IGNORE`, or `SKIP_ABSENT_SOURCE`. `ARCHIVED` requires payload/value read-back and hash equality. `DEFERRED_OUT_OF_SCOPE` requires preserved source evidence and a named later-workflow owner. `SKIP_ABSENT_SOURCE` requires the bound snapshot to prove physical absence and zero rows/fields. `MISSING_EXPECTED`, an unexplained skip, no disposition, or duplicate dispositions is a workflow failure and may not be converted to `IGNORE`, `ARCHIVE`, or `SKIP` merely to reach PASS.
+
+Workflow-specific exceptions and business policies recorded below are evidence inputs only. A newer workflow must explicitly adopt and bind them; workflow/release IDs, hashes, commands, counts, and PASS results are never inherited automatically.
 
 ---
 
@@ -105,6 +125,10 @@ Any of the above blocks migration.
 ---
 
 ## 3. Global Mapping Precedence
+
+### Selected-source exception — `honda_corp` Joomla 3.8 lineage
+
+The canonical manifest remains a 78-table / 711-field Joomla 3.10.12 reference. The selected live source (`honda_corp`, `ty08n_`) is an earlier Joomla 3.8 lineage and has no physical `#__privacy_requests`, `#__privacy_consents`, `#__action_logs_extensions`, `#__action_log_config`, `#__action_logs_users`, or `#__action_logs` table. For workflow `JOOMLA_CORE` / `j3-to-j6-20260813-01`, those six declared rows were persisted as `SKIP_ABSENT_SOURCE`: zero source rows, zero source fields, no target writes, and no field mapping, migration, or validation obligation. That workflow's physical contract was therefore **72 tables / 672 fields**. This evidence does not automatically bind a later workflow: each new Step 1 must re-prove the same physical absences from its own snapshot. A present table must never be skipped.
 
 Every one of the **711 Joomla 3 source fields** is assigned through the following deterministic precedence. The first matching rule wins.
 
@@ -620,7 +644,7 @@ Required J6 fields unresolved        = 0
 FIELD CONTRACT                       = PASS (definition-level)
 ```
 
-Production execution must materialize the 711 decisions into the migration inventory/mapping store and verify the same counts against the real database before execution.
+Production execution must materialize one decision for every active included source field derived from the current workflow's frozen scope. The 711 reference decisions remain a document anti-join input; declared-absent rows contribute no physical fields, while any newly present or drifted field must be explicitly classified before Step 3 can freeze.
 
 ---
 
@@ -711,12 +735,22 @@ For every source table and every production migration run, record:
 
 ```text
 source_rows
-migrate_rows
-transform_rows
-rebuild_source_rows
-archive_rows
-ignore_rows
-error_rows
+migrated_rows
+archived_rows
+rebuilt_rows
+target_owned_rows
+deferred_out_of_scope_rows
+intentional_ignore_rows
+rejected_rows
+
+source_cells
+migrated_cells
+archived_cells
+rebuilt_cells
+target_owned_cells
+deferred_out_of_scope_cells
+intentional_ignore_cells
+rejected_cells
 ```
 
 Invariant:
@@ -724,38 +758,42 @@ Invariant:
 ```text
 source_rows
 =
-migrate_rows
-+ transform_rows
-+ rebuild_source_rows
-+ archive_rows
-+ ignore_rows
-+ error_rows
+migrated_rows
++ archived_rows
++ rebuilt_rows
++ target_owned_rows
++ deferred_out_of_scope_rows
++ intentional_ignore_rows
++ rejected_rows
+
+source_cells
+=
+migrated_cells
++ archived_cells
++ rebuilt_cells
++ target_owned_cells
++ deferred_out_of_scope_cells
++ intentional_ignore_cells
++ rejected_cells
 ```
+
+`TRANSFORM`, `ID_MAP`, and `VALUE_MAP` are migrated subtypes, not additional dispositions that may double-count a row/cell. `SKIP_ABSENT_SOURCE` is table-contract evidence with snapshot-proven zero physical rows/fields and contributes zero to source row/cell denominators.
 
 Final PASS requires:
 
 ```text
-error_rows = 0
+rejected_rows = 0
+rejected_cells = 0
 unaccounted_rows = 0
+unaccounted_cells = 0
+missing_expected_rows = 0
+missing_expected_fields = 0
+unexplained_skips = 0
+duplicate_dispositions = 0
+missing_deferred_evidence = 0
 ```
 
-Recommended table:
-
-```sql
-CREATE TABLE migration_record_accounting (
-    migration_run_id   BIGINT NOT NULL,
-    source_table       VARCHAR(128) NOT NULL,
-    source_rows        BIGINT NOT NULL,
-    migrate_rows       BIGINT NOT NULL DEFAULT 0,
-    transform_rows     BIGINT NOT NULL DEFAULT 0,
-    rebuild_source_rows BIGINT NOT NULL DEFAULT 0,
-    archive_rows       BIGINT NOT NULL DEFAULT 0,
-    ignore_rows        BIGINT NOT NULL DEFAULT 0,
-    error_rows         BIGINT NOT NULL DEFAULT 0,
-    accounted_rows     BIGINT NOT NULL,
-    PRIMARY KEY (migration_run_id, source_table)
-);
-```
+Persist accounting in the existing workflow execution/result/evidence structures and render it as the Step 4 plan's Migration Disposition Report. Do not introduce a standalone accounting/attempt artifact or table merely to satisfy this document. Every evidence row is bound to the immutable workflow identity, release, contract hash, snapshots, source identity, disposition, and verification rule.
 
 ---
 
@@ -766,21 +804,25 @@ CREATE TABLE migration_record_accounting (
 Archive at minimum:
 
 - source table;
-- source primary/business key;
-- source field/record payload;
-- migration decision;
-- reason;
-- source checksum where practical;
-- migration run ID;
-- timestamp.
+- deterministic source primary/business identity and identity hash;
+- exact source field/value or complete recoverable record payload;
+- workflow name/version, mapping-release ID, and normalized contract hash;
+- archive decision and reason;
+- payload/value SHA-256;
+- duplicate-prevention identity;
+- accounting contribution;
+- persisted timestamp;
+- read-back query and hash-verification rule.
 
 This is mandatory for source-only values such as removed operational fields and historical tables intentionally not activated in Joomla 6.
+
+Step 3 stores and parses the complete physical `INSERT ... SELECT` contract without executing it. Step 4 executes that exact frozen producer and verifies inserted counts, duplicate identities, read-back, and hashes. Step 5 independently derives the expected archive identities from the frozen source snapshot, reads the persisted evidence back, and recalculates every hash. An archive label without recoverable evidence is `MISSING_EXPECTED`, not preservation.
 
 ---
 
 # 15. Verification Contract
 
-Verification has four mandatory levels.
+Verification has five mandatory levels.
 
 ## 15.1 Record verification
 
@@ -854,6 +896,23 @@ Unresolved embedded IDs         = 0
 Invalid menu entity references  = 0
 Invalid ACL group references    = 0
 Invalid field-type values       = 0
+```
+
+## 15.5 Disposition and no-data-loss verification
+
+Step 5 executes the eleven-block Post-Migration No-Data-Loss Tutorial defined by the canonical workflow. It independently recalculates source denominators, reconciles every source identity to exactly one disposition, verifies full migrated values/hashes rather than samples, validates runtime maps/FK rewrites, reads back archives, verifies deferred/ignored/absent-source evidence, checks rebuild target state, and prints all table/field exceptions.
+
+Required:
+
+```text
+Disposition coverage                  = frozen source identities / frozen source identities
+Missing expected tables/fields/rows   = 0
+Unexplained skips                     = 0
+Duplicate source dispositions         = 0
+Archive read-back/hash failures       = 0
+Missing deferred evidence             = 0
+Post-migration tutorial blocks PASS   = 11 / 11
+Repairs performed during validation   = 0
 ```
 
 ---
