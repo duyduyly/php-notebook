@@ -1,1 +1,1 @@
-feature_id,feature_name,category,surface,feature_type,description,business_purpose,user_actor,entry_point,primary_implementation,status,access,visibility_condition,language_scope,route_or_trigger,related_page_count,discovery_source,notes
+feature_id,feature_name,category,surface,description,primary_implementation,status,access,notes
