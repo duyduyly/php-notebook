@@ -1,1 +1,1 @@
-coverage_area,total_items,reviewed_items,mapped_items,unknown_items,coverage_percent,status,notes
+coverage_id,inventory_run_id,coverage_area,scope_definition,total_items,reviewed_items,mapped_items,verified_items,unknown_items,excluded_items,coverage_percent,calculation,status,evidence_id,notes

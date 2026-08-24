@@ -1,0 +1,1 @@
+inventory_run_id,project_id,project_name,profile,scope_surfaces,source_root,site_url,admin_url,joomla_version,php_version,database_vendor,database_version,database_schema,database_prefix,environment,started_at_utc,completed_at_utc,operator,source_revision,workflow_version,status,notes

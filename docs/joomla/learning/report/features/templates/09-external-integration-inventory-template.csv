@@ -1,0 +1,1 @@
+integration_id,inventory_run_id,feature_id,implementation_id,integration_key,integration_name,direction,protocol,endpoint_or_host,provider,configuration_reference,secret_location,data_exchanged,contains_pii,authentication_type,timeout_policy,retry_policy,trigger,schedule,enabled,runtime_status,status,evidence_id,notes

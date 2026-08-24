@@ -1,0 +1,1 @@
+acl_map_id,inventory_run_id,subject_type,subject_id,feature_id,page_id,implementation_id,asset_name,action,auth_context,user_group_id,access_level_id,expected_result,observed_result,condition,evidence_id,status,notes

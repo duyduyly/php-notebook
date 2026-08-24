@@ -1,1 +1,1 @@
-feature_id,dependency_type,dependency_name,dependency_id,path_or_reference,required,condition,evidence,notes
+dependency_id,feature_id,implementation_id,depends_on_implementation_id,dependency_type,dependency_name,dependency_key,path_or_reference,required,condition,version_constraint,availability_status,evidence_id,notes

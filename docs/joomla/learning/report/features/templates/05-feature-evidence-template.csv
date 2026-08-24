@@ -1,1 +1,1 @@
-evidence_id,feature_id,page_id,evidence_type,source,reference,observed_value,status,notes
+evidence_id,inventory_run_id,subject_type,subject_id,feature_id,page_id,implementation_id,evidence_type,evidence_level,source,reference,observed_value,environment,observed_at_utc,collected_by,checksum,status,notes

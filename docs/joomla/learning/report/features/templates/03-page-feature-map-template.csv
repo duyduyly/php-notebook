@@ -1,1 +1,1 @@
-map_id,page_id,feature_id,usage_type,visibility,position,trigger,condition,is_primary
+map_id,page_id,feature_id,implementation_id,usage_type,visibility,position,trigger,condition,is_primary,access_override,language_override,evidence_status,notes

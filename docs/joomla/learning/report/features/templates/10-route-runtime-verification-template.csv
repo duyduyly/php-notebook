@@ -1,0 +1,1 @@
+verification_id,inventory_run_id,page_id,feature_id,implementation_id,url_or_command,http_method,auth_context,language,viewport,input_fixture,expected_status,actual_status,redirect_target,render_marker,console_error_count,php_error_count,database_effect_summary,side_effect_summary,observed_at_utc,evidence_id,status,notes

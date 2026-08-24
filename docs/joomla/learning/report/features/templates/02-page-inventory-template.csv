@@ -1,1 +1,1 @@
-page_id,page_name,surface,page_type,url,route_pattern,menu_id,menu_title,component,view,layout,access,language,dynamic,requires_auth,parent_page_id,discovery_source,status,notes
+page_id,page_key,page_name,surface,page_type,canonical_url,route_pattern,non_sef_route,http_method,menu_id,menu_title,menu_path,parent_page_id,component,view,layout,task,itemid,access,language,dynamic,requires_auth,expected_status_code,discovery_source,status,in_scope,evidence_status,notes

@@ -1,1 +1,1 @@
-feature_id,feature_name,category,surface,description,primary_implementation,status,access,notes
+feature_id,feature_key,feature_name,category,surface,feature_type,description,business_owner,primary_implementation_id,status,access,language,data_sensitivity,criticality,in_scope,evidence_status,notes

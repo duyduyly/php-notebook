@@ -1,385 +1,152 @@
-# Joomla Feature Inventory Report
+# Joomla Feature Inventory Contract
 
-This directory defines a reusable reporting model for identifying and documenting the feature set of a single Joomla website or project.
+This directory defines a deterministic inventory contract for one Joomla website or project. It can produce either a
+small stakeholder catalogue or a complete technical baseline suitable for migration planning, support handover, and
+runtime audit.
 
-> **Scope:** This is not a comparison report. It describes one Joomla project at a time.
->
-> **Core objective:** answer three questions: **What features exist? What pages exist? Which pages use which features?**
+> Inventory one environment per `inventory_run_id`. Inventory source and target environments separately; comparison
+> between runs belongs to a separate comparison workflow.
 
-<a id="table-of-contents"></a>
-## Table of Contents
+## Profiles
 
-1. [Purpose](#purpose)
-2. [Core Reporting Model](#core-reporting-model)
-3. [Required Reports](#required-reports)
-4. [Feature Rules](#feature-rules)
-5. [Page Rules](#page-rules)
-6. [Page-to-Feature Mapping](#page-feature-map)
-7. [Optional Reports](#optional-reports)
-8. [Workflow](#workflow)
-9. [Directory Structure](#directory-structure)
+| Profile | Required files | Intended use |
+|---|---|---|
+| `CATALOG` | `00`, `01`, `02`, `03`, `05`, `13` | Stakeholder feature/page catalogue with evidence and structural validation |
+| `COMPLETE` | `00` through `13` | Joomla technical inventory, migration baseline, support handover, and audit |
 
----
+Do not call an inventory `COMPLETE` when a required file or completeness gate is missing. Unknown or blocked semantics
+must be represented in `12-exception-register.csv`; never silently omit them or convert them to empty values.
 
-<a id="purpose"></a>
-## 1. Purpose
-
-The minimum useful report should allow a developer to answer:
+## Reporting model
 
 ```text
-What does this project do?
-→ 01-feature-inventory.csv
-
-What pages or route classes exist?
-→ 02-page-inventory.csv
-
-Where is each feature used?
-→ 03-page-feature-map.csv
+00 Inventory Run
+ ├─ 01 Features ───────────────┐
+ ├─ 02 Pages / Route Classes ──┼─ 03 Page-Feature Map
+ ├─ 07 Implementations ────────┘       │
+ │    ├─ 04 Dependencies               │
+ │    ├─ 08 Data Objects               │
+ │    ├─ 09 Integrations               │
+ │    └─ 11 Access Control             │
+ ├─ 05 Evidence (may prove any record) │
+ ├─ 10 Runtime Verification ───────────┘
+ ├─ 06 Coverage
+ ├─ 12 Exceptions
+ └─ 13 Validation Results
 ```
 
-The core report intentionally avoids deep dependency tracing unless it is needed later.
+## Canonical outputs
 
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="core-reporting-model"></a>
-## 2. Core Reporting Model
-
-```text
-01-feature-inventory.csv
-        │
-        │ feature_id
-        ▼
-03-page-feature-map.csv
-        ▲
-        │ page_id
-        │
-02-page-inventory.csv
-```
-
-The three files have separate responsibilities:
-
-| Report | Responsibility |
+| File | Responsibility |
 |---|---|
-| `01-feature-inventory.csv` | Define the capabilities that exist in the project |
-| `02-page-inventory.csv` | Define the pages or route classes that exist |
-| `03-page-feature-map.csv` | Define which features are used on which pages |
+| `00-inventory-run.csv` | Bind scope, environment, versions, revision, operator, and profile |
+| `01-feature-inventory.csv` | Define business/user capabilities, not merely extension names |
+| `02-page-inventory.csv` | Define menu pages, non-menu pages, route families, APIs, admin pages, and CLI surfaces |
+| `03-page-feature-map.csv` | Map page + feature + implementation usage, placement, and conditions |
+| `04-feature-dependency-map.csv` | Record required and conditional technical dependencies |
+| `05-feature-evidence.csv` | Store authoritative, static, and runtime proof for any inventory subject |
+| `06-feature-coverage.csv` | Measure reviewed, mapped, verified, unknown, and excluded scope with an explicit denominator |
+| `07-implementation-inventory.csv` | Inventory extensions, overrides, libraries, jobs, APIs, and custom code |
+| `08-data-object-inventory.csv` | Inventory tables, fields, files, assets, stored payloads, and migration disposition |
+| `09-external-integration-inventory.csv` | Inventory inbound/outbound services without storing secrets |
+| `10-route-runtime-verification.csv` | Record repeatable HTTP/CLI/runtime checks and observed behavior |
+| `11-access-control-map.csv` | Record ACL, access levels, authentication contexts, and observed decisions |
+| `12-exception-register.csv` | Own every unknown, blocker, exclusion, ambiguity, and manual decision |
+| `13-validation-results.csv` | Record deterministic validation rules, commands, expected values, and results |
 
-Do not duplicate page lists in `01-feature-inventory.csv`. The authoritative Feature ↔ Page relationship belongs in `03-page-feature-map.csv`.
+## Joomla discovery scope
 
-[Back to Table of Contents](#table-of-contents)
+A complete run reviews all applicable surfaces:
 
----
+- extension registry, manifests, namespaces, service providers, Discover state, and update metadata;
+- site/admin components, modules, plugins, templates, overrides, libraries, packages, CLI jobs, APIs, and background tasks;
+- menus, aliases, parent paths, SEF/non-SEF routes, redirects, dynamic routes, filters, pagination, authentication,
+  administrator routes, language variants, and error routes;
+- module instances, positions, menu assignments, publication windows, access, language, and conditions;
+- tables/fields, ownership, counts, identifiers, relationships, stored JSON/HTML/layouts, files, media, generated data,
+  logs/history, PII, and retention;
+- ACL assets/actions, user groups, view levels, authentication and authorization conditions;
+- external APIs, mail, payment, analytics, captcha, SFTP, queues, webhooks, cron/CLI, configuration locations, retry and
+  timeout behavior;
+- runtime outputs, statuses, redirects, PHP/JavaScript errors, writes, messages, mail, files, and side effects.
 
-<a id="required-reports"></a>
-## 3. Required Reports
+Implementation names such as `com_content`, `mod_menu`, and `#__cars_car` are discovery signals. Final feature names
+should describe capabilities such as `Article Detail`, `Main Navigation`, and `Vehicle Search`.
 
-### `01-feature-inventory.csv`
+## Identity and normalization rules
 
-Canonical list of project capabilities.
+- IDs are stable and never reused: `RUN-*`, `F-*`, `P-*`, `MAP-*`, `DEP-*`, `EV-*`, `COV-*`, `IMP-*`, `DATA-*`,
+  `INT-*`, `RV-*`, `ACL-*`, `EXC-*`, and `VAL-*`.
+- Semantic keys are stable; database numeric IDs belong in dedicated fields and are not semantic identity.
+- Dynamic entities sharing implementation and behavior use one route-class row plus representative runtime fixtures.
+- Mapping uniqueness is `(page_id, feature_id, implementation_id, usage_type, position, trigger, condition)`.
+- `primary_implementation_id` references `07`; additional implementations are represented through `03` and `04`.
+- Use empty only for not-applicable fields. Use `UNKNOWN` when a required value was not determined.
+- Store no passwords, tokens, private keys, or session values. Record only a secret/configuration location.
 
-Core fields:
+## Evidence levels
 
-```text
-feature_id
-feature_name
-category
-surface
-description
-primary_implementation
-status
-access
-notes
+| Level | Meaning |
+|---|---|
+| `VERIFIED` | Observed at runtime or read from an authoritative database/manifest/runtime source |
+| `STATIC` | Confirmed in source or configuration but not executed |
+| `INFERRED` | Reasoned from evidence; inference is explicitly stated |
+| `UNKNOWN` | Insufficient evidence |
+| `BLOCKED` | Evidence requires a missing input, authority, dependency, or environment |
+
+Static or inferred evidence cannot be reported as runtime verification.
+
+## Complete-profile gates
+
+A `COMPLETE` run may finish only when:
+
+- every required file exists with the canonical header;
+- IDs/keys are unique and foreign references resolve;
+- every in-scope implementation maps to a feature or an owned exclusion;
+- every published menu and important non-menu route is inventoried or excepted;
+- every page has a feature map and every active page-based feature has a page;
+- every data/file object has an owner or an explicit shared/unknown exception;
+- every required dependency and integration has availability evidence;
+- critical routes and representative dynamic classes have runtime verification;
+- ACL-sensitive features have expected and observed decisions;
+- coverage denominators/formulas are recorded and scoped areas are 100% reviewed or excepted;
+- all unknowns, blockers, exclusions, and failed checks have exception records;
+- no `PASS` depends on an unresolved high/critical exception or `UNKNOWN`, `INFERRED`, or `BLOCKED` evidence.
+
+See [WORKFLOW.md](./WORKFLOW.md) for execution order and
+[CONTROLLED-VOCABULARY.md](./CONTROLLED-VOCABULARY.md) for canonical values.
+
+Run the deterministic validator from the repository root:
+
+```powershell
+pwsh -NoProfile -File workspace/inventories/features/workflow/validate-inventory.ps1 `
+    -RunDirectory workspace/inventories/features/runs/<inventory-run>
 ```
 
-This file should stay compact. It should not contain:
+The validator returns exit code `0` only when required files, exact headers, IDs, references, selected vocabularies,
+mapping uniqueness, coverage arithmetic, and blocking-exception gates pass.
+
+## Directory structure
 
 ```text
-page lists
-technical dependency lists
-formal evidence records
-coverage measurements
-```
-
-Those concerns belong to other reports.
-
-### `02-page-inventory.csv`
-
-Canonical list of pages and route classes.
-
-Typical information includes:
-
-```text
-page_id
-page_name
-surface
-page_type
-url
-route_pattern
-menu_id
-component
-view
-layout
-access
-language
-dynamic
-status
-notes
-```
-
-For large dynamic URL families, prefer a route class instead of one row for every entity.
-
-Example:
-
-```text
-/vehicles/civic
-/vehicles/city
-/vehicles/crv
-
-↓
-
-/vehicles/{alias}
-```
-
-### `03-page-feature-map.csv`
-
-Canonical many-to-many mapping between pages and features.
-
-Core fields:
-
-```text
-map_id
-page_id
-feature_id
-usage_type
-visibility
-position
-trigger
-condition
-is_primary
-```
-
-This file answers both directions:
-
-```text
-Feature → Pages
-Page → Features
-```
-
-Example:
-
-```text
-P001 + F001 → Main Navigation on Home
-P002 + F001 → Main Navigation on Vehicle Listing
-P002 + F014 → Vehicle Search on Vehicle Listing
-```
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="feature-rules"></a>
-## 4. Feature Rules
-
-A feature describes a capability, not only a Joomla implementation.
-
-Good feature names:
-
-```text
-Main Navigation
-Article Listing
-Article Detail
-Vehicle Search
-Contact Form
-Shopping Cart
-Newsletter Signup
-```
-
-Implementation names are discovery signals, not ideal final feature names:
-
-```text
-com_content
-mod_menu
-plg_system_example
-#__custom_table
-```
-
-Example:
-
-```text
-mod_menu instance 42
-position = navigation
-
-↓
-
-Feature = Main Navigation
-```
-
-One Joomla extension may implement several features, and one feature may depend on several Joomla mechanisms.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="page-rules"></a>
-## 5. Page Rules
-
-Do not assume `#__menu` contains every page.
-
-Page discovery may use:
-
-```text
-#__menu
-runtime crawling
-component-generated routes
-dynamic detail routes
-search results
-filters
-pagination
-forms
-authenticated routes
-administrator routes when in scope
-```
-
-A page inventory should represent behavior, not unnecessarily duplicate every data record.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="page-feature-map"></a>
-## 6. Page-to-Feature Mapping
-
-`03-page-feature-map.csv` is the source of truth for feature usage by page.
-
-To find where a feature is used:
-
-```text
-Filter 03 by feature_id
-↓
-Get page_id values
-↓
-Join with 02-page-inventory.csv
-```
-
-Example:
-
-```text
-F001 Main Navigation
-↓
-P001
-P002
-P003
-↓
-Home
-Vehicle Listing
-Vehicle Detail
-```
-
-To find the features used on a page:
-
-```text
-Filter 03 by page_id
-↓
-Get feature_id values
-↓
-Join with 01-feature-inventory.csv
-```
-
-This separation keeps the model normalized and avoids maintaining the same relationship in multiple files.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="optional-reports"></a>
-## 7. Optional Reports
-
-These reports are not required for the normal feature inventory.
-
-### `04-feature-dependency-map.csv`
-
-Use when deep technical dependency tracing is required.
-
-Answers:
-
-> What does this feature technically depend on?
-
-### `05-feature-evidence.csv`
-
-Use when formal evidence or confidence grading is required.
-
-Answers:
-
-> What proves that this feature or mapping exists?
-
-### `06-feature-coverage.csv`
-
-Use when measurable audit coverage is required.
-
-Answers:
-
-> How complete is the discovery process?
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="workflow"></a>
-## 8. Workflow
-
-The core workflow is intentionally small:
-
-```text
-STEP 1
-Feature Inventory
-      ↓
-01-feature-inventory.csv
-
-STEP 2
-Page Inventory
-      ↓
-02-page-inventory.csv
-
-STEP 3
-Page → Feature Mapping
-      ↓
-03-page-feature-map.csv
-
-STEP 4
-Validate Core Inventory
-      ↓
-Need deeper analysis?
-      │
-   YES│NO
-      │ └────────────→ STOP
-      ↓
-Optional 04 / 05 / 06
-```
-
-See [`WORKFLOW.md`](./WORKFLOW.md) for execution details.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="directory-structure"></a>
-## 9. Directory Structure
-
-```text
-report/features/
+workflow/
 ├── README.md
 ├── WORKFLOW.md
+├── CONTROLLED-VOCABULARY.md
+├── validate-inventory.ps1
 └── templates/
+    ├── 00-inventory-run-template.csv
     ├── 01-feature-inventory-template.csv
     ├── 02-page-inventory-template.csv
     ├── 03-page-feature-map-template.csv
     ├── 04-feature-dependency-map-template.csv
     ├── 05-feature-evidence-template.csv
-    └── 06-feature-coverage-template.csv
+    ├── 06-feature-coverage-template.csv
+    ├── 07-implementation-inventory-template.csv
+    ├── 08-data-object-inventory-template.csv
+    ├── 09-external-integration-inventory-template.csv
+    ├── 10-route-runtime-verification-template.csv
+    ├── 11-access-control-map-template.csv
+    ├── 12-exception-register-template.csv
+    └── 13-validation-results-template.csv
 ```
-
-The first three templates are the core reporting model. Templates `04-06` are optional deep-analysis extensions.
-
-[Back to Table of Contents](#table-of-contents)

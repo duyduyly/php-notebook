@@ -1,0 +1,1 @@
+validation_id,inventory_run_id,rule_id,validation_area,rule_description,expected_value,actual_value,status,evidence_id,executed_at_utc,command_or_method,notes

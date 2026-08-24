@@ -1,463 +1,110 @@
-# Joomla Feature Inventory Workflow
+# Complete Joomla Feature Inventory Workflow
 
-This workflow defines the minimum process for building a feature inventory for one Joomla website or project.
+Execute one step at a time. Do not complete a later step while an earlier required gate is failed or blocked.
 
-> **Core outputs:** `01-feature-inventory.csv` → `02-page-inventory.csv` → `03-page-feature-map.csv`.
->
-> **Optional outputs:** `04-feature-dependency-map.csv`, `05-feature-evidence.csv`, and `06-feature-coverage.csv` are created only when deeper analysis is requested.
+## Step 0 — Bind the run
 
-<a id="table-of-contents"></a>
-## Table of Contents
+Create `00-inventory-run.csv`. Record the exact project, environment, Joomla/PHP/database versions, source root,
+site/admin URLs, source revision, profile, operator, and timestamps. One `inventory_run_id` represents one environment.
 
-1. [Goal](#goal)
-2. [Workflow](#workflow)
-3. [Step 1 — Feature Inventory](#step-1)
-4. [Step 2 — Page Inventory](#step-2)
-5. [Step 3 — Page-to-Feature Mapping](#step-3)
-6. [Step 4 — Validate Core Inventory](#step-4)
-7. [Optional Decision Gate](#optional-gate)
-8. [Optional Reports](#optional-reports)
+Gate: exactly one active binding exists and all required environment fields are known.
 
----
+## Step 1 — Inventory Joomla implementations
 
-<a id="goal"></a>
-## 1. Goal
+Create `07-implementation-inventory.csv` from database and filesystem evidence. Review `#__extensions`, manifests,
+source entry points, service providers, namespaces, Discover state, modules, plugins, templates/overrides, libraries,
+packages, CLI jobs, APIs, custom scripts, and background behavior. Separate installed, enabled, published, discoverable,
+compatible, and runtime-verified states.
 
-The core inventory must answer three questions:
+Gate: every in-scope implementation is inventoried or excepted; registry/filesystem discrepancies are explicit.
 
-1. What features exist in the project?
-2. What pages or route classes exist?
-3. Which pages use each feature?
+## Step 2 — Inventory data and integrations
 
-The default deliverable is:
+Create `08-data-object-inventory.csv` and `09-external-integration-inventory.csv`.
 
-```text
-01-feature-inventory.csv
-02-page-inventory.csv
-03-page-feature-map.csv
-```
+For data, record owner, object, identifier, relationships, count/size, classification, PII, retention, generated state,
+and migration disposition. Include extension/shared tables, stored JSON/HTML/layouts, files, media, and missing expected
+objects. For integrations, record direction, protocol, endpoint/host, configuration and secret locations, exchanged data,
+privacy impact, retry/timeout behavior, trigger/schedule, enabled state, and runtime status. Never store credentials.
 
-The workflow stops after the core inventory unless deeper analysis is requested.
+Gate: every in-scope data object and integration has an owner or an owned `UNKNOWN` exception.
 
-[Back to Table of Contents](#table-of-contents)
+## Step 3 — Normalize capabilities
 
----
+Create `01-feature-inventory.csv`. Derive capabilities from implementations, data, configuration, documentation, and
+runtime behavior. Name capabilities rather than folders. Separate materially different behavior and deduplicate multiple
+implementations of one capability.
 
-<a id="workflow"></a>
-## 2. Workflow
+Gate: every active implementation maps to a feature or exclusion; uncertainty remains `UNKNOWN` or `CONDITIONAL`.
 
-```mermaid
-flowchart TD
-    A[Step 1 - Feature Inventory] --> B[01-feature-inventory.csv]
-    B --> C[Step 2 - Page Inventory]
-    C --> D[02-page-inventory.csv]
-    D --> E[Step 3 - Map Features to Pages]
-    E --> F[03-page-feature-map.csv]
-    F --> G[Step 4 - Validate Core Inventory]
-    G --> H{Need deeper analysis?}
-    H -->|No| I[STOP - Core Inventory Complete]
-    H -->|Yes| J[Continue to Optional Reports 04-06]
-```
+## Step 4 — Inventory pages and route classes
 
-Database inspection, source-code inspection, Joomla administrator review, crawling, and browser/runtime inspection are discovery methods used inside the steps. They are not separate workflow steps.
+Create `02-page-inventory.csv`. Start from `#__menu`, then include component routes, SEF/non-SEF forms, dynamic detail
+families, search/filter/pagination, API endpoints, authenticated/admin pages, CLI commands, redirects, language variants,
+and meaningful error/empty states. Keep menu identity separate from route identity. Normalize repeated entities into route
+classes when implementation and behavior match.
 
-[Back to Table of Contents](#table-of-contents)
+Gate: all published menus and important non-menu routes are represented or excepted; canonical routes are explicit.
 
----
+## Step 5 — Map usage, dependencies, and access
 
-<a id="step-1"></a>
-## 3. Step 1 — Feature Inventory
+Create `03-page-feature-map.csv`, `04-feature-dependency-map.csv`, and `11-access-control-map.csv`. Map concrete
+implementations, placement, trigger, visibility, language, access, and conditions. Record direct, indirect, conditional,
+data, runtime, presentation, external, and authorization dependencies. Record expected ACL decisions by context.
 
-### Goal
+Gate: references resolve; no normalized duplicates exist; dependencies have availability; ACL expectations are explicit.
 
-Identify what the website or project can do.
+## Step 6 — Collect evidence
 
-### Input
+Create `05-feature-evidence.csv` throughout discovery and close its gate here. Evidence may prove any feature, page,
+mapping, implementation, data object, integration, ACL record, runtime check, or exception. Record exact subject, source,
+reference, observed value, environment, time, collector, and checksum where useful. Keep evidence levels distinct.
 
-Use available sources such as:
+Gate: each active feature, critical page, required dependency/integration, and exclusion has evidence.
 
-```text
-Joomla database
-Joomla source code
-Administrator UI
-Frontend runtime
-Menus
-Modules
-Plugins
-Templates
-External integrations
-Existing project documentation
-```
+## Step 7 — Verify runtime behavior
 
-Typical Joomla discovery points include:
+Create `10-route-runtime-verification.csv`. For each critical page and representative dynamic route class, record the
+request/command, auth/language context, fixture, expected/actual status, redirects, render marker, PHP/JavaScript errors,
+database effects, messages, mail/files, and side effects. Test SEF and non-SEF forms when routing matters.
 
-```text
-#__extensions
-#__menu
-#__modules
-#__modules_menu
-/components
-/administrator/components
-/modules
-/plugins
-/templates
-```
+Gate: critical flows are verified; failures and required checks not run have exceptions.
 
-### Action
+## Step 8 — Measure coverage and own exceptions
 
-Discover candidate capabilities and normalize them into feature names.
+Create `06-feature-coverage.csv` and `12-exception-register.csv`. Every coverage row defines its denominator and formula.
+Measure extensions, modules, plugins, menus, routes, features, mappings, data, integrations, ACL contexts, runtime flows,
+languages, and admin surfaces as applicable. Register each unknown, ambiguity, blocker, exclusion, mismatch, and failure.
 
-Name the capability, not only the Joomla implementation.
+Gate: all areas are 100% reviewed or the remainder is represented by owned exceptions.
 
-Good examples:
+## Step 9 — Validate and freeze
 
-```text
-Main Navigation
-Article Listing
-Article Detail
-Vehicle Search
-Contact Form
-Shopping Cart
-Newsletter Signup
-```
+Create `13-validation-results.csv` and execute all applicable rules:
 
-Avoid using implementation names as final feature names:
+1. Required files and exact headers.
+2. ID and semantic-key uniqueness.
+3. Foreign-reference integrity.
+4. Controlled vocabularies.
+5. Normalized mapping duplicates.
+6. Installed-implementation disposition.
+7. Published-menu and non-menu-route disposition.
+8. Bidirectional feature/page completeness.
+9. Data-object ownership.
+10. Required dependency/integration availability.
+11. Evidence completeness.
+12. Critical runtime and ACL verification.
+13. Coverage arithmetic and denominators.
+14. Exception ownership and closure.
+15. No false `PASS`: unresolved high/critical blockers force `INCOMPLETE` or `BLOCKED`.
 
-```text
-com_content
-mod_menu
-plg_system_example
-#__custom_table
-```
+Record command/method, expected value, actual value, timestamp, evidence, and result. Set the run to `COMPLETE` only when
+all applicable gates pass; otherwise use `INCOMPLETE` or `BLOCKED`.
 
-Example:
+## Profile completion
 
-```text
-mod_menu instance 42
-position = navigation
-published globally
+`CATALOG` requires Steps 0, 3, 4, 5 (`03` only), 6, and structural validation in Step 9. It must not be presented as a
+technical or migration-complete inventory.
 
-↓
-
-Feature = Main Navigation
-```
-
-### Output
-
-```text
-01-feature-inventory.csv
-```
-
-Use:
-
-```text
-templates/01-feature-inventory-template.csv
-```
-
-Core fields:
-
-```text
-feature_id
-feature_name
-category
-surface
-description
-primary_implementation
-status
-access
-notes
-```
-
-Do not store page lists, detailed dependencies, evidence, or coverage data in this file. Those concerns belong to `03`, `04`, `05`, and `06`.
-
-### Done when
-
-- feature IDs are unique;
-- known active feature candidates have been reviewed;
-- duplicate capabilities are normalized;
-- feature names describe capabilities rather than implementation names;
-- uncertain items are recorded as `UNKNOWN` or `CONDITIONAL` instead of being silently removed.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="step-2"></a>
-## 4. Step 2 — Page Inventory
-
-### Goal
-
-Identify the pages or route classes where features can appear or be used.
-
-### Input
-
-Start with Joomla menu configuration, then extend it with runtime and component-generated routes.
-
-Typical sources:
-
-```text
-#__menu
-runtime crawl
-component routes
-dynamic detail pages
-search results
-filter states
-pagination
-forms
-authenticated routes
-administrator routes when in scope
-```
-
-Do not assume `#__menu` contains every page in the website.
-
-### Action
-
-Inventory pages by page type or route class.
-
-For repeated dynamic pages, use one route class when the implementation and behavior are the same.
-
-Example:
-
-```text
-/vehicles/civic
-/vehicles/city
-/vehicles/crv
-
-↓
-
-page_id       = P003
-page_name     = Vehicle Detail
-route_pattern = /vehicles/{alias}
-dynamic       = YES
-```
-
-### Output
-
-```text
-02-page-inventory.csv
-```
-
-Use:
-
-```text
-templates/02-page-inventory-template.csv
-```
-
-### Done when
-
-- page IDs are unique;
-- published in-scope menu pages are represented;
-- important runtime-discovered routes are represented;
-- dynamic URL families are normalized where appropriate;
-- unknown pages are recorded rather than ignored.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="step-3"></a>
-## 5. Step 3 — Page-to-Feature Mapping
-
-### Goal
-
-Identify which features are used on each page or route class.
-
-`03-page-feature-map.csv` is the authoritative source for the relationship between features and pages.
-
-Use it to answer both:
-
-```text
-Where is feature F001 used?
-```
-
-and:
-
-```text
-Which features are used on page P002?
-```
-
-### Input
-
-```text
-01-feature-inventory.csv
-02-page-inventory.csv
-runtime page inspection
-Joomla module/menu assignments
-component behavior
-known page conditions
-```
-
-### Action
-
-Create one row for every `page_id + feature_id` relationship.
-
-Example:
-
-```text
-P001 + F001 → Main Navigation on Home
-P002 + F001 → Main Navigation on Vehicle Listing
-P002 + F014 → Vehicle Search on Vehicle Listing
-```
-
-This creates a many-to-many relationship:
-
-```text
-01 Feature Inventory
-        │
-        │ feature_id
-        ▼
-03 Page-Feature Map
-        ▲
-        │ page_id
-        │
-02 Page Inventory
-```
-
-Do not duplicate the page list inside `01-feature-inventory.csv`.
-
-### Output
-
-```text
-03-page-feature-map.csv
-```
-
-Use:
-
-```text
-templates/03-page-feature-map-template.csv
-```
-
-Core fields:
-
-```text
-map_id
-page_id
-feature_id
-usage_type
-visibility
-position
-trigger
-condition
-is_primary
-```
-
-### Done when
-
-- every in-scope page has at least one mapped feature;
-- every active page-based feature maps to at least one page;
-- every mapped `page_id` exists in `02-page-inventory.csv`;
-- every mapped `feature_id` exists in `01-feature-inventory.csv`;
-- conditional feature usage records the relevant condition.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="step-4"></a>
-## 6. Step 4 — Validate Core Inventory
-
-### Goal
-
-Confirm that the three core reports are internally consistent and usable.
-
-### Action
-
-Validate both directions.
-
-#### Feature → Page
-
-For every page-based feature, verify that `03-page-feature-map.csv` can answer where it is used.
-
-#### Page → Feature
-
-For every page, verify that `03-page-feature-map.csv` can answer which features it contains.
-
-Validate references:
-
-```text
-03.page_id    → must exist in 02.page_id
-03.feature_id → must exist in 01.feature_id
-```
-
-### Done when
-
-```text
-Broken page references             = 0
-Broken feature references          = 0
-Duplicate feature IDs              = 0
-Duplicate page IDs                 = 0
-Duplicate normalized mappings      = 0
-In-scope pages without features    = 0
-Page-based features without pages  = 0
-Unknown items                      = explicitly documented
-```
-
-This validates the inventory structure. It does not require dependency tracing or formal evidence collection.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="optional-gate"></a>
-## 7. Optional Decision Gate
-
-After Step 4 is complete, stop and ask before continuing.
-
-Ask exactly:
-
-> **Do you want to continue with optional deep analysis reports (`04-06`)? Yes / No**
-
-### If No
-
-```text
-STOP
-↓
-Core Feature Inventory Complete
-```
-
-### If Yes
-
-Continue only with the optional report or reports required by the task.
-
-```text
-04-feature-dependency-map.csv
-05-feature-evidence.csv
-06-feature-coverage.csv
-```
-
-The core inventory remains complete when the answer is `No`.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="optional-reports"></a>
-## 8. Optional Reports
-
-### `04-feature-dependency-map.csv`
-
-Use when technical dependencies need to be traced.
-
-Answers:
-
-> What does this feature technically depend on?
-
-### `05-feature-evidence.csv`
-
-Use when explicit evidence is required.
-
-Answers:
-
-> What proves that this feature or mapping exists?
-
-### `06-feature-coverage.csv`
-
-Use when measurable audit coverage is required.
-
-Answers:
-
-> How complete is the feature discovery process?
-
-Optional reports extend the core inventory. They are not required for the normal feature inventory workflow.
-
-[Back to Table of Contents](#table-of-contents)
+`COMPLETE` requires every step and applicable gate. Dependencies, evidence, coverage, implementations, data,
+integrations, runtime checks, ACL, exceptions, and validation are mandatory.
