@@ -1,718 +1,244 @@
 # Joomla Feature Inventory Report
 
-This document defines a practical workflow for discovering, documenting, and validating the complete feature set of a Joomla website or project.
+This directory defines a reusable reporting model for identifying and documenting the complete feature set of a single Joomla website or project.
 
-> **Scope:** This is a single-project feature inventory. It does not compare Joomla versions, environments, releases, or websites. Its purpose is to answer: **What features exist, where are they used, how are they implemented, what data and assets do they depend on, and what evidence proves they exist?**
+> **Scope:** This is not a comparison report. It describes one Joomla project at a time. The core objective is to answer three questions: **What features exist? What pages exist? Which pages use which features?**
 
 <a id="table-of-contents"></a>
 ## Table of Contents
 
 1. [Purpose](#purpose)
-2. [What Counts as a Feature?](#feature-definition)
-3. [Feature vs. Joomla Implementation](#feature-vs-implementation)
-4. [Recommended Feature Taxonomy](#feature-taxonomy)
-5. [Feature Discovery Sources](#discovery-sources)
-6. [Page and Route Inventory](#page-inventory)
-7. [Feature Inventory](#feature-inventory)
-8. [Page-to-Feature Matrix](#page-feature-matrix)
-9. [Feature Dependency Map](#dependency-map)
-10. [Feature Evidence Model](#evidence-model)
-11. [Feature Signature](#feature-signature)
-12. [Discovery Workflow](#discovery-workflow)
-13. [Database Discovery](#database-discovery)
-14. [Source-Code Discovery](#source-discovery)
-15. [Runtime Discovery](#runtime-discovery)
-16. [How to Handle Dynamic and Conditional Features](#dynamic-features)
-17. [Completeness and Coverage Gates](#coverage-gates)
-18. [Recommended Report Files](#report-files)
-19. [Example Feature Record](#example-feature)
-20. [Final Validation Checklist](#validation-checklist)
+2. [Core Reporting Model](#core-reporting-model)
+3. [Required Core Reports](#required-core-reports)
+4. [Optional Deep Reports](#optional-deep-reports)
+5. [Feature Definition Rules](#feature-definition-rules)
+6. [Page Definition Rules](#page-definition-rules)
+7. [Page-to-Feature Mapping Rules](#page-feature-mapping-rules)
+8. [Inventory Workflow](#inventory-workflow)
+9. [Recommended Directory Structure](#directory-structure)
+10. [Minimum Completion Criteria](#minimum-completion-criteria)
 
 ---
 
 <a id="purpose"></a>
 ## 1. Purpose
 
-A Joomla project is not fully described by its installed extensions or database tables. A real feature may be assembled from several Joomla mechanisms at the same time:
+The report is designed to create a practical inventory of a Joomla project's behavior without requiring a deep technical audit for every feature.
+
+The minimum useful output is:
+
+```text
+Feature Inventory
+      ↓
+Page Inventory
+      ↓
+Page ↔ Feature Mapping
+```
+
+This produces a traceable answer to:
 
 ```text
 Feature
-→ Route or trigger
-→ Component / module / plugin
-→ View and layout
-→ Template override
-→ Database data
-→ Media and static assets
-→ JavaScript / CSS
-→ External integration
-→ Runtime behavior
+→ where it is used
+→ which page or route exposes it
 ```
 
-The goal of a feature inventory is to create a stable, evidence-backed catalog of the capabilities provided by the project.
+The core reports are intentionally sufficient for project understanding, testing scope, migration planning, regression planning, and feature-level debugging entry points.
 
-A complete report should allow a developer to answer questions such as:
-
-- What business and user-facing features exist?
-- Which pages use each feature?
-- Which Joomla extension implements each feature?
-- Which component view, module instance, plugin, layout, or template override participates in the feature?
-- Which database tables contain its data or configuration?
-- Which CSS, JavaScript, images, or other assets are required?
-- Which external APIs or services are required?
-- Is the feature public, authenticated, administrator-only, scheduled, or conditionally visible?
-- What evidence proves the feature is present?
-- Has every relevant page, extension, override, module, interaction, and integration been reviewed?
-
-The report is therefore useful for:
-
-- project understanding;
-- technical handover;
-- maintenance planning;
-- refactoring;
-- migration preparation;
-- regression-test planning;
-- security review;
-- dependency analysis;
-- decommissioning unused functionality.
+Technical dependency analysis, runtime evidence, and audit coverage calculations are available as optional reports when deeper investigation is required.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="feature-definition"></a>
-## 2. What Counts as a Feature?
+<a id="core-reporting-model"></a>
+## 2. Core Reporting Model
 
-A **feature** is a capability that provides observable business, user, administrator, integration, or operational behavior.
+The reporting model is split into two levels.
 
-Good feature names describe **what the project does**, not the Joomla extension name that happens to implement it.
+### Level 1 — Required core inventory
+
+```text
+01-feature-inventory.csv
+02-page-inventory.csv
+03-page-feature-map.csv
+```
+
+These three files are the default deliverables and should be detailed enough to stand on their own.
+
+### Level 2 — Optional deep analysis
+
+```text
+04-feature-dependency-map.csv
+05-feature-evidence.csv
+06-feature-coverage.csv
+```
+
+Create these only when the project requires deeper technical analysis, audit evidence, dependency tracing, or measurable discovery coverage.
+
+The optional reports must not be required to understand the basic feature-to-page inventory.
+
+[Back to Table of Contents](#table-of-contents)
+
+---
+
+<a id="required-core-reports"></a>
+## 3. Required Core Reports
+
+### 3.1 `01-feature-inventory.csv`
+
+This is the canonical list of features provided by the Joomla project.
+
+A feature should describe a capability, not merely an implementation name.
 
 Examples:
 
-| Feature | Typical capability |
-|---|---|
-| Main Navigation | Lets visitors navigate primary website sections |
-| Article Listing | Displays a collection of articles |
-| Article Detail | Displays one article |
-| Vehicle Search | Lets visitors search vehicles by criteria |
-| Product Cart | Stores products selected for purchase |
-| Newsletter Signup | Collects newsletter subscriptions |
-| Contact Form | Sends visitor enquiries |
-| User Login | Authenticates users |
-| Image Slider | Displays rotating promotional media |
-| Breadcrumb | Shows the current navigation hierarchy |
-| Site Search | Searches indexed website content |
-| Sitemap Generation | Generates a machine- or user-readable sitemap |
-| Scheduled Email | Sends messages through a scheduled process |
-| Payment Processing | Sends transaction data to a payment provider |
-
-The following items are normally **not** feature names by themselves:
-
 ```text
-com_content
-mod_menu
-plg_system_example
-#__content
-/templates/site/html/com_content
-media/com_example/app.js
-```
-
-Those are implementations or dependencies.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="feature-vs-implementation"></a>
-## 3. Feature vs. Joomla Implementation
-
-A feature and its implementation must be recorded separately.
-
-Example:
-
-```text
-Feature: Homepage Hero Slider
-
-Implementation
-├── Module type: mod_example_slider
-├── Module instance: ID 123
-├── Position: hero
-├── Menu assignment: Home
-├── Layout: default
-├── Template override: templates/site/html/mod_example_slider/default.php
-├── Database: #__example_slider
-├── JavaScript: media/mod_example_slider/js/slider.js
-├── CSS: media/mod_example_slider/css/slider.css
-└── Media: images/banners/*
-```
-
-This distinction matters because:
-
-- one feature can depend on several extensions;
-- one extension can implement several features;
-- one module type can have many module instances with different business purposes;
-- the same component view can behave differently because of menu parameters or layout overrides;
-- a feature can exist without a dedicated Joomla extension, for example when it is implemented in a template or custom JavaScript;
-- a feature can be triggered by a plugin, cron job, CLI command, webhook, or external API rather than a visible page.
-
-Use this rule throughout the report:
-
-```text
-Feature = capability
-Implementation = Joomla mechanism that provides the capability
-```
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="feature-taxonomy"></a>
-## 4. Recommended Feature Taxonomy
-
-Use a taxonomy so features are grouped consistently.
-
-```text
-FEATURES
-│
-├── NAVIGATION
-│   ├── Main Menu
-│   ├── Secondary Menu
-│   ├── Footer Menu
-│   ├── Breadcrumb
-│   └── Pagination
-│
-├── CONTENT
-│   ├── Article Listing
-│   ├── Article Detail
-│   ├── Featured Content
-│   ├── Category Navigation
-│   └── Tags
-│
-├── SEARCH_AND_DISCOVERY
-│   ├── Site Search
-│   ├── Filters
-│   ├── Sorting
-│   └── Recommendations
-│
-├── BUSINESS_DOMAIN
-│   ├── Product / Vehicle / Property Listing
-│   ├── Detail View
-│   ├── Search
-│   ├── Filter
-│   └── Business-specific Actions
-│
-├── COMMERCE
-│   ├── Product Catalog
-│   ├── Cart
-│   ├── Checkout
-│   ├── Payment
-│   └── Order History
-│
-├── FORMS
-│   ├── Contact Form
-│   ├── Registration Form
-│   ├── Lead Form
-│   ├── Newsletter Signup
-│   └── Custom Forms
-│
-├── USER_AND_ACCESS
-│   ├── Login
-│   ├── Logout
-│   ├── Registration
-│   ├── Password Reset
-│   ├── Profile
-│   └── Access-controlled Content
-│
-├── MEDIA
-│   ├── Slider
-│   ├── Gallery
-│   ├── Video
-│   ├── Document Download
-│   └── Lightbox
-│
-├── GLOBAL_UI
-│   ├── Header
-│   ├── Footer
-│   ├── Cookie Notice
-│   ├── Modal / Popup
-│   ├── Social Links
-│   └── Responsive Navigation
-│
-├── ADMINISTRATION
-│   ├── Content Management
-│   ├── User Management
-│   ├── Configuration
-│   ├── Import / Export
-│   └── Reporting
-│
-├── INTEGRATION
-│   ├── Analytics
-│   ├── Maps
-│   ├── CRM
-│   ├── SMTP
-│   ├── Payment Gateway
-│   ├── Webhooks
-│   └── External APIs
-│
-├── SECURITY_AND_COMPLIANCE
-│   ├── CAPTCHA
-│   ├── Consent
-│   ├── Access Control
-│   ├── Security Filtering
-│   └── Audit Logging
-│
-└── OPERATIONAL
-    ├── Scheduled Tasks
-    ├── Background Jobs
-    ├── Cache
-    ├── Search Indexing
-    ├── Backup
-    └── Monitoring
-```
-
-The taxonomy is a classification aid, not a restriction. Add project-specific categories when the domain requires them.
-
-Each feature should also record its **surface**:
-
-| Surface | Meaning |
-|---|---|
-| `frontend` | Public or authenticated site application |
-| `administrator` | Joomla administrator application |
-| `system` | Background, CLI, scheduled, or event-driven behavior |
-| `integration` | Behavior primarily involving an external service |
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="discovery-sources"></a>
-## 5. Feature Discovery Sources
-
-No single source can produce a complete Joomla feature inventory. Discovery should combine the database, source code, configuration, and runtime website.
-
-| Source | What it reveals |
-|---|---|
-| `#__menu` | Menu-driven routes, component context, aliases, access, language, menu parameters |
-| `#__extensions` | Installed components, modules, plugins, templates, libraries, packages, and other extension types |
-| `#__modules` | Module instances, positions, publication state, parameters, access, language |
-| `#__modules_menu` | Page assignments for module instances |
-| Extension-specific tables | Business data and extension configuration |
-| `/components` | Frontend component implementations |
-| `/administrator/components` | Administrator component implementations |
-| `/modules` | Frontend module implementations |
-| `/plugins` | Event-driven behavior |
-| `/templates` | Templates, positions, overrides, custom UI behavior |
-| `/layouts` | Shared layouts |
-| `/media` | Extension CSS, JavaScript, images, and other assets |
-| `/images` | Project media referenced by features |
-| `configuration.php` | Global Joomla configuration and environment dependencies |
-| Web server / deployment config | Redirects, headers, rewrites, cron jobs, PHP and server behavior |
-| Runtime crawl | Real URLs, DOM, hidden links, dynamic pages, HTTP behavior |
-| Browser network activity | APIs, AJAX, assets, third-party services |
-| Browser console | Runtime JavaScript errors and warnings |
-| Administrator UI | Published state, assignments, extension settings, ACL, workflows |
-
-The report should distinguish between **discovered evidence** and **inferred relationships**. Do not mark a feature as confirmed only because a similarly named extension is installed.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="page-inventory"></a>
-## 6. Page and Route Inventory
-
-A complete feature report needs a page inventory because features must be mapped to where they are used.
-
-Do not assume that `#__menu` contains every page. Joomla components frequently generate dynamic URLs that have no dedicated menu item.
-
-The page inventory should combine:
-
-```text
-Published menu items
-+ Runtime crawler results
-+ Component-generated detail routes
-+ Search / filter / pagination routes
-+ Authenticated routes
-+ Administrator routes when in scope
-+ Known non-HTML endpoints when relevant
+Main Navigation
+Homepage Hero Slider
+Article Listing
+Article Detail
+Vehicle Search
+Shopping Cart
+Newsletter Signup
+Contact Form
+User Login
+Site Search
 ```
 
 Recommended fields:
 
 | Field | Purpose |
 |---|---|
-| `page_id` | Stable internal identifier, for example `P001` |
-| `page_name` | Human-readable page name |
-| `surface` | `frontend` or `administrator` |
-| `page_type` | Home, listing, detail, search, form, dashboard, etc. |
-| `url` | Observed or canonical URL |
-| `route_pattern` | Pattern for dynamic routes when many URLs share one behavior |
+| `feature_id` | Stable feature identifier, for example `F001` |
+| `feature_name` | Human-readable capability name |
+| `category` | Navigation, content, commerce, forms, user, media, integration, etc. |
+| `surface` | Frontend, administrator, system, or integration |
+| `feature_type` | Visual, interaction, workflow, background, integration, administration, etc. |
+| `description` | What the feature does |
+| `business_purpose` | Why the project needs the feature |
+| `user_actor` | Visitor, authenticated user, editor, administrator, system, external service |
+| `entry_point` | URL, menu item, action, event, CLI command, cron, webhook, etc. |
+| `primary_implementation` | Main Joomla component, module, plugin, template, or custom code |
+| `status` | Active, conditional, disabled, legacy, unknown |
+| `access` | Public, authenticated, ACL-restricted, administrator, system |
+| `visibility_condition` | Important condition controlling feature availability |
+| `language_scope` | Language restriction when relevant |
+| `route_or_trigger` | Primary route, route pattern, or non-page trigger |
+| `related_page_count` | Number of mapped pages when known |
+| `discovery_source` | Menu, module, source, runtime, administrator UI, integration, etc. |
+| `notes` | Additional project-specific context |
+
+The inventory should not duplicate one capability merely because it appears on several pages.
+
+[Back to Table of Contents](#table-of-contents)
+
+### 3.2 `02-page-inventory.csv`
+
+This is the canonical list of pages and route classes exposed by the project.
+
+Do not treat `#__menu` as the complete page list. Joomla components can generate detail pages, search results, filters, pagination states, authenticated pages, and other routes without dedicated menu items.
+
+Recommended fields:
+
+| Field | Purpose |
+|---|---|
+| `page_id` | Stable page identifier, for example `P001` |
+| `page_name` | Human-readable page or route-class name |
+| `surface` | Frontend or administrator |
+| `page_type` | Home, listing, detail, search, form, checkout, dashboard, etc. |
+| `url` | Representative or canonical URL |
+| `route_pattern` | Pattern for dynamic routes, for example `/vehicles/{alias}` |
 | `menu_id` | Joomla menu item ID when applicable |
-| `component` | Main component, for example `com_content` |
-| `view` | Component view |
-| `layout` | Selected layout |
-| `access` | Access requirement |
+| `menu_title` | Joomla menu item title when applicable |
+| `component` | Main component handling the page |
+| `view` | Component view when known |
+| `layout` | Selected layout when known |
+| `access` | Public, authenticated, ACL-restricted, administrator |
 | `language` | Language context |
-| `dynamic` | Whether the route is generated from entity data |
-| `evidence` | Source that confirms the page exists |
+| `dynamic` | Whether many entity URLs share the same page behavior |
+| `requires_auth` | Whether authentication is required |
+| `parent_page_id` | Parent page/route class when useful |
+| `discovery_source` | Menu, crawler, component route, administrator UI, manual discovery, etc. |
+| `status` | Active, conditional, disabled, legacy, unknown |
 | `notes` | Important context or exceptions |
 
-For large sites, do not create thousands of manually maintained rows when many entity URLs use the same implementation. Record both the route pattern and representative runtime URLs.
-
-Example:
-
-| page_id | page_name | page_type | url | route_pattern | component | view |
-|---|---|---|---|---|---|---|
-| P001 | Home | home | `/` | `/` | `com_content` | `featured` |
-| P002 | Vehicle Listing | listing | `/vehicles` | `/vehicles` | `com_vehicle` | `vehicles` |
-| P003 | Vehicle Detail | detail | `/vehicles/civic` | `/vehicles/{alias}` | `com_vehicle` | `vehicle` |
+For high-volume dynamic pages, prefer one route-class row plus representative URLs instead of thousands of nearly identical records.
 
 [Back to Table of Contents](#table-of-contents)
 
----
+### 3.3 `03-page-feature-map.csv`
 
-<a id="feature-inventory"></a>
-## 7. Feature Inventory
+This file is the normalized many-to-many relationship between the two core inventories.
 
-The feature inventory is the canonical list of capabilities discovered in the project.
+It answers:
+
+> Which feature is used on which page, and under what condition?
 
 Recommended fields:
 
 | Field | Purpose |
 |---|---|
-| `feature_id` | Stable identifier, for example `F001` |
-| `feature_name` | Business or user-oriented feature name |
-| `category` | Feature taxonomy category |
-| `surface` | Frontend, administrator, system, integration |
-| `description` | What the feature does |
-| `business_purpose` | Why the feature exists |
-| `user_actor` | Visitor, authenticated user, editor, administrator, system, external service |
-| `entry_point` | URL, menu item, button, event, CLI command, cron, webhook, etc. |
-| `primary_implementation` | Main component, module, plugin, template, or custom code |
-| `status` | Active, conditional, disabled, unknown, legacy |
-| `access` | Public, authenticated, ACL-restricted, administrator, system |
-| `language_scope` | Language restrictions when applicable |
-| `pages_used` | Page IDs or route classes using the feature |
-| `data_sources` | Joomla tables, custom tables, files, or APIs |
-| `external_dependencies` | External services or providers |
-| `evidence_status` | Confirmed, probable, unknown |
-| `evidence_refs` | References supporting the record |
-| `notes` | Exceptions and operational details |
-
-Avoid duplicate records caused by implementation details. For example, five `mod_menu` module instances may represent three distinct features: Main Navigation, Footer Navigation, and Account Navigation.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="page-feature-matrix"></a>
-## 8. Page-to-Feature Matrix
-
-The page-to-feature matrix answers:
-
-> Which features are expected or observed on which pages?
+| `map_id` | Stable relationship identifier |
+| `page_id` | Reference to `02-page-inventory.csv` |
+| `feature_id` | Reference to `01-feature-inventory.csv` |
+| `usage_type` | Primary, supporting, global, contextual, interactive, embedded, etc. |
+| `visibility` | Always, conditional, authenticated-only, role-based, language-specific, etc. |
+| `condition` | Concrete visibility or activation condition |
+| `position_or_region` | Header, hero, main, sidebar, footer, modal, background, etc. |
+| `trigger` | Page load, click, submit, filter, event, cron, webhook, etc. |
+| `interaction_type` | Display, navigation, form, search, filter, transaction, background action, etc. |
+| `is_primary` | Whether the feature represents the page's primary capability |
+| `discovery_source` | How the relationship was discovered |
+| `notes` | Mapping-specific context |
 
 Example:
 
-| Page | Main Navigation | Breadcrumb | Hero Slider | Vehicle Search | Newsletter | Cart |
-|---|---:|---:|---:|---:|---:|---:|
-| Home | ✓ |  | ✓ |  | ✓ | ✓ |
-| Vehicle Listing | ✓ | ✓ |  | ✓ | ✓ | ✓ |
-| Vehicle Detail | ✓ | ✓ |  |  | ✓ | ✓ |
-| News Listing | ✓ | ✓ |  |  | ✓ | ✓ |
-| Contact | ✓ | ✓ |  |  |  |  |
+```text
+P001 → F001 Main Navigation → global → header → page_load
+P001 → F002 Homepage Hero Slider → primary → hero → page_load
+P010 → F014 Vehicle Search → primary → main → user_action
+P010 → F020 Newsletter Signup → supporting → footer → submit
+```
 
-For machine-readable reports, prefer one row per relationship instead of a very wide table:
-
-| page_id | feature_id | relationship | condition | evidence |
-|---|---|---|---|---|
-| P001 | F001 | visible | always | runtime + module assignment |
-| P001 | F002 | visible | always | runtime + DOM |
-| P002 | F007 | interactive | query/filter form | runtime + source |
-
-This normalized format scales better and can later generate a visual matrix automatically.
+This file is the main bridge between feature-level and page-level testing.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="dependency-map"></a>
-## 9. Feature Dependency Map
+<a id="optional-deep-reports"></a>
+## 4. Optional Deep Reports
 
-Every confirmed feature should be connected to its technical dependencies.
+The following reports are optional and should be created only when the project needs deeper analysis.
 
-Recommended dependency types:
-
-```text
-Feature
-├── Route / Menu Item
-├── Component
-├── View
-├── Layout
-├── Template Override
-├── Module Type
-├── Module Instance
-├── Module Position
-├── Plugin
-├── Database Table
-├── Configuration
-├── Media File
-├── CSS
-├── JavaScript
-├── AJAX / API Endpoint
-├── External Service
-├── ACL / Access Level
-├── Language
-└── Scheduled / Background Trigger
-```
-
-Recommended fields:
-
-| Field | Purpose |
+| Report | Use it when... |
 |---|---|
-| `feature_id` | Feature identifier |
-| `dependency_type` | Component, module, table, asset, API, etc. |
-| `dependency_name` | Technical identifier |
-| `dependency_id` | Joomla/database ID when relevant |
-| `path_or_reference` | File path, table name, URL, or configuration key |
-| `required` | Whether the dependency is mandatory for the feature |
-| `condition` | Condition under which the dependency is used |
-| `evidence` | How the dependency relationship was confirmed |
-| `notes` | Additional context |
+| `04-feature-dependency-map.csv` | You need to trace components, modules, plugins, layouts, tables, assets, APIs, configuration, or other technical dependencies behind a feature |
+| `05-feature-evidence.csv` | You need explicit proof that a feature or mapping exists in configuration, source code, or runtime behavior |
+| `06-feature-coverage.csv` | You need measurable audit/discovery coverage and visibility into unknown or unreviewed areas |
 
-Example:
+These reports are useful for technical audits, difficult debugging, migration risk analysis, security review, handover, or high-confidence completeness checks.
 
-| feature_id | dependency_type | dependency_name | path_or_reference | required |
-|---|---|---|---|---:|
-| F002 | module | `mod_example_slider` | module instance 123 | yes |
-| F002 | layout | `default` | `modules/mod_example_slider/tmpl/default.php` | yes |
-| F002 | override | `default` | `templates/site/html/mod_example_slider/default.php` | no |
-| F002 | database | slider data | `#__example_slider` | yes |
-| F002 | JavaScript | slider runtime | `media/mod_example_slider/js/slider.js` | yes |
+They are not required for the default feature inventory workflow.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="evidence-model"></a>
-## 10. Feature Evidence Model
+<a id="feature-definition-rules"></a>
+## 5. Feature Definition Rules
 
-A useful feature report should separate three kinds of evidence.
+Use the following rules when creating `01-feature-inventory.csv`.
 
-### 10.1 Configuration evidence
-
-Configuration says the feature **should be available**.
-
-Examples:
-
-- published menu item;
-- published module;
-- module-to-menu assignment;
-- enabled plugin;
-- component configuration;
-- ACL assignment;
-- scheduled-task configuration.
-
-### 10.2 Implementation evidence
-
-Implementation says the code and dependencies **exist**.
-
-Examples:
-
-- component view;
-- module implementation;
-- plugin event handler;
-- layout file;
-- template override;
-- database table;
-- JavaScript or CSS asset;
-- API client;
-- CLI command.
-
-### 10.3 Runtime evidence
-
-Runtime evidence proves the feature **actually executes or renders**.
-
-Examples:
-
-- feature DOM element exists;
-- internal link is observed;
-- form can be opened;
-- module markup renders;
-- AJAX request is made;
-- external API call is observed;
-- scheduled task logs execution;
-- administrator page is accessible to the correct actor.
-
-Recommended evidence status:
-
-| Status | Meaning |
-|---|---|
-| `CONFIRMED` | Supported by direct runtime evidence or by multiple consistent technical sources |
-| `PROBABLE` | Strong implementation/configuration evidence but no runtime confirmation |
-| `UNKNOWN` | Evidence is insufficient or contradictory |
-| `INACTIVE` | Implementation exists but the feature is intentionally disabled or unpublished |
-
-A feature inventory should avoid presenting `PROBABLE` or `UNKNOWN` items as confirmed functionality.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="feature-signature"></a>
-## 11. Feature Signature
-
-A **feature signature** is a compact technical identity used to recognize a feature consistently across pages and tools.
+1. Name the capability, not the extension.
+2. Create separate features when the business purpose is different, even if the same extension implements them.
+3. Do not create duplicate features just because the same capability appears on multiple pages.
+4. Record global features once, then map them to all relevant page classes in `03-page-feature-map.csv`.
+5. Treat visual, interactive, background, administrator, and integration capabilities as valid features when they are in scope.
+6. Mark uncertain capabilities as `unknown` rather than presenting assumptions as facts.
 
 Example:
-
-```text
-Feature ID: F005
-Feature: Vehicle Listing
-
-Route
-  component = com_vehicle
-  view      = vehicles
-
-Data
-  #__vehicles
-  #__vehicle_categories
-
-Layout
-  com_vehicle/vehicles/default
-
-DOM
-  .vehicle-list
-
-Interactions
-  .vehicle-filter-form
-  pagination
-
-Assets
-  vehicle.css
-  vehicle.js
-```
-
-A signature can contain:
-
-- component/view/layout;
-- module type and instance;
-- known DOM selectors;
-- URL pattern;
-- database tables;
-- form action;
-- JavaScript module;
-- AJAX endpoint;
-- plugin event;
-- external host;
-- template override path.
-
-Signatures are especially useful for automated crawlers and Playwright-based inventory tools because they provide deterministic evidence for feature presence.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="discovery-workflow"></a>
-## 12. Discovery Workflow
-
-The recommended workflow is feature-first but evidence-driven.
-
-```mermaid
-flowchart TD
-    A[Define audit scope] --> B[Collect Joomla technical inventory]
-    B --> C[Discover pages and routes]
-    C --> D[Observe runtime behavior]
-    D --> E[Derive candidate features]
-    E --> F[Normalize and deduplicate features]
-    F --> G[Map features to pages and triggers]
-    G --> H[Map technical dependencies]
-    H --> I[Attach evidence and confidence]
-    I --> J[Review unknown and orphaned items]
-    J --> K[Run completeness gates]
-    K --> L[Publish feature report]
-```
-
-### Step 1 — Define the audit scope
-
-Record what the report covers:
-
-- frontend only or entire project;
-- administrator application;
-- authenticated user features;
-- multilingual behavior;
-- external integrations;
-- scheduled and CLI behavior;
-- deployment-specific features;
-- disabled or legacy functionality.
-
-Also record the environment used for runtime discovery.
-
-### Step 2 — Collect the Joomla technical inventory
-
-Inventory:
-
-- extensions;
-- menu items;
-- module instances;
-- module assignments;
-- templates;
-- template overrides;
-- plugins;
-- layouts;
-- custom database tables;
-- assets;
-- configuration;
-- external endpoints;
-- scheduled tasks and CLI commands when in scope.
-
-This step creates implementation candidates. It does not yet define business features.
-
-### Step 3 — Discover pages and routes
-
-Build the page inventory from menu configuration, runtime crawling, component-generated URLs, authenticated routes, and administrator routes when applicable.
-
-Group high-volume dynamic URLs by route pattern while retaining representative examples.
-
-### Step 4 — Observe runtime behavior
-
-For each page or route class, record:
-
-- visible sections;
-- navigation;
-- forms;
-- filters;
-- buttons;
-- search;
-- pagination;
-- modal behavior;
-- user actions;
-- network requests;
-- third-party integrations;
-- conditional blocks.
-
-Runtime inspection finds features that are difficult to infer from the database or extension list alone.
-
-### Step 5 — Derive candidate features
-
-Convert technical observations into capability names.
-
-Example:
-
-```text
-Observed
-- mod_menu instance 42
-- position = navigation
-- visible on all public pages
-
-Candidate feature
-- Main Navigation
-```
-
-### Step 6 — Normalize and deduplicate features
-
-Merge duplicate candidate records that describe the same capability.
-
-Do not merge features only because they use the same extension. For example:
 
 ```text
 mod_menu instance 42 → Main Navigation
@@ -720,591 +246,155 @@ mod_menu instance 51 → Footer Navigation
 mod_menu instance 67 → Account Navigation
 ```
 
-These are separate features because they serve different purposes.
-
-### Step 7 — Map features to pages and triggers
-
-For visual features, map each feature to the pages where it appears.
-
-For non-page features, map the trigger instead:
-
-- plugin event;
-- scheduled task;
-- CLI command;
-- webhook;
-- API endpoint;
-- administrator action.
-
-### Step 8 — Map technical dependencies
-
-Connect each feature to its component, module, plugin, layout, table, asset, configuration, integration, and runtime dependencies.
-
-### Step 9 — Attach evidence and confidence
-
-Every feature should have evidence references and an evidence status.
-
-Avoid undocumented assumptions.
-
-### Step 10 — Resolve unknown and orphaned items
-
-Review anything that is installed, published, rendered, or referenced but not yet associated with a feature.
-
-Examples:
-
-- enabled plugin with unknown behavior;
-- published module with no feature mapping;
-- template override with no known page;
-- custom table with unknown owner;
-- external JavaScript host with unknown purpose;
-- crawler-discovered page with no feature classification.
-
-Each item must either be mapped, documented as technical-only, documented as legacy/inactive, or remain explicitly `UNKNOWN`.
-
-### Step 11 — Run completeness gates
-
-Use the gates in [Completeness and Coverage Gates](#coverage-gates).
-
-### Step 12 — Publish the report
-
-Publish the canonical feature inventory together with the page mapping, dependency mapping, and unresolved findings.
+These are three features because they serve different purposes, even though all three use `mod_menu`.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="database-discovery"></a>
-## 13. Database Discovery
+<a id="page-definition-rules"></a>
+## 6. Page Definition Rules
 
-Database discovery identifies configuration and implementation candidates. It does not prove that a feature is currently visible or working.
+Use the following rules when creating `02-page-inventory.csv`.
 
-### 13.1 Installed extensions
-
-```sql
-SELECT
-    extension_id,
-    name,
-    type,
-    element,
-    folder,
-    client_id,
-    enabled,
-    package_id
-FROM #__extensions
-ORDER BY type, element, folder;
-```
-
-Review at least:
-
-- components;
-- modules;
-- plugins;
-- templates;
-- libraries;
-- packages;
-- file extensions;
-- language extensions when they influence project behavior.
-
-### 13.2 Menu-driven page candidates
-
-```sql
-SELECT
-    id,
-    menutype,
-    title,
-    alias,
-    path,
-    link,
-    type,
-    component_id,
-    parent_id,
-    level,
-    published,
-    access,
-    language,
-    template_style_id,
-    params
-FROM #__menu
-ORDER BY menutype, lft;
-```
-
-Menu items are important for routing and page context, but they are not a complete page inventory.
-
-### 13.3 Module instances
-
-```sql
-SELECT
-    id,
-    title,
-    module,
-    position,
-    published,
-    access,
-    language,
-    showtitle,
-    ordering,
-    params
-FROM #__modules
-ORDER BY position, ordering, id;
-```
-
-A module type is not necessarily one feature. Inspect module instances individually because the same type may be used for different business purposes.
-
-### 13.4 Module-to-menu assignment
-
-```sql
-SELECT
-    moduleid,
-    menuid
-FROM #__modules_menu
-ORDER BY moduleid, menuid;
-```
-
-Use this relationship to determine the page context in which module-based features are configured to appear.
-
-### 13.5 Extension-specific data
-
-For each confirmed feature owner, identify:
-
-- configuration tables;
-- content tables;
-- mapping tables;
-- history/log tables;
-- cache/index tables;
-- temporary tables;
-- external identifiers;
-- media references.
-
-Do not assume every table matching an extension prefix is required by every feature of that extension.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="source-discovery"></a>
-## 14. Source-Code Discovery
-
-Source-code discovery establishes which implementation paths exist and how the project renders or executes them.
-
-Review at least:
-
-```text
-/components
-/administrator/components
-/modules
-/administrator/modules
-/plugins
-/templates
-/layouts
-/media
-/images
-/cli
-```
-
-Depending on the Joomla version and project structure, also review project-specific library, helper, service, command, and task locations.
-
-### Components
-
-For each relevant component, identify:
-
-- frontend and administrator entry points;
-- views;
-- layouts;
-- controllers or task handlers;
-- models and data access;
-- forms;
-- routers;
-- AJAX/API endpoints;
-- CLI or scheduled behavior when present.
-
-### Modules
-
-Identify:
-
-- module type;
-- module layouts;
-- alternate layouts;
-- helper/service code;
-- loaded assets;
-- template overrides;
-- conditions driven by module parameters.
-
-### Plugins
-
-Identify:
-
-- plugin group;
-- enabled state;
-- subscribed events;
-- actions performed by event handlers;
-- pages or processes affected;
-- data modified;
-- external services called.
-
-Plugins can implement important features without producing visible standalone pages.
-
-### Templates and overrides
-
-Inspect:
-
-```text
-/templates/<template>/html/
-```
-
-Map each override to the component, module, or layout it replaces.
-
-Also identify:
-
-- template positions;
-- custom template JavaScript;
-- custom CSS;
-- hard-coded content;
-- custom layouts;
-- embedded third-party widgets;
-- template-level feature logic.
-
-### Assets
-
-Map relevant CSS, JavaScript, images, fonts, and documents to features when those assets are required for behavior or presentation.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="runtime-discovery"></a>
-## 15. Runtime Discovery
-
-Runtime discovery is required because configuration and source code cannot reliably tell whether a feature is actually used.
-
-A browser automation tool such as Playwright can collect:
-
-- discovered internal URLs;
-- page title and canonical URL;
-- DOM snapshots;
-- visible module regions;
-- forms and controls;
-- links and buttons;
-- JavaScript console output;
-- network requests;
-- failed resources;
-- AJAX endpoints;
-- external hosts;
-- screenshots;
-- cookies and storage usage when relevant.
-
-Runtime feature detection should use stable signatures instead of visual text alone whenever possible.
+1. Start from published menu items, but do not stop there.
+2. Add crawler-discovered internal routes.
+3. Add component-generated detail pages and important stateful routes.
+4. Represent large dynamic URL families with route patterns.
+5. Separate pages when the page behavior or primary capability is meaningfully different.
+6. Do not create separate page rows for trivial URL variations that do not change behavior.
+7. Include authenticated, administrator, multilingual, or conditional routes only when they are inside the defined inventory scope.
 
 Example:
 
 ```text
-If URL matches /vehicles/*
-and DOM contains .vehicle-detail
-and component context is com_vehicle
-→ Vehicle Detail feature is confirmed
+/vehicles              → Vehicle Listing
+/vehicles/civic        → Vehicle Detail
+/vehicles/city         → Vehicle Detail
+/vehicles/crv          → Vehicle Detail
 ```
 
-Runtime crawling should not be treated as complete by itself. It can miss:
-
-- authenticated pages;
-- ACL-protected features;
-- language-specific routes;
-- conditionally visible modules;
-- time-based features;
-- admin-only behavior;
-- scheduled jobs;
-- webhook-triggered processes;
-- forms or actions that require specific state;
-- pages that are not linked from the crawl seed.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="dynamic-features"></a>
-## 16. How to Handle Dynamic and Conditional Features
-
-A feature may not appear on every request even when its implementation is valid.
-
-Record conditions explicitly.
-
-Typical conditions include:
-
-| Condition | Example |
-|---|---|
-| Menu assignment | Module appears only on selected menu items |
-| Authentication | Account menu appears only after login |
-| ACL | Administrative action available only to a specific group |
-| Language | Module visible only in one language |
-| Device / viewport | Responsive navigation changes at a breakpoint |
-| Query state | Filter controls change when parameters are supplied |
-| Entity state | Button appears only for published or available items |
-| Time | Campaign banner appears only inside a date range |
-| Session / cookie | Popup appears only for new visitors |
-| Configuration | Feature enabled only when an extension option is active |
-| External state | Payment or API capability depends on provider configuration |
-
-For each conditional feature, record:
+Recommended inventory representation:
 
 ```text
-feature_id
-condition_type
-condition_expression
-expected_actor_or_state
-page_or_trigger
-runtime_evidence
+P002 Vehicle Listing → /vehicles
+P003 Vehicle Detail  → /vehicles/{alias}
 ```
 
-Do not create separate feature records for every state unless the states represent genuinely different capabilities.
+Representative runtime URLs can be recorded in `notes` or supporting tooling.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="coverage-gates"></a>
-## 17. Completeness and Coverage Gates
+<a id="page-feature-mapping-rules"></a>
+## 7. Page-to-Feature Mapping Rules
 
-A feature inventory should not be considered complete merely because the visible homepage has been reviewed.
+Use `03-page-feature-map.csv` only for relationships between already-defined pages and features.
 
-Use measurable coverage gates.
+Recommended rules:
 
-### Extension coverage
+- one row represents one `page_id + feature_id` relationship;
+- global features may have many mapping rows;
+- page-specific features normally have fewer mappings;
+- conditional behavior must record its condition;
+- the page's main capability should use `is_primary=yes`;
+- supporting UI should use a suitable `usage_type`, such as `global` or `supporting`;
+- do not duplicate technical dependency information here unless it is necessary to explain the relationship.
 
-- Every installed and enabled frontend component has been reviewed.
-- Every installed and enabled administrator component is reviewed when administrator scope is included.
-- Every published module instance is mapped to a feature, documented as technical-only, or documented as unknown.
-- Every enabled plugin is mapped to behavior, documented as infrastructure-only, or documented as unknown.
-- Every active template is reviewed.
+Example mapping:
 
-### Page coverage
-
-- Every published menu item is accounted for.
-- Every crawler-discovered internal route is assigned to a page or route class.
-- Dynamic detail routes are represented by route patterns and runtime samples.
-- Search, filter, pagination, form, and action states are represented where they change functionality.
-- Authenticated and ACL-restricted routes are reviewed when in scope.
-
-### Layout and override coverage
-
-- Every active template override is mapped to its owner and known feature/page usage.
-- Alternate layouts referenced by menu, module, or component configuration are reviewed.
-- Custom template feature logic is documented.
-
-### Data coverage
-
-- Every confirmed feature has known data/configuration sources.
-- Custom tables have an owner or documented unknown status.
-- Important media/file references are associated with the features that consume them.
-
-### Runtime coverage
-
-- Every public page class has at least one runtime sample.
-- Every interactive feature has a known trigger.
-- External network dependencies are inventoried.
-- Runtime-only features discovered by crawling are mapped back to the inventory.
-
-### Unknown-item gate
-
-The ideal release condition is:
-
-```text
-Unreviewed published modules        = 0
-Unreviewed enabled plugins          = 0
-Unmapped active overrides           = 0
-Unclassified discovered page types = 0
-Unowned custom tables               = 0
-Unknown external integrations       = 0
-```
-
-If zero is not achievable, each remaining item must be explicitly recorded as `UNKNOWN` with an owner, reason, and next investigation step.
+| page_id | feature_id | usage_type | visibility | position_or_region | trigger | is_primary |
+|---|---|---|---|---|---|---|
+| P001 | F001 | global | always | header | page_load | no |
+| P001 | F002 | primary | always | hero | page_load | yes |
+| P002 | F014 | primary | always | main | page_load | yes |
+| P002 | F015 | interactive | always | main | user_action | no |
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="report-files"></a>
-## 18. Recommended Report Files
+<a id="inventory-workflow"></a>
+## 8. Inventory Workflow
 
-For a reusable project audit, separate the canonical datasets rather than placing all information in one large document.
+The detailed execution workflow is documented in [`WORKFLOW.md`](./WORKFLOW.md).
+
+At a high level:
+
+```mermaid
+flowchart TD
+    A[Define inventory scope] --> B[Discover candidate capabilities]
+    B --> C[Build 01 Feature Inventory]
+    C --> D[Discover pages and route classes]
+    D --> E[Build 02 Page Inventory]
+    E --> F[Inspect each page and map capabilities]
+    F --> G[Build 03 Page-Feature Map]
+    G --> H[Resolve duplicates and unknown mappings]
+    H --> I[Validate core inventory completeness]
+    I --> J{Need deep technical analysis?}
+    J -- No --> K[Publish core inventory]
+    J -- Yes --> L[Create optional 04-06 reports]
+```
+
+Templates for every report are available under [`templates/`](./templates/).
+
+[Back to Table of Contents](#table-of-contents)
+
+---
+
+<a id="directory-structure"></a>
+## 9. Recommended Directory Structure
 
 ```text
 report/features/
 ├── README.md
+├── WORKFLOW.md
 ├── 01-feature-inventory.csv
 ├── 02-page-inventory.csv
 ├── 03-page-feature-map.csv
-├── 04-feature-dependency-map.csv
-├── 05-feature-evidence.csv
-└── 06-feature-coverage.csv
+├── 04-feature-dependency-map.csv        # optional
+├── 05-feature-evidence.csv              # optional
+├── 06-feature-coverage.csv              # optional
+└── templates/
+    ├── 01-feature-inventory-template.csv
+    ├── 02-page-inventory-template.csv
+    ├── 03-page-feature-map-template.csv
+    ├── 04-feature-dependency-map-template.csv
+    ├── 05-feature-evidence-template.csv
+    └── 06-feature-coverage-template.csv
 ```
 
-### `01-feature-inventory.csv`
-
-Canonical list of project capabilities.
-
-### `02-page-inventory.csv`
-
-Canonical list of pages, route classes, and entry points.
-
-### `03-page-feature-map.csv`
-
-Normalized many-to-many relationship between pages and features.
-
-### `04-feature-dependency-map.csv`
-
-Technical dependencies used by each feature.
-
-### `05-feature-evidence.csv`
-
-Evidence records proving configuration, implementation, and runtime behavior.
-
-Recommended fields:
-
-```text
-evidence_id
-feature_id
-evidence_type
-source
-reference
-observed_value
-status
-notes
-```
-
-### `06-feature-coverage.csv`
-
-Coverage summary for the audit.
-
-Recommended dimensions:
-
-```text
-extensions
-menus
-modules
-plugins
-overrides
-pages
-page_types
-features
-integrations
-custom_tables
-unknown_items
-```
-
-These files describe one Joomla project. They are not version-comparison datasets.
+The actual project may contain only `README.md`, `WORKFLOW.md`, and the three core report files if optional deep analysis is unnecessary.
 
 [Back to Table of Contents](#table-of-contents)
 
 ---
 
-<a id="example-feature"></a>
-## 19. Example Feature Record
+<a id="minimum-completion-criteria"></a>
+## 10. Minimum Completion Criteria
 
-Example feature:
+The core inventory can be considered usable when all of the following are true:
 
-```text
-Feature ID: F014
-Feature Name: Vehicle Search
-Category: BUSINESS_DOMAIN
-Surface: frontend
-Actor: visitor
-Status: active
+- [ ] Every confirmed feature has a unique `feature_id`.
+- [ ] Every relevant page or route class has a unique `page_id`.
+- [ ] Published menu-driven pages are represented.
+- [ ] Important dynamic page classes are represented.
+- [ ] Every active in-scope feature is mapped to at least one page or documented as a non-page feature.
+- [ ] Every in-scope page has its primary feature identified.
+- [ ] Global features are mapped consistently across applicable page classes.
+- [ ] Conditional mappings record their activation or visibility condition.
+- [ ] Duplicate feature definitions have been normalized.
+- [ ] Unknown features or pages are explicitly marked instead of silently omitted.
 
-Purpose
-Allow visitors to find vehicles using make, model, price, or other filters.
-
-Entry Points
-- /vehicles
-- Search/filter form on Vehicle Listing
-
-Implementation
-- Component: com_vehicle
-- View: vehicles
-- Layout: default
-- Controller/task: search/filter handling
-- Template override: templates/site/html/com_vehicle/vehicles/default.php
-
-Data
-- #__vehicles
-- #__vehicle_categories
-- project-specific lookup tables
-
-Assets
-- vehicle.css
-- vehicle.js
-
-Interactions
-- Filter form
-- Sorting
-- Pagination
-- Reset filters
-
-Runtime Signature
-- URL /vehicles
-- DOM .vehicle-search-form
-- DOM .vehicle-list
-
-Pages Used
-- P002 Vehicle Listing
-
-Conditions
-- Public
-- Results depend on filter query parameters
-
-Evidence
-- menu configuration
-- component source
-- runtime DOM
-- network behavior
-
-Evidence Status
-CONFIRMED
-```
-
-The record describes the capability independently from the extension inventory while preserving enough technical information to locate and maintain the implementation.
-
-[Back to Table of Contents](#table-of-contents)
-
----
-
-<a id="validation-checklist"></a>
-## 20. Final Validation Checklist
-
-Before treating the feature report as complete:
-
-- [ ] Audit scope is explicitly defined.
-- [ ] Feature names describe capabilities rather than extension names.
-- [ ] Every feature has a stable `feature_id`.
-- [ ] Every relevant page or route class has a stable `page_id`.
-- [ ] Menu items have been reviewed.
-- [ ] Installed/enabled components have been reviewed.
-- [ ] Published module instances have been reviewed individually.
-- [ ] Module-to-menu assignments have been inspected.
-- [ ] Enabled plugins have been reviewed for behavior.
-- [ ] Active templates and template overrides have been reviewed.
-- [ ] Custom layouts and custom template logic have been reviewed.
-- [ ] Custom and extension-specific database tables have known owners or explicit unknown status.
-- [ ] Relevant CSS, JavaScript, media, and file dependencies are mapped.
-- [ ] External APIs and third-party services are inventoried.
-- [ ] Runtime crawling has been performed for public page classes.
-- [ ] Authenticated, ACL, multilingual, conditional, and scheduled features are covered when in scope.
-- [ ] Dynamic pages are represented by route patterns and runtime samples.
-- [ ] Every feature is mapped to pages, triggers, or both.
-- [ ] Every feature has implementation dependencies.
-- [ ] Every feature has evidence and an evidence status.
-- [ ] Unknown or orphaned items are explicitly documented.
-- [ ] Completeness gates have been evaluated.
-- [ ] The final report contains no undocumented assumptions presented as confirmed facts.
-
-A completed feature report should provide a traceable chain:
+For the default workflow, completion means:
 
 ```text
-Capability
-→ Page or Trigger
-→ Joomla Implementation
-→ Data / Configuration
-→ Assets / Integrations
-→ Runtime Evidence
+01-feature-inventory.csv   → complete enough to list project capabilities
+02-page-inventory.csv      → complete enough to list project page/route classes
+03-page-feature-map.csv    → complete enough to connect features to their usage locations
 ```
 
-That chain is the core definition of a complete Joomla project feature inventory.
+Use the optional reports only when stronger technical traceability or measurable audit confidence is required.
 
 [Back to Table of Contents](#table-of-contents)
