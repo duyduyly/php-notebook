@@ -29,7 +29,7 @@ The core inventory must answer three questions:
 2. What pages or route classes exist?
 3. Which pages use each feature?
 
-The default deliverable is therefore:
+The default deliverable is:
 
 ```text
 01-feature-inventory.csv
@@ -37,7 +37,7 @@ The default deliverable is therefore:
 03-page-feature-map.csv
 ```
 
-The workflow intentionally stops after these reports unless deeper technical analysis is required.
+The workflow stops after the core inventory unless deeper analysis is requested.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -59,7 +59,7 @@ flowchart TD
     H -->|Yes| J[Continue to Optional Reports 04-06]
 ```
 
-Database inspection, source-code inspection, Joomla administrator review, crawling, and browser/runtime inspection are **discovery methods used inside the steps**. They are not separate workflow steps.
+Database inspection, source-code inspection, Joomla administrator review, crawling, and browser/runtime inspection are discovery methods used inside the steps. They are not separate workflow steps.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -74,7 +74,7 @@ Identify what the website or project can do.
 
 ### Input
 
-Use the available project sources, for example:
+Use available sources such as:
 
 ```text
 Joomla database
@@ -107,7 +107,7 @@ Typical Joomla discovery points include:
 
 Discover candidate capabilities and normalize them into feature names.
 
-Name the **capability**, not only the Joomla implementation.
+Name the capability, not only the Joomla implementation.
 
 Good examples:
 
@@ -121,7 +121,7 @@ Shopping Cart
 Newsletter Signup
 ```
 
-Avoid using implementation names as the final feature name:
+Avoid using implementation names as final feature names:
 
 ```text
 com_content
@@ -142,8 +142,6 @@ published globally
 Feature = Main Navigation
 ```
 
-If several technical items provide the same capability, keep one feature unless they represent different business behavior.
-
 ### Output
 
 ```text
@@ -156,7 +154,7 @@ Use:
 templates/01-feature-inventory-template.csv
 ```
 
-Each feature should at least identify:
+Core fields:
 
 ```text
 feature_id
@@ -164,13 +162,13 @@ feature_name
 category
 surface
 description
-user_actor
 primary_implementation
 status
 access
-discovery_source
 notes
 ```
+
+Do not store page lists, detailed dependencies, evidence, or coverage data in this file. Those concerns belong to `03`, `04`, `05`, and `06`.
 
 ### Done when
 
@@ -214,9 +212,9 @@ Do not assume `#__menu` contains every page in the website.
 
 ### Action
 
-Inventory pages by **page type or route class**.
+Inventory pages by page type or route class.
 
-For repeated dynamic pages, do not create thousands of rows when they use the same implementation and behavior.
+For repeated dynamic pages, use one route class when the implementation and behavior are the same.
 
 Example:
 
@@ -224,18 +222,14 @@ Example:
 /vehicles/civic
 /vehicles/city
 /vehicles/crv
-```
 
-can be represented as:
+↓
 
-```text
 page_id       = P003
 page_name     = Vehicle Detail
 route_pattern = /vehicles/{alias}
 dynamic       = YES
 ```
-
-Keep representative URLs where useful.
 
 ### Output
 
@@ -249,34 +243,13 @@ Use:
 templates/02-page-inventory-template.csv
 ```
 
-Each page should at least identify:
-
-```text
-page_id
-page_name
-surface
-page_type
-url
-route_pattern
-menu_id
-component
-view
-layout
-access
-language
-dynamic
-discovery_source
-status
-notes
-```
-
 ### Done when
 
 - page IDs are unique;
 - published in-scope menu pages are represented;
 - important runtime-discovered routes are represented;
-- dynamic URL families are normalized into route classes where appropriate;
-- unknown pages are recorded instead of being ignored.
+- dynamic URL families are normalized where appropriate;
+- unknown pages are recorded rather than ignored.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -289,9 +262,21 @@ notes
 
 Identify which features are used on each page or route class.
 
-### Input
+`03-page-feature-map.csv` is the authoritative source for the relationship between features and pages.
 
-Use:
+Use it to answer both:
+
+```text
+Where is feature F001 used?
+```
+
+and:
+
+```text
+Which features are used on page P002?
+```
+
+### Input
 
 ```text
 01-feature-inventory.csv
@@ -304,45 +289,31 @@ known page conditions
 
 ### Action
 
-For each `page_id`, list the features that are available on that page.
+Create one row for every `page_id + feature_id` relationship.
 
 Example:
 
 ```text
-P002 Vehicle Listing
-
-├── Main Navigation
-├── Breadcrumb
-├── Vehicle Listing
-├── Vehicle Search
-├── Vehicle Filter
-├── Pagination
-└── Footer Navigation
+P001 + F001 → Main Navigation on Home
+P002 + F001 → Main Navigation on Vehicle Listing
+P002 + F014 → Vehicle Search on Vehicle Listing
 ```
 
-Create one row for each `page_id + feature_id` relationship.
-
-Example:
+This creates a many-to-many relationship:
 
 ```text
-P002 + F001 → Main Navigation
-P002 + F014 → Vehicle Search
-P002 + F015 → Vehicle Filter
+01 Feature Inventory
+        │
+        │ feature_id
+        ▼
+03 Page-Feature Map
+        ▲
+        │ page_id
+        │
+02 Page Inventory
 ```
 
-Record conditions only when they affect whether or how the feature is available.
-
-Examples:
-
-```text
-always
-guest_only
-authenticated_only
-acl_restricted
-language_specific
-query_parameter_present
-only_when_cart_has_items
-```
+Do not duplicate the page list inside `01-feature-inventory.csv`.
 
 ### Output
 
@@ -356,7 +327,7 @@ Use:
 templates/03-page-feature-map-template.csv
 ```
 
-Each mapping should at least identify:
+Core fields:
 
 ```text
 map_id
@@ -368,8 +339,6 @@ position
 trigger
 condition
 is_primary
-discovery_source
-notes
 ```
 
 ### Done when
@@ -378,7 +347,7 @@ notes
 - every active page-based feature maps to at least one page;
 - every mapped `page_id` exists in `02-page-inventory.csv`;
 - every mapped `feature_id` exists in `01-feature-inventory.csv`;
-- conditional mappings record the relevant condition.
+- conditional feature usage records the relevant condition.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -389,51 +358,25 @@ notes
 
 ### Goal
 
-Confirm that the three core reports are complete enough for normal feature inventory use and internally consistent.
-
-### Input
-
-```text
-01-feature-inventory.csv
-02-page-inventory.csv
-03-page-feature-map.csv
-```
+Confirm that the three core reports are internally consistent and usable.
 
 ### Action
 
-Validate the inventory in both directions.
+Validate both directions.
 
 #### Feature → Page
 
-For every page-based feature, answer:
-
-```text
-Where is this feature used?
-```
+For every page-based feature, verify that `03-page-feature-map.csv` can answer where it is used.
 
 #### Page → Feature
 
-For every page, answer:
+For every page, verify that `03-page-feature-map.csv` can answer which features it contains.
 
-```text
-What features are used on this page?
-```
-
-Also validate references:
+Validate references:
 
 ```text
 03.page_id    → must exist in 02.page_id
 03.feature_id → must exist in 01.feature_id
-```
-
-### Output
-
-A validated core inventory consisting of:
-
-```text
-01-feature-inventory.csv
-02-page-inventory.csv
-03-page-feature-map.csv
 ```
 
 ### Done when
@@ -449,7 +392,7 @@ Page-based features without pages  = 0
 Unknown items                      = explicitly documented
 ```
 
-This step validates the **inventory structure**. It does not require dependency tracing or formal audit evidence.
+This validates the inventory structure. It does not require dependency tracing or formal evidence collection.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -458,7 +401,7 @@ This step validates the **inventory structure**. It does not require dependency 
 <a id="optional-gate"></a>
 ## 7. Optional Decision Gate
 
-After Step 4 is complete, **stop and ask before continuing**.
+After Step 4 is complete, stop and ask before continuing.
 
 Ask exactly:
 
@@ -472,8 +415,6 @@ STOP
 Core Feature Inventory Complete
 ```
 
-Do not create any optional report.
-
 ### If Yes
 
 Continue only with the optional report or reports required by the task.
@@ -484,7 +425,7 @@ Continue only with the optional report or reports required by the task.
 06-feature-coverage.csv
 ```
 
-The core inventory remains complete even when the answer is `No`.
+The core inventory remains complete when the answer is `No`.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -501,14 +442,6 @@ Answers:
 
 > What does this feature technically depend on?
 
-Typical use cases:
-
-- deep debugging;
-- migration analysis;
-- extension replacement;
-- impact analysis;
-- technical handover.
-
 ### `05-feature-evidence.csv`
 
 Use when explicit evidence is required.
@@ -517,13 +450,6 @@ Answers:
 
 > What proves that this feature or mapping exists?
 
-Typical use cases:
-
-- formal verification;
-- audit;
-- unclear feature ownership;
-- confidence grading.
-
 ### `06-feature-coverage.csv`
 
 Use when measurable audit coverage is required.
@@ -531,13 +457,6 @@ Use when measurable audit coverage is required.
 Answers:
 
 > How complete is the feature discovery process?
-
-Typical use cases:
-
-- large-project audits;
-- formal acceptance;
-- measurable completeness;
-- high-confidence coverage reporting.
 
 Optional reports extend the core inventory. They are not required for the normal feature inventory workflow.
 
