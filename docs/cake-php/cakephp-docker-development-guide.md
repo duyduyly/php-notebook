@@ -197,22 +197,22 @@ After Composer creates the application, `www/` becomes the CakePHP project root.
 
 ```mermaid
 flowchart LR
-    A[Browser] --> B[cakephp.local:8080]
-    B --> C[Docker Port 8080 -> 80]
-    C --> D[Apache VirtualHost]
-    D --> E[/var/www/html/webroot]
-    E --> F[index.php]
-    F --> G[CakePHP]
+    A["Browser"] --> B["cakephp.local:8080"]
+    B --> C["Docker port 8080 to 80"]
+    C --> D["Apache VirtualHost"]
+    D --> E["/var/www/html/webroot"]
+    E --> F["index.php"]
+    F --> G["CakePHP"]
 ```
 
 ### Database flow
 
 ```mermaid
 flowchart LR
-    A[CakePHP] --> B[DB_HOST=mysql]
-    B --> C[Docker Network]
-    C --> D[MySQL Container]
-    D --> E[(cakephp Database)]
+    A["CakePHP"] --> B["DB_HOST=mysql"]
+    B --> C["Docker network"]
+    C --> D["MySQL container"]
+    D --> E["cakephp database"]
 ```
 
 A critical Docker rule:
