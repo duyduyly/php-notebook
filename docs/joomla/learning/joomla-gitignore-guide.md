@@ -27,6 +27,7 @@ A practical guide to deciding what Git should track in a Joomla project, includi
 - [18. Common Mistakes](#18-common-mistakes)
 - [19. Decision Matrix](#19-decision-matrix)
 - [20. Verification Checklist](#20-verification-checklist)
+- [21. Final Example `.gitignore`](#21-final-example-gitignore)
 
 ## 1. Recommended Strategy
 
@@ -1289,3 +1290,497 @@ The final rule is the most useful test:
 
 > [!IMPORTANT]
 > **If deleting the ignored file would prevent a clean checkout from being rebuilt, audited, migrated, or deployed, do not ignore it until you have a reliable replacement process.**
+
+## 21. Final Example `.gitignore`
+
+The following example is a practical starting point for a Joomla project, especially when the repository is used for maintenance, auditing, or migration.
+
+This example assumes:
+
+- Joomla and project source code must remain visible to Git.
+- Custom components, modules, plugins, templates, and libraries are tracked.
+- Third-party extension source is preserved unless a reliable reinstall process exists.
+- Joomla extension install/update SQL files are tracked.
+- Uploaded media under `/images/` is preserved.
+- Generated frontend output is preserved unless CI/CD explicitly rebuilds it.
+- Runtime data, secrets, backups, local dependencies, IDE files, and machine-specific state are ignored.
+
+> [!IMPORTANT]
+> This is a **conservative example**. Start with this version, verify it with `git check-ignore -v`, and only add broader ignore rules when the project has a reliable replacement or build process.
+
+```gitignore
+# ============================================================
+# Joomla Project - Practical .gitignore Example
+# ============================================================
+
+
+# ------------------------------------------------------------
+# Joomla runtime
+# ------------------------------------------------------------
+
+/cache/*
+!/cache/index.html
+
+/administrator/cache/*
+!/administrator/cache/index.html
+
+/tmp/*
+!/tmp/index.html
+
+/logs/*
+!/logs/index.html
+
+/administrator/logs/*
+!/administrator/logs/index.html
+
+
+# ------------------------------------------------------------
+# Joomla configuration / secrets
+# ------------------------------------------------------------
+
+/configuration.php
+/configuration.local.php
+/configuration.*.local.php
+
+.env
+.env.*
+!.env.example
+
+*.secret
+*.secrets
+secrets/
+.credentials/
+
+
+# ------------------------------------------------------------
+# Joomla installation directory
+# ------------------------------------------------------------
+
+/installation/
+
+
+# ------------------------------------------------------------
+# Runtime / temporary files
+# ------------------------------------------------------------
+
+*.log
+*.tmp
+*.temp
+*.cache
+*.pid
+*.sess
+*.lock.tmp
+
+sessions/
+php_sessions/
+
+
+# ------------------------------------------------------------
+# Database dumps
+#
+# IMPORTANT:
+# Do NOT use "*.sql" here because Joomla extensions commonly
+# contain installer and schema-update SQL that must be tracked.
+# ------------------------------------------------------------
+
+/database-dump/
+/database-dumps/
+/db-dump/
+/db-dumps/
+/dumps/
+
+*.sql.gz
+*.sql.zip
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ------------------------------------------------------------
+# Backups / archives
+# ------------------------------------------------------------
+
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+
+*.tar
+*.tar.gz
+*.tgz
+*.bz2
+*.7z
+*.rar
+
+backup/
+backups/
+_backup/
+_backups/
+
+akeeba-backup/
+administrator/components/com_akeebabackup/backup/
+administrator/components/com_akeeba/backup/
+
+*.jpa
+*.jps
+*.j01
+*.j02
+*.j03
+*.j04
+*.j05
+
+
+# ------------------------------------------------------------
+# Composer / PHP tooling
+# ------------------------------------------------------------
+
+composer.phar
+
+.php-cs-fixer.cache
+.phpstan.cache
+.psalm-cache/
+
+phpstan.neon.local
+phpstan.local.neon
+phpcs.xml.local
+
+.phpunit.result.cache
+.phpunit.cache/
+
+
+# ------------------------------------------------------------
+# Node.js / frontend dependencies
+# ------------------------------------------------------------
+
+/node_modules/
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+
+*.tsbuildinfo
+
+
+# ------------------------------------------------------------
+# Test / coverage output
+# ------------------------------------------------------------
+
+coverage/
+.nyc_output/
+
+coverage.xml
+clover.xml
+
+/test-results/
+/tests/_output/
+/tests/output/
+
+/playwright-report/
+/blob-report/
+playwright/.cache/
+
+/cypress/videos/
+/cypress/screenshots/
+/cypress/downloads/
+
+
+# ------------------------------------------------------------
+# IDE / editors
+# ------------------------------------------------------------
+
+.idea/
+.idea_modules/
+
+*.iml
+*.ipr
+*.iws
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+!.vscode/tasks.example.json
+!.vscode/launch.example.json
+
+.project
+.classpath
+.settings/
+
+nbproject/private/
+.nb-gradle/
+
+*.swp
+*.swo
+*.swn
+*~
+
+
+# ------------------------------------------------------------
+# Operating system files
+# ------------------------------------------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+
+# ------------------------------------------------------------
+# Docker local state
+#
+# Keep Dockerfile, docker-compose.yml, .dockerignore, and shared
+# deployment scripts under version control.
+# ------------------------------------------------------------
+
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.dev.yml
+
+docker-data/
+docker-data-*/
+
+mysql-data/
+mysql_data/
+mariadb-data/
+postgres-data/
+redis-data/
+
+
+# ------------------------------------------------------------
+# Local credentials / private keys
+# ------------------------------------------------------------
+
+*.key
+*.p12
+*.pfx
+*.pem
+
+credentials.json
+service-account.json
+service-account*.json
+auth.local.json
+
+*.credentials.json
+*.token
+*.tokens
+
+.ssh/
+id_rsa
+id_ed25519
+
+
+# ------------------------------------------------------------
+# Cloud / infrastructure local state
+# ------------------------------------------------------------
+
+.aws/
+.azure/
+.gcloud/
+
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+
+# ------------------------------------------------------------
+# Local web-server overrides
+# ------------------------------------------------------------
+
+.htaccess.local
+.htaccess.dev
+.htaccess.development
+.htaccess.test
+
+web.config.local
+web.config.dev
+
+nginx.local.conf
+nginx.dev.conf
+apache.local.conf
+
+
+# ------------------------------------------------------------
+# Joomla extension package/build artifacts
+# ------------------------------------------------------------
+
+package-build/
+extension-build/
+extension-packages/
+
+
+# ------------------------------------------------------------
+# Profiling / debug output
+# ------------------------------------------------------------
+
+.profile/
+.profiler/
+
+.cachegrind
+cachegrind.out.*
+*.prof
+
+debug.log
+debug.txt
+php_errors.log
+error_log
+
+xdebug.log
+xdebug.log.*
+
+
+# ------------------------------------------------------------
+# Local scratch / personal tool state
+# ------------------------------------------------------------
+
+scratch/
+sandbox/
+working/
+
+notes.local.*
+todo.local.*
+
+*.patch.local
+*.diff.local
+
+.cursorignore.local
+.aider*
+.continue/
+
+
+# ------------------------------------------------------------
+# OPTIONAL: custom extension generated files
+#
+# Replace "com_example" with the real custom extension name.
+# Keep the extension source itself tracked.
+# ------------------------------------------------------------
+
+# /components/com_example/cache/
+# /components/com_example/tmp/
+# /components/com_example/logs/
+# /components/com_example/node_modules/
+# /components/com_example/vendor/
+# /components/com_example/coverage/
+
+# /administrator/components/com_example/cache/
+# /administrator/components/com_example/tmp/
+# /administrator/components/com_example/logs/
+
+
+# ------------------------------------------------------------
+# OPTIONAL: third-party extension
+#
+# Enable only when the exact extension version can be restored
+# reliably from an installation package or deployment process.
+# ------------------------------------------------------------
+
+# /components/com_vendor/
+# /administrator/components/com_vendor/
+# /modules/mod_vendor/
+# /plugins/system/vendor/
+# /media/com_vendor/
+
+
+# ------------------------------------------------------------
+# OPTIONAL: uploaded content
+#
+# Enable only when uploads are persisted or synchronized
+# outside Git.
+# ------------------------------------------------------------
+
+# /images/*
+# !/images/index.html
+# /uploads/
+# /media/uploads/
+
+
+# ------------------------------------------------------------
+# OPTIONAL: generated frontend build output
+#
+# Enable only when CI/CD rebuilds these files before deployment.
+# ------------------------------------------------------------
+
+# /dist/
+# /build/
+
+
+# ------------------------------------------------------------
+# Intentionally tracked
+# ------------------------------------------------------------
+#
+# Do NOT globally ignore these Joomla source locations:
+#
+# /components/
+# /administrator/components/
+# /modules/
+# /administrator/modules/
+# /plugins/
+# /templates/
+# /administrator/templates/
+# /media/
+# /libraries/
+# /language/
+# /administrator/language/
+#
+# Do NOT globally ignore:
+#
+# *.sql
+# *.xml
+# *.ini
+# *.min.js
+# *.min.css
+#
+# These files can be legitimate Joomla or extension source.
+```
+
+After copying the example into the project root as `.gitignore`, verify the critical paths:
+
+```bash
+git check-ignore -v configuration.php
+git check-ignore -v administrator/components/com_example/sql/updates/1.0.2.sql
+git check-ignore -v components/com_example/src/Service/ExampleService.php
+git status --ignored
+```
+
+For a custom extension, the expected behavior is:
+
+```text
+configuration.php                                      -> ignored
+cache/log/tmp files                                    -> ignored
+database dumps                                         -> ignored
+custom extension PHP source                            -> tracked
+custom extension manifest XML                          -> tracked
+custom extension install/update SQL                    -> tracked
+custom extension language files                        -> tracked
+uploaded media                                         -> tracked by default
+third-party extension source                           -> tracked by default
+```
+
+> [!TIP]
+> If a third-party extension later becomes fully reproducible through deployment automation, add its exact installed paths to the optional third-party section instead of ignoring broad Joomla directories.
