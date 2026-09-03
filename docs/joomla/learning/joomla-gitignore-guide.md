@@ -139,20 +139,20 @@ Custom extensions are application source code and should normally remain under v
 
 ### What to track
 
-For a custom component such as `com_honda`, Git should normally track:
+For a custom component such as `com_example`, Git should normally track:
 
 ```text
-components/com_honda/
-administrator/components/com_honda/
-media/com_honda/
-language/*/com_honda*.ini
-administrator/language/*/com_honda*.ini
+components/com_example/
+administrator/components/com_example/
+media/com_example/
+language/*/com_example*.ini
+administrator/language/*/com_example*.ini
 ```
 
 Inside the extension, track source files such as:
 
 ```text
-com_honda/
+com_example/
 ├── src/                              # PHP source
 ├── controllers/                      # Legacy controller source when applicable
 ├── models/                           # Legacy model source when applicable
@@ -164,7 +164,7 @@ com_honda/
 ├── language/                         # Translation source
 ├── media/                            # Source assets owned by the extension
 ├── tests/                            # Automated tests
-├── honda.xml                         # Extension manifest
+├── example.xml                         # Extension manifest
 ├── composer.json                     # Dependency definition
 ├── package.json                      # Frontend dependency definition
 ├── vite.config.*                     # Build configuration
@@ -178,37 +178,37 @@ Ignore only generated or local-only files.
 
 ```gitignore
 # Custom extension runtime files
-/components/com_honda/cache/
-/components/com_honda/tmp/
-/components/com_honda/logs/
-/administrator/components/com_honda/cache/
-/administrator/components/com_honda/tmp/
-/administrator/components/com_honda/logs/
+/components/com_example/cache/
+/components/com_example/tmp/
+/components/com_example/logs/
+/administrator/components/com_example/cache/
+/administrator/components/com_example/tmp/
+/administrator/components/com_example/logs/
 
 # Local configuration / secrets
-/components/com_honda/.env
-/components/com_honda/.env.*
-!/components/com_honda/.env.example
-/components/com_honda/config.local.php
+/components/com_example/.env
+/components/com_example/.env.*
+!/components/com_example/.env.example
+/components/com_example/config.local.php
 
 # Reproducible dependencies
-/components/com_honda/node_modules/
-/components/com_honda/vendor/
+/components/com_example/node_modules/
+/components/com_example/vendor/
 
 # Test output
-/components/com_honda/coverage/
-/components/com_honda/test-results/
+/components/com_example/coverage/
+/components/com_example/test-results/
 ```
 
 > [!WARNING]
-> Never add `/components/com_honda/` or `/administrator/components/com_honda/` to `.gitignore` if those directories contain the custom source that must be audited, migrated, or deployed.
+> Never add `/components/com_example/` or `/administrator/components/com_example/` to `.gitignore` if those directories contain the custom source that must be audited, migrated, or deployed.
 
 ### Custom modules and plugins
 
 The same principle applies to custom modules and plugins.
 
 ```text
-/modules/mod_newcars/                 -> Track
+/modules/mod_featureditems/                 -> Track
 /plugins/system/customrouter/         -> Track
 /plugins/content/customcontent/       -> Track
 ```
@@ -378,7 +378,7 @@ This is one of the most important Joomla-specific rules.
 Custom extensions commonly store schema source under paths such as:
 
 ```text
-administrator/components/com_honda/sql/
+administrator/components/com_example/sql/
 ├── install.mysql.utf8.sql
 ├── uninstall.mysql.utf8.sql
 └── updates/
@@ -625,11 +625,11 @@ A practical migration policy is:
 For custom migration-critical code such as:
 
 ```text
-/components/com_honda/
-/administrator/components/com_honda/
-/components/com_cars/
-/administrator/components/com_cars/
-/modules/mod_newcars/
+/components/com_example/
+/administrator/components/com_example/
+/components/com_catalog/
+/administrator/components/com_catalog/
+/modules/mod_featureditems/
 ```
 
 Git should keep the source visible so it can be searched, compared, ported, and reviewed.
@@ -1084,15 +1084,15 @@ Use extension-specific rules only after deciding that the extension should not b
 
 ```gitignore
 # Keep the custom component source, ignore only generated/local state
-/components/com_honda/cache/
-/components/com_honda/tmp/
-/components/com_honda/logs/
-/components/com_honda/node_modules/
-/components/com_honda/coverage/
+/components/com_example/cache/
+/components/com_example/tmp/
+/components/com_example/logs/
+/components/com_example/node_modules/
+/components/com_example/coverage/
 
-/administrator/components/com_honda/cache/
-/administrator/components/com_honda/tmp/
-/administrator/components/com_honda/logs/
+/administrator/components/com_example/cache/
+/administrator/components/com_example/tmp/
+/administrator/components/com_example/logs/
 ```
 
 ### Language files
@@ -1123,7 +1123,7 @@ git check-ignore -v path/to/file
 Example:
 
 ```bash
-git check-ignore -v administrator/components/com_honda/sql/updates/1.0.2.sql
+git check-ignore -v administrator/components/com_example/sql/updates/1.0.2.sql
 ```
 
 For a custom extension SQL source file, this command should normally return no ignore match.
@@ -1137,7 +1137,7 @@ git status --ignored
 ### Check whether a path is already tracked
 
 ```bash
-git ls-files components/com_honda
+git ls-files components/com_example
 ```
 
 ### Test multiple important paths
@@ -1146,8 +1146,8 @@ git ls-files components/com_honda
 git check-ignore -v \
   configuration.php \
   logs/error.php \
-  administrator/components/com_honda/sql/updates/1.0.2.sql \
-  components/com_honda/src/Service/ExampleService.php
+  administrator/components/com_example/sql/updates/1.0.2.sql \
+  components/com_example/src/Service/ExampleService.php
 ```
 
 Expected result:
